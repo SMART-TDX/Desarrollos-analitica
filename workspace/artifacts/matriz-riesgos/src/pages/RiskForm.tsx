@@ -1,22 +1,52 @@
 import { useState, useEffect } from "react";
 import { useLocation, useParams } from "wouter";
-import {
-  useGetRiesgo,
-  useCreateRiesgo,
-  useUpdateRiesgo,
-  useGetControles,
-  useAddControlToRiesgo,
-  useRemoveControlFromRiesgo,
-  useGetParametros,
-  getGetRiesgosQueryKey,
-  getGetRiesgoQueryKey,
-  getGetParametrosQueryKey,
-} from "@workspace/api-client-react";
 import { Button, Input, Label, Textarea, Card, CardContent, CardHeader, CardTitle, Badge } from "@/components/ui";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/table";
-import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ArrowLeft, Save, Plus, X, Search } from "lucide-react";
+
+// Claves de almacenamiento local
+const PARAMETROS_KEY = "laft_parametros_v1";
+const RIESGOS_KEY = "laft_riesgos_v1";
+const CONTROLES_KEY = "laft_controles_v1";
+
+// Datos por defecto si el localStorage está vacío
+const DEFAULT_PROCESOS = [
+  "GESTION ADMINISTRATIVA Y FINANCIERA",
+  "Gestión Académica",
+  "Gestión Comercial",
+  "Gestión Humana",
+  "Gestión Jurídica",
+  "Gestión de Tecnología",
+];
+
+const DEFAULT_SUBPROCESOS = [
+  "CARTERA",
+  "COMERCIAL-TELEMERCADEO-VENTAS",
+  "COMERCIAL-TELEMERCADEO-VENTAS-CORPORATIVO Y PERSONALIZADO-EXAMENES INTERNACIONALES-INSTITUTO-SMART ONLINE",
+  "COMPRAS",
+  "CONTABILIDAD",
+  "INSTITUTO",
+];
+
+const DEFAULT_FACTORES = [
+  "ALIADOS ESTRATÉGICOS",
+  "CANALES DE DISTRIBUCIÓN",
+  "Colaboradores",
+  "EMPLEADOS",
+  "ESTUDIANTES",
+  "PRODUCTOS Y SERVICIOS",
+  "PROVEEDORES",
+  "TECNOLÓGICO",
+];
+
+const DEFAULT_CONTROLES = [
+  { id: 1, codigo: "CTR-LAFT-01", descripcion: "Consulta en las listas para todas las personas...", clase: "PREVENTIVO", ponderacion: 0.425 },
+  { id: 2, codigo: "CTR-LAFT-02", descripcion: "Aceptacion de clausula SAGRILAFT sobre...", clase: "PREVENTIVO", ponderacion: 0.425 },
+  { id: 3, codigo: "CTR-LAFT-03", descripcion: "Aprobación por parte de gerencia para...", clase: "PREVENTIVO", ponderacion: 0.335 },
+  { id: 4, codigo: "CTR-LAFT-04", descripcion: "Chequeo de información pública en medios...", clase: "PREVENTIVO", ponderacion: 0.425 },
+  { id: 5, codigo: "CTR-LAFT-05", descripcion: "Validacion y causacion de recibos de caja...", clase: "DETECTIVO", ponderacion: 0.415 },
+];
 
 const PROB_LABELS: Record<number, string> = {
   1: "1 — Raro",
@@ -93,49 +123,109 @@ export default function RiskForm() {
   const params = useParams();
   const isNew = !params.id || params.id === "nuevo";
   const id = isNew ? null : parseInt(params.id!);
-  const queryClient = useQueryClient();
 
-  const { data: controlesDB = [] } = useGetControles();
-  const { data: parametros = [] } = useGetParametros({ query: { queryKey: getGetParametrosQueryKey() } });
-
-  const { data: riesgoDB, isLoading, refetch: refetchRiesgo } = useGetRiesgo(id!, {
-    query: { enabled: !!id, queryKey: getGetRiesgoQueryKey(id!) },
-  });
-
-  const createMutation = useCreateRiesgo();
-  const updateMutation = useUpdateRiesgo();
-  const addControlMutation = useAddControlToRiesgo();
-  const removeControlMutation = useRemoveControlFromRiesgo();
+  // Listas locales
+  const [procesos, setProcesos] = useState<string[]>([]);
+  const [subprocesos, setSubprocesos] = useState<string[]>([]);
+  const [factores, setFactores] = useState<string[]>([]);
+  const [controlesDB, setControlesDB] = useState<any[]>([]);
+  const [riesgosDB, setRiesgosDB] = useState<any[]>([]);
 
   const [formData, setFormData] = useState({
     codigo: "", proceso: "", subproceso: "", factorRiesgo: "", descripcion: "",
     riesgoLaft: false, riesgoOperativo: false, riesgoLegal: false, riesgoReputacional: false, riesgoContagio: false,
     quePuedeSuceder: "", tipologia: "", porQuePuedeSuceder: "", consecuencias: "",
     probabilidadInherente: 1, impactoInherente: 1,
-    tipoMonitoreo: "", responsableMonitoreo: "", periodicidadMonitoreo: "", prioridad: "", sugerencias: ""
+    tipoMonitoreo: "", responsableMonitoreo: "", periodicidadMonitoreo: "", prioridad: "", sugerencias: "",
+    controles: [] as any[]
   });
 
-  // Control search state
+  // Estado para la búsqueda de controles
   const [controlSearch, setControlSearch] = useState("");
   const [showControlList, setShowControlList] = useState(false);
 
+  // Cargar listas y datos al iniciar
   useEffect(() => {
-    if (riesgoDB && !isNew) {
-      setFormData({
-        codigo: riesgoDB.codigo || "", proceso: riesgoDB.proceso || "", subproceso: riesgoDB.subproceso || "",
-        factorRiesgo: riesgoDB.factorRiesgo || "", descripcion: riesgoDB.descripcion || "",
-        riesgoLaft: riesgoDB.riesgoLaft || false, riesgoOperativo: riesgoDB.riesgoOperativo || false,
-        riesgoLegal: riesgoDB.riesgoLegal || false, riesgoReputacional: riesgoDB.riesgoReputacional || false,
-        riesgoContagio: riesgoDB.riesgoContagio || false,
-        quePuedeSuceder: riesgoDB.quePuedeSuceder || "", tipologia: riesgoDB.tipologia || "",
-        porQuePuedeSuceder: riesgoDB.porQuePuedeSuceder || "", consecuencias: riesgoDB.consecuencias || "",
-        probabilidadInherente: riesgoDB.probabilidadInherente || 1, impactoInherente: riesgoDB.impactoInherente || 1,
-        tipoMonitoreo: riesgoDB.tipoMonitoreo || "", responsableMonitoreo: riesgoDB.responsableMonitoreo || "",
-        periodicidadMonitoreo: riesgoDB.periodicidadMonitoreo || "", prioridad: riesgoDB.prioridad || "",
-        sugerencias: riesgoDB.sugerencias || ""
-      });
+    // 1. Cargar Parámetros
+    const savedParametros = localStorage.getItem(PARAMETROS_KEY);
+    if (savedParametros) {
+      try {
+        const list: any[] = JSON.parse(savedParametros);
+        setProcesos(list.filter(p => p.categoria === "PROCESO").map(p => p.nombre));
+        setSubprocesos(list.filter(p => p.categoria === "SUBPROCESO").map(p => p.nombre));
+        setFactores(list.filter(p => p.categoria === "FACTOR_RIESGO").map(p => p.nombre));
+      } catch {
+        setProcesos(DEFAULT_PROCESOS);
+        setSubprocesos(DEFAULT_SUBPROCESOS);
+        setFactores(DEFAULT_FACTORES);
+      }
+    } else {
+      setProcesos(DEFAULT_PROCESOS);
+      setSubprocesos(DEFAULT_SUBPROCESOS);
+      setFactores(DEFAULT_FACTORES);
     }
-  }, [riesgoDB, isNew]);
+
+    // 2. Cargar Catálogo de Controles
+    const savedControles = localStorage.getItem(CONTROLES_KEY);
+    if (savedControles) {
+      try {
+        setControlesDB(JSON.parse(savedControles));
+      } catch {
+        setControlesDB(DEFAULT_CONTROLES);
+      }
+    } else {
+      setControlesDB(DEFAULT_CONTROLES);
+      localStorage.setItem(CONTROLES_KEY, JSON.stringify(DEFAULT_CONTROLES));
+    }
+
+    // 3. Cargar Riesgos
+    const savedRiesgos = localStorage.getItem(RIESGOS_KEY);
+    let currentRiesgos: any[] = [];
+    if (savedRiesgos) {
+      try {
+        currentRiesgos = JSON.parse(savedRiesgos);
+      } catch {
+        currentRiesgos = [];
+      }
+    }
+    setRiesgosDB(currentRiesgos);
+
+    // 4. Si se está editando un riesgo, poblar formData
+    if (!isNew && id) {
+      const found = currentRiesgos.find((r: any) => r.id === id);
+      if (found) {
+        setFormData({
+          codigo: found.codigo || "",
+          proceso: found.proceso || "",
+          subproceso: found.subproceso || "",
+          factorRiesgo: found.factorRiesgo || "",
+          descripcion: found.descripcion || "",
+          riesgoLaft: found.riesgoLaft || false,
+          riesgoOperativo: found.riesgoOperativo || false,
+          riesgoLegal: found.riesgoLegal || false,
+          riesgoReputacional: found.riesgoReputacional || false,
+          riesgoContagio: found.riesgoContagio || false,
+          quePuedeSuceder: found.quePuedeSuceder || "",
+          tipologia: found.tipologia || "",
+          porQuePuedeSuceder: found.porQuePuedeSuceder || "",
+          consecuencias: found.consecuencias || "",
+          probabilidadInherente: found.probabilidadInherente || 1,
+          impactoInherente: found.impactoInherente || 1,
+          tipoMonitoreo: found.tipoMonitoreo || "",
+          responsableMonitoreo: found.responsableMonitoreo || "",
+          periodicidadMonitoreo: found.periodicidadMonitoreo || "",
+          prioridad: found.prioridad || "",
+          sugerencias: found.sugerencias || "",
+          controles: found.controles || []
+        });
+      }
+    } else {
+      // Sugerencia de código para un nuevo riesgo
+      const nextNum = currentRiesgos.length + 1;
+      const codeStr = nextNum < 10 ? `00${nextNum}` : nextNum < 100 ? `0${nextNum}` : `${nextNum}`;
+      setFormData(prev => ({ ...prev, codigo: `R-LAFT${codeStr}` }));
+    }
+  }, [isNew, id]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
@@ -157,74 +247,80 @@ export default function RiskForm() {
       toast.error("Complete los campos obligatorios: Código, Proceso y Descripción");
       return;
     }
+
+    const savedRiesgos = localStorage.getItem(RIESGOS_KEY);
+    let currentRiesgos: any[] = savedRiesgos ? JSON.parse(savedRiesgos) : [];
+
     if (isNew) {
-      createMutation.mutate({ data: formData }, {
-        onSuccess: () => {
-          toast.success("Riesgo creado exitosamente");
-          queryClient.invalidateQueries({ queryKey: getGetRiesgosQueryKey() });
-          setLocation("/matriz");
-        },
-        onError: () => toast.error("Error al crear riesgo")
-      });
+      const newRisk = {
+        ...formData,
+        id: Date.now(),
+        fechaCreacion: new Date().toISOString().split("T")[0]
+      };
+      currentRiesgos.push(newRisk);
+      toast.success("Riesgo creado exitosamente");
     } else {
-      updateMutation.mutate({ id: id!, data: formData }, {
-        onSuccess: () => {
-          toast.success("Riesgo actualizado exitosamente");
-          queryClient.invalidateQueries({ queryKey: getGetRiesgosQueryKey() });
-          queryClient.invalidateQueries({ queryKey: getGetRiesgoQueryKey(id!) });
-          setLocation("/matriz");
-        },
-        onError: () => toast.error("Error al actualizar riesgo")
-      });
+      currentRiesgos = currentRiesgos.map((r: any) =>
+        r.id === id ? { ...r, ...formData } : r
+      );
+      toast.success("Riesgo actualizado exitosamente");
     }
+
+    localStorage.setItem(RIESGOS_KEY, JSON.stringify(currentRiesgos));
+    setLocation("/matriz");
   };
 
   const handleAddControl = (controlId: number) => {
-    if (!id) return;
-    addControlMutation.mutate({ riesgoId: id, data: { controlId, orden: (riesgoDB?.controles?.length ?? 0) + 1 } }, {
-      onSuccess: () => {
-        toast.success("Control añadido");
-        queryClient.invalidateQueries({ queryKey: getGetRiesgoQueryKey(id) });
-        refetchRiesgo();
-        setShowControlList(false);
-        setControlSearch("");
-      },
-      onError: () => toast.error("Error al añadir control"),
-    });
+    const controlObj = controlesDB.find(c => c.id === controlId);
+    if (!controlObj) return;
+
+    const newControlLink = {
+      controlId: controlObj.id,
+      control: controlObj
+    };
+
+    const updatedControles = [...formData.controles, newControlLink];
+    setFormData(prev => ({ ...prev, controles: updatedControles }));
+
+    // Si no es un riesgo nuevo, persistir de inmediato en localStorage
+    if (!isNew && id) {
+      const updatedRiesgos = riesgosDB.map((r: any) =>
+        r.id === id ? { ...r, controles: updatedControles } : r
+      );
+      setRiesgosDB(updatedRiesgos);
+      localStorage.setItem(RIESGOS_KEY, JSON.stringify(updatedRiesgos));
+    }
+
+    toast.success("Control añadido");
+    setShowControlList(false);
+    setControlSearch("");
   };
 
   const handleRemoveControl = (controlId: number) => {
-    if (!id) return;
-    removeControlMutation.mutate({ riesgoId: id, controlId }, {
-      onSuccess: () => {
-        toast.success("Control desvinculado");
-        queryClient.invalidateQueries({ queryKey: getGetRiesgoQueryKey(id) });
-        refetchRiesgo();
-      },
-      onError: () => toast.error("Error al eliminar control"),
-    });
+    const updatedControles = formData.controles.filter(rc => rc.controlId !== controlId);
+    setFormData(prev => ({ ...prev, controles: updatedControles }));
+
+    if (!isNew && id) {
+      const updatedRiesgos = riesgosDB.map((r: any) =>
+        r.id === id ? { ...r, controles: updatedControles } : r
+      );
+      setRiesgosDB(updatedRiesgos);
+      localStorage.setItem(RIESGOS_KEY, JSON.stringify(updatedRiesgos));
+    }
+
+    toast.success("Control desvinculado");
   };
 
-  // Get lists from parametros
-  const getList = (cat: string) =>
-    parametros.filter((p) => p.categoria === cat).map((p) => p.nombre);
-
-  const procesos = getList("PROCESO");
-  const subprocesos = getList("SUBPROCESO");
-  const factores = getList("FACTOR_RIESGO");
-
-  const linkedControlIds = new Set((riesgoDB?.controles ?? []).map((rc) => rc.controlId));
+  const linkedControlIds = new Set(formData.controles.map((rc: any) => rc.controlId));
   const availableControles = controlesDB.filter(
-    (c) =>
+    (c: any) =>
       !linkedControlIds.has(c.id) &&
       (controlSearch === "" ||
-        c.codigo.toLowerCase().includes(controlSearch.toLowerCase()) ||
-        c.descripcion.toLowerCase().includes(controlSearch.toLowerCase()))
+        c.codigo?.toLowerCase().includes(controlSearch.toLowerCase()) ||
+        c.descripcion?.toLowerCase().includes(controlSearch.toLowerCase()))
   );
 
   const perfilInherente = calcPerfil(formData.probabilidadInherente, formData.impactoInherente);
-
-  if (isLoading) return <div className="p-8">Cargando...</div>;
 
   return (
     <div className="flex-1 overflow-y-auto bg-background p-6">
@@ -239,7 +335,7 @@ export default function RiskForm() {
               <p className="text-muted-foreground text-sm">Información detallada para la matriz de riesgos</p>
             </div>
           </div>
-          <Button onClick={handleSave} className="gap-2" disabled={createMutation.isPending || updateMutation.isPending}>
+          <Button onClick={handleSave} className="gap-2">
             <Save className="w-4 h-4" /> Guardar Riesgo
           </Button>
         </div>
@@ -376,7 +472,7 @@ export default function RiskForm() {
                     {availableControles.length === 0 ? (
                       <p className="text-sm text-muted-foreground text-center py-3">Sin controles disponibles</p>
                     ) : (
-                      availableControles.map((c) => (
+                      availableControles.map((c: any) => (
                         <button
                           key={c.id}
                           onClick={() => handleAddControl(c.id)}
@@ -392,7 +488,7 @@ export default function RiskForm() {
                 </div>
               )}
 
-              {riesgoDB?.controles && riesgoDB.controles.length > 0 ? (
+              {formData.controles && formData.controles.length > 0 ? (
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -404,7 +500,7 @@ export default function RiskForm() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {riesgoDB.controles.map((rc) => (
+                    {formData.controles.map((rc: any) => (
                       <TableRow key={rc.controlId}>
                         <TableCell className="font-mono text-xs">{rc.control?.codigo}</TableCell>
                         <TableCell className="max-w-[280px] truncate">{rc.control?.descripcion}</TableCell>

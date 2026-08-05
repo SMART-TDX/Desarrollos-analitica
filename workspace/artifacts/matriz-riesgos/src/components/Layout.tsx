@@ -25,7 +25,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <div className="h-16 flex items-center px-6 border-b border-sidebar-border shrink-0">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded bg-primary flex items-center justify-center text-primary-foreground font-bold text-lg">
-              MR
+              
             </div>
             <span className="font-semibold text-lg tracking-tight">Matriz de Riesgos</span>
           </div>
