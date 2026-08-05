@@ -32,6 +32,8 @@ jobs:
           pnpm install --no-frozen-lockfile
 
       - name: Build frontend
+        env:
+          PORT: 5173
         run: |
           cd workspace/artifacts/matriz-riesgos
           pnpm build
