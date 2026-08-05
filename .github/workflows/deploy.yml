@@ -26,10 +26,14 @@ jobs:
         with:
           version: 8
 
-      - name: Install & Build
+      - name: Install workspace dependencies
+        run: |
+          cd workspace
+          pnpm install --no-frozen-lockfile
+
+      - name: Build frontend
         run: |
           cd workspace/artifacts/matriz-riesgos
-          pnpm install
           pnpm build
 
       - name: Upload artifact
