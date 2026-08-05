@@ -42,7 +42,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: 'workspace/artifacts/matriz-riesgos/dist'
+          path: 'workspace/artifacts/matriz-riesgos/dist/public'
 
   deploy:
     environment:
