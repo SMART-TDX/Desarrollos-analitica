@@ -1,0 +1,27 @@
+kind = "web"
+previewPath = "/"
+title = "Matriz de Riesgos LAFT"
+version = "1.0.0"
+id = "artifacts/matriz-riesgos"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 26064
+
+[services.development]
+run = "pnpm --filter @workspace/matriz-riesgos run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/matriz-riesgos", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/matriz-riesgos/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "26064"
+BASE_PATH = "/"

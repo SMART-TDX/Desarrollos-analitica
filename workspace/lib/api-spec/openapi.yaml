@@ -1,0 +1,1200 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: API for Matriz de Riesgos LAFT
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: riesgos
+    description: Risk management
+  - name: controles
+    description: Controls management
+  - name: monitoreo
+    description: Monitoring
+  - name: eventos
+    description: Risk events
+  - name: mediciones
+    description: Measurements and ratings
+  - name: parametros
+    description: System parameters
+  - name: dashboard
+    description: Dashboard summaries
+
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  # ── RIESGOS ──────────────────────────────────────────────────────────────────
+  /riesgos:
+    get:
+      operationId: getRiesgos
+      tags: [riesgos]
+      summary: List all risks
+      parameters:
+        - name: proceso
+          in: query
+          schema: { type: string }
+        - name: perfil
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: List of risks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Riesgo"
+    post:
+      operationId: createRiesgo
+      tags: [riesgos]
+      summary: Create a new risk
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RiesgoInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Riesgo"
+
+  /riesgos/{id}:
+    get:
+      operationId: getRiesgo
+      tags: [riesgos]
+      summary: Get a risk by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Risk detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RiesgoDetalle"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateRiesgo
+      tags: [riesgos]
+      summary: Update a risk
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RiesgoUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Riesgo"
+    delete:
+      operationId: deleteRiesgo
+      tags: [riesgos]
+      summary: Delete a risk
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "204":
+          description: Deleted
+
+  # ── CONTROLES ─────────────────────────────────────────────────────────────────
+  /controles:
+    get:
+      operationId: getControles
+      tags: [controles]
+      summary: List all controls
+      responses:
+        "200":
+          description: List of controls
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Control"
+    post:
+      operationId: createControl
+      tags: [controles]
+      summary: Create a new control
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ControlInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Control"
+
+  /controles/{id}:
+    get:
+      operationId: getControl
+      tags: [controles]
+      summary: Get a control by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Control detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Control"
+    patch:
+      operationId: updateControl
+      tags: [controles]
+      summary: Update a control
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ControlUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Control"
+    delete:
+      operationId: deleteControl
+      tags: [controles]
+      summary: Delete a control
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "204":
+          description: Deleted
+
+  # Risk–Control associations
+  /riesgos/{riesgoId}/controles:
+    get:
+      operationId: getRiesgoControles
+      tags: [controles]
+      summary: Get controls for a specific risk
+      parameters:
+        - name: riesgoId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Controls for the risk
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RiesgoControlDetalle"
+    post:
+      operationId: addControlToRiesgo
+      tags: [controles]
+      summary: Associate a control with a risk
+      parameters:
+        - name: riesgoId
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RiesgoControlInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RiesgoControlDetalle"
+
+  /riesgos/{riesgoId}/controles/{controlId}:
+    delete:
+      operationId: removeControlFromRiesgo
+      tags: [controles]
+      summary: Remove a control from a risk
+      parameters:
+        - name: riesgoId
+          in: path
+          required: true
+          schema: { type: integer }
+        - name: controlId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "204":
+          description: Deleted
+
+  # ── MONITOREO ─────────────────────────────────────────────────────────────────
+  /monitoreo:
+    get:
+      operationId: getMonitoreos
+      tags: [monitoreo]
+      summary: List all monitoring records
+      responses:
+        "200":
+          description: List of monitoring records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Monitoreo"
+    post:
+      operationId: createMonitoreo
+      tags: [monitoreo]
+      summary: Create a monitoring record
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MonitoreoInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Monitoreo"
+
+  /monitoreo/{id}:
+    patch:
+      operationId: updateMonitoreo
+      tags: [monitoreo]
+      summary: Update a monitoring record
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MonitoreoUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Monitoreo"
+    delete:
+      operationId: deleteMonitoreo
+      tags: [monitoreo]
+      summary: Delete a monitoring record
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "204":
+          description: Deleted
+
+  # ── EVENTOS RIESGO ────────────────────────────────────────────────────────────
+  /eventos:
+    get:
+      operationId: getEventos
+      tags: [eventos]
+      summary: List risk events
+      responses:
+        "200":
+          description: List of events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EventoRiesgo"
+    post:
+      operationId: createEvento
+      tags: [eventos]
+      summary: Create a risk event
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EventoRiesgoInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventoRiesgo"
+
+  /eventos/{id}:
+    patch:
+      operationId: updateEvento
+      tags: [eventos]
+      summary: Update a risk event
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EventoRiesgoUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventoRiesgo"
+    delete:
+      operationId: deleteEvento
+      tags: [eventos]
+      summary: Delete a risk event
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "204":
+          description: Deleted
+
+  # ── EVENTOS SAGRILAF ──────────────────────────────────────────────────────────
+  /eventos-sagrilaf:
+    get:
+      operationId: getEventosSagrilaf
+      tags: [eventos]
+      summary: List SAGRILAF events
+      responses:
+        "200":
+          description: List of SAGRILAF events
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EventoSagrilaf"
+    post:
+      operationId: createEventoSagrilaf
+      tags: [eventos]
+      summary: Create a SAGRILAF event
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EventoSagrilafInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventoSagrilaf"
+
+  /eventos-sagrilaf/{id}:
+    patch:
+      operationId: updateEventoSagrilaf
+      tags: [eventos]
+      summary: Update a SAGRILAF event
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EventoSagrilafUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventoSagrilaf"
+    delete:
+      operationId: deleteEventoSagrilaf
+      tags: [eventos]
+      summary: Delete a SAGRILAF event
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "204":
+          description: Deleted
+
+  # ── MEDICIONES ────────────────────────────────────────────────────────────────
+  /mediciones:
+    get:
+      operationId: getMediciones
+      tags: [mediciones]
+      summary: List all measurement sessions
+      responses:
+        "200":
+          description: List of measurement sessions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Medicion"
+    post:
+      operationId: createMedicion
+      tags: [mediciones]
+      summary: Create a measurement session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MedicionInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Medicion"
+
+  /mediciones/{id}:
+    patch:
+      operationId: updateMedicion
+      tags: [mediciones]
+      summary: Update a measurement session
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MedicionUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Medicion"
+
+  /mediciones/{id}/calificaciones:
+    get:
+      operationId: getMedicionCalificaciones
+      tags: [mediciones]
+      summary: Get individual risk ratings for a measurement session
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Rating details
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CalificacionRiesgo"
+    post:
+      operationId: upsertCalificacion
+      tags: [mediciones]
+      summary: Upsert a risk rating in a measurement session
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CalificacionInput"
+      responses:
+        "200":
+          description: Upserted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CalificacionRiesgo"
+
+  # ── PARÁMETROS ────────────────────────────────────────────────────────────────
+  /parametros:
+    get:
+      operationId: getParametros
+      tags: [parametros]
+      summary: Get all parameters (control weights)
+      responses:
+        "200":
+          description: List of parameters
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Parametro"
+    post:
+      operationId: createParametro
+      tags: [parametros]
+      summary: Create a parameter
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ParametroInput"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Parametro"
+
+  /parametros/{id}:
+    patch:
+      operationId: updateParametro
+      tags: [parametros]
+      summary: Update a parameter
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ParametroUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Parametro"
+
+  # ── DASHBOARD / WOW ENDPOINTS ─────────────────────────────────────────────────
+  /dashboard/resumen:
+    get:
+      operationId: getDashboardResumen
+      tags: [dashboard]
+      summary: Summary counts and risk breakdown
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardResumen"
+
+  /dashboard/mapa-calor:
+    get:
+      operationId: getMapaCalor
+      tags: [dashboard]
+      summary: Heat map data for inherent and residual risk
+      responses:
+        "200":
+          description: Heat map data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MapaCalor"
+
+  /dashboard/cal:
+    get:
+      operationId: getCalConsolidado
+      tags: [dashboard]
+      summary: CAL sheet - consolidated risk ratings (inherent and residual per risk)
+      responses:
+        "200":
+          description: Consolidated ratings
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CalEntry"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status: { type: string }
+      required: [status]
+
+    # ── RIESGO ────────────────────────────────────────────────────────────────
+    Riesgo:
+      type: object
+      required:
+        - id
+        - codigo
+        - proceso
+        - descripcion
+        - perfilInherente
+        - perfilResidual
+        - createdAt
+        - updatedAt
+      properties:
+        id: { type: integer }
+        codigo: { type: string }
+        proceso: { type: string }
+        subproceso: { type: ["string", "null"] }
+        factorRiesgo: { type: ["string", "null"] }
+        descripcion: { type: string }
+        riesgoLaft: { type: boolean }
+        riesgoOperativo: { type: boolean }
+        riesgoLegal: { type: boolean }
+        riesgoReputacional: { type: boolean }
+        riesgoContagio: { type: boolean }
+        quePuedeSuceder: { type: ["string", "null"] }
+        tipologia: { type: ["string", "null"] }
+        porQuePuedeSuceder: { type: ["string", "null"] }
+        consecuencias: { type: ["string", "null"] }
+        probabilidadInherente: { type: ["number", "null"] }
+        impactoInherente: { type: ["number", "null"] }
+        perfilInherente: { type: string }
+        probabilidadResidual: { type: ["number", "null"] }
+        impactoResidual: { type: ["number", "null"] }
+        perfilResidual: { type: string }
+        promedioEfectividad: { type: ["number", "null"] }
+        tipoMonitoreo: { type: ["string", "null"] }
+        responsableMonitoreo: { type: ["string", "null"] }
+        periodicidadMonitoreo: { type: ["string", "null"] }
+        prioridad: { type: ["string", "null"] }
+        sugerencias: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    RiesgoInput:
+      type: object
+      required: [codigo, proceso, descripcion]
+      properties:
+        codigo: { type: string }
+        proceso: { type: string }
+        subproceso: { type: string }
+        factorRiesgo: { type: string }
+        descripcion: { type: string }
+        riesgoLaft: { type: boolean }
+        riesgoOperativo: { type: boolean }
+        riesgoLegal: { type: boolean }
+        riesgoReputacional: { type: boolean }
+        riesgoContagio: { type: boolean }
+        quePuedeSuceder: { type: string }
+        tipologia: { type: string }
+        porQuePuedeSuceder: { type: string }
+        consecuencias: { type: string }
+        probabilidadInherente: { type: number }
+        impactoInherente: { type: number }
+        probabilidadResidual: { type: number }
+        impactoResidual: { type: number }
+        tipoMonitoreo: { type: string }
+        responsableMonitoreo: { type: string }
+        periodicidadMonitoreo: { type: string }
+        prioridad: { type: string }
+        sugerencias: { type: string }
+
+    RiesgoUpdate:
+      type: object
+      properties:
+        codigo: { type: string }
+        proceso: { type: string }
+        subproceso: { type: string }
+        factorRiesgo: { type: string }
+        descripcion: { type: string }
+        riesgoLaft: { type: boolean }
+        riesgoOperativo: { type: boolean }
+        riesgoLegal: { type: boolean }
+        riesgoReputacional: { type: boolean }
+        riesgoContagio: { type: boolean }
+        quePuedeSuceder: { type: string }
+        tipologia: { type: string }
+        porQuePuedeSuceder: { type: string }
+        consecuencias: { type: string }
+        probabilidadInherente: { type: number }
+        impactoInherente: { type: number }
+        probabilidadResidual: { type: number }
+        impactoResidual: { type: number }
+        tipoMonitoreo: { type: string }
+        responsableMonitoreo: { type: string }
+        periodicidadMonitoreo: { type: string }
+        prioridad: { type: string }
+        sugerencias: { type: string }
+
+    RiesgoDetalle:
+      allOf:
+        - $ref: "#/components/schemas/Riesgo"
+        - type: object
+          properties:
+            controles:
+              type: array
+              items:
+                $ref: "#/components/schemas/RiesgoControlDetalle"
+            monitoreos:
+              type: array
+              items:
+                $ref: "#/components/schemas/Monitoreo"
+
+    # ── CONTROL ───────────────────────────────────────────────────────────────
+    Control:
+      type: object
+      required: [id, codigo, descripcion, clase, tipo, frecuencia, formalidad, ponderacion, createdAt, updatedAt]
+      properties:
+        id: { type: integer }
+        codigo: { type: string }
+        descripcion: { type: string }
+        clase: { type: string }
+        pesoClase: { type: ["number", "null"] }
+        tipo: { type: string }
+        pesoTipo: { type: ["number", "null"] }
+        frecuencia: { type: string }
+        pesoFrecuencia: { type: ["number", "null"] }
+        formalidad: { type: string }
+        pesoFormalidad: { type: ["number", "null"] }
+        soporte: { type: ["string", "null"] }
+        responsable: { type: ["string", "null"] }
+        ponderacion: { type: number }
+        areas:
+          type: array
+          items: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    ControlInput:
+      type: object
+      required: [codigo, descripcion, clase, tipo, frecuencia, formalidad]
+      properties:
+        codigo: { type: string }
+        descripcion: { type: string }
+        clase: { type: string }
+        pesoClase: { type: number }
+        tipo: { type: string }
+        pesoTipo: { type: number }
+        frecuencia: { type: string }
+        pesoFrecuencia: { type: number }
+        formalidad: { type: string }
+        pesoFormalidad: { type: number }
+        soporte: { type: string }
+        responsable: { type: string }
+        ponderacion: { type: number }
+        areas:
+          type: array
+          items: { type: string }
+
+    ControlUpdate:
+      type: object
+      properties:
+        codigo: { type: string }
+        descripcion: { type: string }
+        clase: { type: string }
+        pesoClase: { type: number }
+        tipo: { type: string }
+        pesoTipo: { type: number }
+        frecuencia: { type: string }
+        pesoFrecuencia: { type: number }
+        formalidad: { type: string }
+        pesoFormalidad: { type: number }
+        soporte: { type: string }
+        responsable: { type: string }
+        ponderacion: { type: number }
+        areas:
+          type: array
+          items: { type: string }
+
+    RiesgoControlInput:
+      type: object
+      required: [controlId]
+      properties:
+        controlId: { type: integer }
+        orden: { type: integer }
+
+    RiesgoControlDetalle:
+      type: object
+      required: [controlId, riesgoId, orden]
+      properties:
+        controlId: { type: integer }
+        riesgoId: { type: integer }
+        orden: { type: integer }
+        control:
+          $ref: "#/components/schemas/Control"
+
+    # ── MONITOREO ─────────────────────────────────────────────────────────────
+    Monitoreo:
+      type: object
+      required: [id, codigo, aspectoMonitorear, riesgoId, createdAt, updatedAt]
+      properties:
+        id: { type: integer }
+        codigo: { type: string }
+        aspectoMonitorear: { type: string }
+        indicador: { type: ["string", "null"] }
+        periodicidad: { type: ["string", "null"] }
+        responsable: { type: ["string", "null"] }
+        riesgoId: { type: ["integer", "null"] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    MonitoreoInput:
+      type: object
+      required: [codigo, aspectoMonitorear]
+      properties:
+        codigo: { type: string }
+        aspectoMonitorear: { type: string }
+        indicador: { type: string }
+        periodicidad: { type: string }
+        responsable: { type: string }
+        riesgoId: { type: integer }
+
+    MonitoreoUpdate:
+      type: object
+      properties:
+        codigo: { type: string }
+        aspectoMonitorear: { type: string }
+        indicador: { type: string }
+        periodicidad: { type: string }
+        responsable: { type: string }
+        riesgoId: { type: integer }
+
+    # ── EVENTO RIESGO ─────────────────────────────────────────────────────────
+    EventoRiesgo:
+      type: object
+      required: [id, codigoEvento, tipoEvento, descripcion, probabilidad, impacto, nivelEvento, createdAt, updatedAt]
+      properties:
+        id: { type: integer }
+        fechaEvento: { type: ["string", "null"], format: date }
+        codigoEvento: { type: string }
+        tipoEvento: { type: string }
+        descripcion: { type: string }
+        tipoIncidencia: { type: ["string", "null"] }
+        probabilidad: { type: number }
+        impacto: { type: number }
+        nivelEvento: { type: number }
+        riesgoId: { type: ["integer", "null"] }
+        codigoRiesgo: { type: ["string", "null"] }
+        estado: { type: ["string", "null"] }
+        controles:
+          type: array
+          items: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    EventoRiesgoInput:
+      type: object
+      required: [codigoEvento, tipoEvento, descripcion, probabilidad, impacto]
+      properties:
+        fechaEvento: { type: string, format: date }
+        codigoEvento: { type: string }
+        tipoEvento: { type: string }
+        descripcion: { type: string }
+        tipoIncidencia: { type: string }
+        probabilidad: { type: number }
+        impacto: { type: number }
+        riesgoId: { type: integer }
+        estado: { type: string }
+        controles:
+          type: array
+          items: { type: string }
+
+    EventoRiesgoUpdate:
+      type: object
+      properties:
+        fechaEvento: { type: string, format: date }
+        codigoEvento: { type: string }
+        tipoEvento: { type: string }
+        descripcion: { type: string }
+        tipoIncidencia: { type: string }
+        probabilidad: { type: number }
+        impacto: { type: number }
+        riesgoId: { type: integer }
+        estado: { type: string }
+        controles:
+          type: array
+          items: { type: string }
+
+    # ── EVENTO SAGRILAF ───────────────────────────────────────────────────────
+    EventoSagrilaf:
+      type: object
+      required: [id, codigo, tipo, factor, etapa, evento, probabilidad, impacto, nivel, createdAt, updatedAt]
+      properties:
+        id: { type: integer }
+        codigo: { type: string }
+        tipo: { type: string }
+        factor: { type: string }
+        etapa: { type: string }
+        evento: { type: string }
+        probabilidad: { type: number }
+        impacto: { type: number }
+        nivel: { type: number }
+        apetito: { type: ["number", "null"] }
+        brecha: { type: ["number", "null"] }
+        estado: { type: ["string", "null"] }
+        efectividadControl: { type: ["number", "null"] }
+        controlesTipicos: { type: ["string", "null"] }
+        fechaCreacion: { type: string, format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    EventoSagrilafInput:
+      type: object
+      required: [codigo, tipo, factor, etapa, evento, probabilidad, impacto]
+      properties:
+        codigo: { type: string }
+        tipo: { type: string }
+        factor: { type: string }
+        etapa: { type: string }
+        evento: { type: string }
+        probabilidad: { type: number }
+        impacto: { type: number }
+        nivel: { type: number }
+        apetito: { type: number }
+        brecha: { type: number }
+        estado: { type: string }
+        efectividadControl: { type: number }
+        controlesTipicos: { type: string }
+
+    EventoSagrilafUpdate:
+      type: object
+      properties:
+        codigo: { type: string }
+        tipo: { type: string }
+        factor: { type: string }
+        etapa: { type: string }
+        evento: { type: string }
+        probabilidad: { type: number }
+        impacto: { type: number }
+        nivel: { type: number }
+        apetito: { type: number }
+        brecha: { type: number }
+        estado: { type: string }
+        efectividadControl: { type: number }
+        controlesTipicos: { type: string }
+
+    # ── MEDICION ──────────────────────────────────────────────────────────────
+    Medicion:
+      type: object
+      required: [id, nombre, tipo, fechaMedicion, numParticipantes, createdAt]
+      properties:
+        id: { type: integer }
+        nombre: { type: string }
+        tipo: { type: string }
+        fechaMedicion: { type: string, format: date }
+        numParticipantes: { type: integer }
+        rangoMaximoApetito: { type: ["number", "null"] }
+        createdAt: { type: string, format: date-time }
+
+    MedicionInput:
+      type: object
+      required: [nombre, tipo, fechaMedicion]
+      properties:
+        nombre: { type: string }
+        tipo: { type: string }
+        fechaMedicion: { type: string, format: date }
+        numParticipantes: { type: integer }
+        rangoMaximoApetito: { type: number }
+
+    MedicionUpdate:
+      type: object
+      properties:
+        nombre: { type: string }
+        tipo: { type: string }
+        fechaMedicion: { type: string, format: date }
+        numParticipantes: { type: integer }
+        rangoMaximoApetito: { type: number }
+
+    CalificacionRiesgo:
+      type: object
+      required: [id, medicionId, riesgoId, probabilidad, impacto, resultado, calificacion]
+      properties:
+        id: { type: integer }
+        medicionId: { type: integer }
+        riesgoId: { type: integer }
+        codigoRiesgo: { type: string }
+        descripcionRiesgo: { type: string }
+        probabilidad: { type: number }
+        impacto: { type: number }
+        resultado: { type: number }
+        calificacion: { type: string }
+        tipoCalificacion: { type: string }
+
+    CalificacionInput:
+      type: object
+      required: [riesgoId, probabilidad, impacto, tipoCalificacion]
+      properties:
+        riesgoId: { type: integer }
+        probabilidad: { type: number }
+        impacto: { type: number }
+        tipoCalificacion: { type: string }
+
+    # ── PARÁMETRO ─────────────────────────────────────────────────────────────
+    Parametro:
+      type: object
+      required: [id, categoria, nombre, valor, createdAt]
+      properties:
+        id: { type: integer }
+        categoria: { type: string }
+        nombre: { type: string }
+        valor: { type: number }
+        descripcion: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+
+    ParametroInput:
+      type: object
+      required: [categoria, nombre, valor]
+      properties:
+        categoria: { type: string }
+        nombre: { type: string }
+        valor: { type: number }
+        descripcion: { type: string }
+
+    ParametroUpdate:
+      type: object
+      properties:
+        categoria: { type: string }
+        nombre: { type: string }
+        valor: { type: number }
+        descripcion: { type: string }
+
+    # ── DASHBOARD ─────────────────────────────────────────────────────────────
+    DashboardResumen:
+      type: object
+      required:
+        - totalRiesgos
+        - totalControles
+        - riesgosPorPerfil
+        - riesgosPorProceso
+        - controlesActivos
+        - eventosPorEstado
+      properties:
+        totalRiesgos: { type: integer }
+        totalControles: { type: integer }
+        controlesActivos: { type: integer }
+        riesgosPorPerfil:
+          type: array
+          items:
+            type: object
+            required: [perfil, count]
+            properties:
+              perfil: { type: string }
+              count: { type: integer }
+        riesgosPorProceso:
+          type: array
+          items:
+            type: object
+            required: [proceso, count]
+            properties:
+              proceso: { type: string }
+              count: { type: integer }
+        eventosPorEstado:
+          type: array
+          items:
+            type: object
+            required: [estado, count]
+            properties:
+              estado: { type: string }
+              count: { type: integer }
+
+    MapaCalor:
+      type: object
+      required: [inherente, residual]
+      properties:
+        inherente:
+          type: array
+          items:
+            $ref: "#/components/schemas/MapaCalorItem"
+        residual:
+          type: array
+          items:
+            $ref: "#/components/schemas/MapaCalorItem"
+
+    MapaCalorItem:
+      type: object
+      required: [riesgoId, codigo, descripcion, probabilidad, impacto, perfil]
+      properties:
+        riesgoId: { type: integer }
+        codigo: { type: string }
+        descripcion: { type: string }
+        probabilidad: { type: number }
+        impacto: { type: number }
+        perfil: { type: string }
+
+    CalEntry:
+      type: object
+      required: [riesgoId, codigo, descripcion]
+      properties:
+        riesgoId: { type: integer }
+        codigo: { type: string }
+        descripcion: { type: string }
+        probInherente: { type: ["number", "null"] }
+        impactoInherente: { type: ["number", "null"] }
+        probResidual: { type: ["number", "null"] }
+        impactoResidual: { type: ["number", "null"] }
+        perfilInherente: { type: string }
+        perfilResidual: { type: string }
