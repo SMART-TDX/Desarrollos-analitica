@@ -27,7 +27,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <div className="w-8 h-8 rounded bg-primary flex items-center justify-center text-primary-foreground font-bold text-lg">
               MR
             </div>
-            <span className="font-semibold text-lg tracking-tight">Matriz LAFT</span>
+            <span className="font-semibold text-lg tracking-tight">Matriz de Riesgos</span>
           </div>
         </div>
         <nav className="flex-1 overflow-y-auto py-4 px-3 flex flex-col gap-1">
@@ -50,7 +50,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           })}
         </nav>
         <div className="p-4 border-t border-sidebar-border shrink-0 text-xs text-sidebar-foreground/50">
-          Matriz de Riesgos LAFT v1.0
+          Matriz de Riesgos
         </div>
       </aside>
       <main className="flex-1 flex flex-col min-w-0 bg-background overflow-hidden">

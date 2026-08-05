@@ -236,7 +236,7 @@ export default function RiskForm() {
             </Button>
             <div>
               <h1 className="text-2xl font-bold">{isNew ? "Nuevo Riesgo" : `Editar Riesgo ${formData.codigo}`}</h1>
-              <p className="text-muted-foreground text-sm">Información detallada para la matriz LAFT</p>
+              <p className="text-muted-foreground text-sm">Información detallada para la matriz de riesgos</p>
             </div>
           </div>
           <Button onClick={handleSave} className="gap-2" disabled={createMutation.isPending || updateMutation.isPending}>
