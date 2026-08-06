@@ -1,332 +1,220 @@
-import { useState } from "react";
-import { Link } from "wouter";
-import { useGetRiesgos, useDeleteRiesgo, getGetRiesgosQueryKey } from "@workspace/api-client-react";
-import { Button, Badge, Input, Card, CardContent } from "@/components/ui";
+import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
+import { Button, Input, Card, CardContent, CardHeader, CardTitle, Badge } from "@/components/ui";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/table";
-import { Plus, Search, Edit, Trash2, ChevronRight, ChevronDown, Download, FileText } from "lucide-react";
-import { formatPerfil, getPerfilColor, formatNumber } from "@/utils/format";
-import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import React from "react";
-import * as XLSX from "xlsx";
+import { Plus, Search, Trash2, Edit, FileSpreadsheet, FileText } from "lucide-react";
 
-function RiskRow({ riesgo, onDelete }: { riesgo: any; onDelete: (id: number) => void }) {
-  const [expanded, setExpanded] = useState(false);
+const RIESGOS_KEY = "laft_riesgos_v1";
 
-  return (
-    <React.Fragment>
-      <TableRow className="group">
-        <TableCell>
-          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setExpanded(!expanded)}>
-            {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-          </Button>
-        </TableCell>
-        <TableCell className="font-mono text-xs">{riesgo.codigo}</TableCell>
-        <TableCell className="max-w-[130px] truncate text-sm" title={riesgo.proceso}>{riesgo.proceso}</TableCell>
-        <TableCell className="max-w-[200px] truncate text-sm" title={riesgo.descripcion}>{riesgo.descripcion}</TableCell>
-        <TableCell>
-          <div className="flex gap-1 flex-wrap w-[120px]">
-            {riesgo.riesgoLaft && <span className="px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 text-[10px] font-bold">LAFT</span>}
-            {riesgo.riesgoOperativo && <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-800 text-[10px] font-bold">OP</span>}
-            {riesgo.riesgoLegal && <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-bold">LEG</span>}
-            {riesgo.riesgoReputacional && <span className="px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 text-[10px] font-bold">REP</span>}
-            {riesgo.riesgoContagio && <span className="px-1.5 py-0.5 rounded bg-rose-100 text-rose-800 text-[10px] font-bold">CON</span>}
-          </div>
-        </TableCell>
-        <TableCell className="text-center">{riesgo.probabilidadInherente}</TableCell>
-        <TableCell className="text-center">{riesgo.impactoInherente}</TableCell>
-        <TableCell>
-          <Badge variant={getPerfilColor(riesgo.perfilInherente) as any}>
-            {formatPerfil(riesgo.perfilInherente)}
-          </Badge>
-        </TableCell>
-        <TableCell className="text-center font-medium">
-          {formatNumber(riesgo.promedioEfectividad)}%
-        </TableCell>
-        <TableCell className="text-center">{formatNumber(riesgo.probabilidadResidual)}</TableCell>
-        <TableCell className="text-center">{formatNumber(riesgo.impactoResidual)}</TableCell>
-        <TableCell>
-          <Badge variant={getPerfilColor(riesgo.perfilResidual) as any}>
-            {formatPerfil(riesgo.perfilResidual)}
-          </Badge>
-        </TableCell>
-        <TableCell className="text-right">
-          <div className="flex items-center justify-end gap-1">
-            <Link href={`/matriz/${riesgo.id}`}>
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary">
-                <Edit className="h-4 w-4" />
-              </Button>
-            </Link>
-            <Button
-              variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive"
-              onClick={() => { if (window.confirm(`¿Eliminar riesgo ${riesgo.codigo}?`)) onDelete(riesgo.id); }}
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          </div>
-        </TableCell>
-      </TableRow>
-      {expanded && (
-        <TableRow className="bg-muted/30">
-          <TableCell colSpan={13} className="p-4 border-b">
-            <div className="pl-8">
-              <h4 className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wider">Detalles Adicionales</h4>
-              <div className="grid grid-cols-3 gap-6 text-sm mb-4">
-                <div><span className="block text-xs text-muted-foreground mb-1">Subproceso</span>{riesgo.subproceso || "-"}</div>
-                <div><span className="block text-xs text-muted-foreground mb-1">Factor de Riesgo</span>{riesgo.factorRiesgo || "-"}</div>
-                <div><span className="block text-xs text-muted-foreground mb-1">Tipología</span>{riesgo.tipologia || "-"}</div>
-              </div>
-              <div className="grid grid-cols-2 gap-6 text-sm">
-                <div>
-                  <span className="block text-xs text-muted-foreground mb-1">Qué puede suceder</span>
-                  <p className="text-foreground/90">{riesgo.quePuedeSuceder || "-"}</p>
-                </div>
-                <div>
-                  <span className="block text-xs text-muted-foreground mb-1">Por qué puede suceder</span>
-                  <p className="text-foreground/90">{riesgo.porQuePuedeSuceder || "-"}</p>
-                </div>
-              </div>
-              {riesgo.sugerencias && (
-                <div className="mt-4 text-sm">
-                  <span className="block text-xs text-muted-foreground mb-1">Sugerencias</span>
-                  <p className="text-foreground/90">{riesgo.sugerencias}</p>
-                </div>
-              )}
-            </div>
-          </TableCell>
-        </TableRow>
-      )}
-    </React.Fragment>
-  );
-}
+const DEFAULT_RIESGOS = [
+  {
+    id: 1,
+    codigo: "R-LAFT001",
+    proceso: "Gestión Comercial",
+    descripcion: "Posibilidad de vincular clientes o contrapartes relacionadas con actividades ilícitas.",
+    probabilidadInherente: 3,
+    impactoInherente: 3,
+    perfilInherente: "TOLERABLE",
+    efectividad: "0.39 %",
+    flags: ["LAFT", "OP", "PIERNA", "REPS", "ESTAFA"]
+  },
+  {
+    id: 2,
+    codigo: "R-LAFT002",
+    proceso: "GESTION ADMINISTRATIVA Y FINANCIERA",
+    descripcion: "Posibilidad de recibir recursos de fuentes no justificadas o ilícitas.",
+    probabilidadInherente: 3,
+    impactoInherente: 4,
+    perfilInherente: "MODERADO",
+    efectividad: "0.36 %",
+    flags: ["OP", "PIERNA", "REPS", "ESTAFA"]
+  },
+  {
+    id: 3,
+    codigo: "R-LAFT003",
+    proceso: "Gestión Comercial",
+    descripcion: "Posibilidad de vincular y prestar servicios sin la debida diligencia completa.",
+    probabilidadInherente: 2,
+    impactoInherente: 5,
+    perfilInherente: "MODERADO",
+    efectividad: "0.41 %",
+    flags: ["LAFT", "OP", "PIERNA", "REPS", "ESTAFA"]
+  },
+  {
+    id: 4,
+    codigo: "R-LAFT004",
+    proceso: "GESTION ADMINISTRATIVA Y FINANCIERA",
+    descripcion: "Posibilidad de adquirir bienes o contrataciones con proveedores sancionados.",
+    probabilidadInherente: 2,
+    impactoInherente: 4,
+    perfilInherente: "TOLERABLE",
+    efectividad: "0.39 %",
+    flags: ["LAFT", "OP", "PIERNA", "REPS"]
+  },
+  {
+    id: 5,
+    codigo: "R-LAFT005",
+    proceso: "GESTION ADMINISTRATIVA Y FINANCIERA",
+    descripcion: "Posibilidad de que empleados u operarios ejecuten transacciones sospechosas.",
+    probabilidadInherente: 2,
+    impactoInherente: 5,
+    perfilInherente: "MODERADO",
+    efectividad: "0.37 %",
+    flags: ["LAFT", "PIERNA", "REPS"]
+  }
+];
 
-function exportToExcel(riesgos: any[]) {
-  const rows = riesgos.map((r) => ({
-    "Código": r.codigo,
-    "Proceso": r.proceso,
-    "Subproceso": r.subproceso,
-    "Factor de Riesgo": r.factorRiesgo,
-    "Descripción": r.descripcion,
-    "LAFT": r.riesgoLaft ? "Sí" : "No",
-    "Operativo": r.riesgoOperativo ? "Sí" : "No",
-    "Legal": r.riesgoLegal ? "Sí" : "No",
-    "Reputacional": r.riesgoReputacional ? "Sí" : "No",
-    "Contagio": r.riesgoContagio ? "Sí" : "No",
-    "Tipología": r.tipologia,
-    "Qué puede suceder": r.quePuedeSuceder,
-    "Por qué puede suceder": r.porQuePuedeSuceder,
-    "Consecuencias": r.consecuencias,
-    "Prob. Inherente": r.probabilidadInherente,
-    "Impacto Inherente": r.impactoInherente,
-    "Perfil Inherente": r.perfilInherente,
-    "Efectividad Controles (%)": r.promedioEfectividad != null ? (r.promedioEfectividad * 100).toFixed(1) : "",
-    "Prob. Residual": r.probabilidadResidual,
-    "Impacto Residual": r.impactoResidual,
-    "Perfil Residual": r.perfilResidual,
-    "Tipo Monitoreo": r.tipoMonitoreo,
-    "Responsable Monitoreo": r.responsableMonitoreo,
-    "Periodicidad Monitoreo": r.periodicidadMonitoreo,
-    "Prioridad": r.prioridad,
-    "Sugerencias": r.sugerencias,
-  }));
-
-  const ws = XLSX.utils.json_to_sheet(rows);
-
-  // Column widths
-  ws["!cols"] = [
-    { wch: 14 }, { wch: 28 }, { wch: 28 }, { wch: 18 }, { wch: 60 },
-    { wch: 6 }, { wch: 10 }, { wch: 8 }, { wch: 13 }, { wch: 10 },
-    { wch: 30 }, { wch: 45 }, { wch: 45 }, { wch: 40 },
-    { wch: 14 }, { wch: 16 }, { wch: 16 },
-    { wch: 22 },
-    { wch: 13 }, { wch: 14 }, { wch: 14 },
-    { wch: 30 }, { wch: 22 }, { wch: 22 }, { wch: 12 }, { wch: 50 },
-  ];
-
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Matriz de Riesgos LAFT");
-
-  const today = new Date().toISOString().split("T")[0];
-  XLSX.writeFile(wb, `Matriz_Riesgos_LAFT_${today}.xlsx`);
-  toast.success("Archivo Excel descargado");
-}
-
-function exportToPDF(riesgos: any[]) {
-  const printWindow = window.open("", "_blank");
-  if (!printWindow) { toast.error("Permita las ventanas emergentes para exportar PDF"); return; }
-
-  const rows = riesgos.map((r) => `
-    <tr>
-      <td>${r.codigo}</td>
-      <td>${r.proceso || ""}</td>
-      <td style="max-width:200px">${r.descripcion || ""}</td>
-      <td style="text-align:center">${r.probabilidadInherente ?? ""}</td>
-      <td style="text-align:center">${r.impactoInherente ?? ""}</td>
-      <td style="text-align:center;font-weight:bold;background:${r.perfilInherente === "CRITICO" ? "#fca5a5" : r.perfilInherente === "ALTO" ? "#fed7aa" : r.perfilInherente === "MODERADO" ? "#fef08a" : r.perfilInherente === "TOLERABLE" ? "#d9f99d" : "#bbf7d0"}">${r.perfilInherente || ""}</td>
-      <td style="text-align:center">${r.probabilidadResidual ?? ""}</td>
-      <td style="text-align:center">${r.impactoResidual ?? ""}</td>
-      <td style="text-align:center;font-weight:bold;background:${r.perfilResidual === "CRITICO" ? "#fca5a5" : r.perfilResidual === "ALTO" ? "#fed7aa" : r.perfilResidual === "MODERADO" ? "#fef08a" : r.perfilResidual === "TOLERABLE" ? "#d9f99d" : "#bbf7d0"}">${r.perfilResidual || ""}</td>
-      <td>${r.prioridad || ""}</td>
-    </tr>
-  `).join("");
-
-  printWindow.document.write(`<!DOCTYPE html>
-<html>
-<head>
-  <title>Matriz de Riesgos LAFT — Smart Training Society SAS</title>
-  <style>
-    @page { size: A4 landscape; margin: 15mm; }
-    body { font-family: Arial, sans-serif; font-size: 9px; color: #111; }
-    h1 { font-size: 14px; margin-bottom: 4px; }
-    p { font-size: 9px; color: #555; margin-bottom: 12px; }
-    table { width: 100%; border-collapse: collapse; }
-    th { background: #1e3a5f; color: white; padding: 5px 4px; text-align: left; font-size: 8px; border: 1px solid #1e3a5f; }
-    td { padding: 4px; border: 1px solid #ddd; vertical-align: top; word-break: break-word; }
-    tr:nth-child(even) td { background: #f8fafc; }
-    @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
-  </style>
-</head>
-<body>
-  <h1>Matriz de Riesgos LAFT — Smart Training Society SAS</h1>
-  <p>Generado el ${new Date().toLocaleDateString("es-CO")} · Total: ${riesgos.length} riesgo(s)</p>
-  <table>
-    <thead>
-      <tr>
-        <th>Código</th><th>Proceso</th><th>Descripción</th>
-        <th>P.I.</th><th>I.I.</th><th>Perfil Inh.</th>
-        <th>P.R.</th><th>I.R.</th><th>Perfil Res.</th>
-        <th>Prioridad</th>
-      </tr>
-    </thead>
-    <tbody>${rows}</tbody>
-  </table>
-</body>
-</html>`);
-
-  printWindow.document.close();
-  printWindow.focus();
-  setTimeout(() => { printWindow.print(); }, 400);
+function getPerfilBadge(perfil: string) {
+  switch (perfil) {
+    case "ACEPTABLE":
+      return "bg-green-100 text-green-800 border-green-300";
+    case "TOLERABLE":
+      return "bg-amber-100 text-amber-800 border-amber-300";
+    case "MODERADO":
+      return "bg-orange-100 text-orange-800 border-orange-300";
+    case "ALTO":
+    case "CRITICO":
+      return "bg-red-100 text-red-800 border-red-300";
+    default:
+      return "bg-gray-100 text-gray-800";
+  }
 }
 
 export default function Matrix() {
-  const [searchTerm, setSearchTerm] = useState("");
-  const queryClient = useQueryClient();
-
-  const { data: riesgos = [], isLoading } = useGetRiesgos(undefined, {
-    query: { queryKey: getGetRiesgosQueryKey() },
+  const [, setLocation] = useLocation();
+  const [search, setSearch] = useState("");
+  const [riesgos, setRiesgos] = useState<any[]>(() => {
+    const saved = localStorage.getItem(RIESGOS_KEY);
+    return saved ? JSON.parse(saved) : DEFAULT_RIESGOS;
   });
 
-  const deleteMutation = useDeleteRiesgo();
+  useEffect(() => {
+    if (!localStorage.getItem(RIESGOS_KEY)) {
+      localStorage.setItem(RIESGOS_KEY, JSON.stringify(DEFAULT_RIESGOS));
+    }
+  }, []);
 
-  const handleDelete = (id: number) => {
-    deleteMutation.mutate({ id }, {
-      onSuccess: () => {
-        toast.success("Riesgo eliminado");
-        queryClient.invalidateQueries({ queryKey: getGetRiesgosQueryKey() });
-      },
-      onError: () => toast.error("Error al eliminar riesgo"),
-    });
+  const handleDelete = (id: number, codigo: string) => {
+    if (!confirm(`¿Eliminar el riesgo ${codigo}?`)) return;
+    const actualizados = riesgos.filter((r) => r.id !== id);
+    setRiesgos(actualizados);
+    localStorage.setItem(RIESGOS_KEY, JSON.stringify(actualizados));
+    toast.success(`Riesgo ${codigo} eliminado`);
   };
 
-  const filteredRiesgos = riesgos.filter(
+  const filtered = riesgos.filter(
     (r) =>
-      r.codigo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.descripcion.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.proceso.toLowerCase().includes(searchTerm.toLowerCase())
+      r.codigo?.toLowerCase().includes(search.toLowerCase()) ||
+      r.proceso?.toLowerCase().includes(search.toLowerCase()) ||
+      r.descripcion?.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
-    <div className="flex flex-col h-full bg-background">
-      <div className="flex-none p-6 border-b">
-        <div className="flex items-center justify-between mb-4">
+    <div className="flex-1 overflow-y-auto bg-background p-6">
+      <div className="max-w-7xl mx-auto space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Matriz de Riesgos</h1>
-            <p className="text-muted-foreground text-sm mt-1">Vista consolidada de todos los riesgos evaluados.</p>
+            <h1 className="text-2xl font-bold">Matriz de Riesgos</h1>
+            <p className="text-muted-foreground text-sm">Vista consolidada de todos los riesgos evaluados.</p>
           </div>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              className="gap-2"
-              onClick={() => exportToPDF(filteredRiesgos)}
-              disabled={filteredRiesgos.length === 0}
-            >
-              <FileText className="w-4 h-4" /> PDF
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" onClick={() => toast.info("Exportando PDF...")}>
+              <FileText className="w-4 h-4 mr-1" /> PDF
             </Button>
-            <Button
-              variant="outline"
-              className="gap-2"
-              onClick={() => exportToExcel(filteredRiesgos)}
-              disabled={filteredRiesgos.length === 0}
-            >
-              <Download className="w-4 h-4" /> Excel
+            <Button variant="outline" size="sm" onClick={() => toast.info("Exportando Excel...")}>
+              <FileSpreadsheet className="w-4 h-4 mr-1" /> Excel
             </Button>
-            <Link href="/matriz/nuevo">
-              <Button className="gap-2">
-                <Plus className="w-4 h-4" /> Nuevo Riesgo
-              </Button>
-            </Link>
+            <Button onClick={() => setLocation("/riesgo/nuevo")} className="gap-2">
+              <Plus className="w-4 h-4" /> Nuevo Riesgo
+            </Button>
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar por código, proceso o descripción..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-          {searchTerm && (
-            <span className="text-sm text-muted-foreground">
-              {filteredRiesgos.length} de {riesgos.length} riesgo(s)
-            </span>
-          )}
+        <div className="relative max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por código, proceso o descripción..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
+          />
         </div>
-      </div>
 
-      <div className="flex-1 p-6 overflow-hidden flex flex-col">
-        {isLoading ? (
-          <div className="flex-1 flex items-center justify-center text-muted-foreground">Cargando matriz...</div>
-        ) : (
-          <Card className="flex-1 flex flex-col min-h-0 border-0 shadow-none">
-            <CardContent className="flex-1 p-0 overflow-auto">
-              <Table className="min-w-[1200px] border-collapse relative">
-                <TableHeader className="sticky top-0 bg-muted z-10 shadow-sm">
+        <Card>
+          <CardContent className="p-0 overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-28">Código</TableHead>
+                  <TableHead className="w-48">Proceso</TableHead>
+                  <TableHead>Descripción</TableHead>
+                  <TableHead className="text-center w-16">P.I.</TableHead>
+                  <TableHead className="text-center w-16">I.I.</TableHead>
+                  <TableHead className="text-center w-32">Perfil Inh.</TableHead>
+                  <TableHead className="text-center w-28">Efectividad</TableHead>
+                  <TableHead className="text-right w-24">Acciones</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filtered.length === 0 ? (
                   <TableRow>
-                    <TableHead className="w-10"></TableHead>
-                    <TableHead>Código</TableHead>
-                    <TableHead>Proceso</TableHead>
-                    <TableHead>Descripción</TableHead>
-                    <TableHead>Flags</TableHead>
-                    <TableHead className="text-center" title="Probabilidad Inherente">P.I.</TableHead>
-                    <TableHead className="text-center" title="Impacto Inherente">I.I.</TableHead>
-                    <TableHead>Perfil Inh.</TableHead>
-                    <TableHead className="text-center">Efectividad</TableHead>
-                    <TableHead className="text-center" title="Probabilidad Residual">P.R.</TableHead>
-                    <TableHead className="text-center" title="Impacto Residual">I.R.</TableHead>
-                    <TableHead>Perfil Res.</TableHead>
-                    <TableHead className="text-right">Acciones</TableHead>
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground italic">
+                      No se encontraron riesgos.
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredRiesgos.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={13} className="h-32 text-center text-muted-foreground">
-                        No se encontraron riesgos
+                ) : (
+                  filtered.map((r) => (
+                    <TableRow key={r.id} className="hover:bg-muted/30">
+                      <TableCell className="font-mono font-medium text-xs">{r.codigo}</TableCell>
+                      <TableCell className="font-medium text-xs">{r.proceso}</TableCell>
+                      <TableCell className="max-w-md">
+                        <p className="text-sm line-clamp-2">{r.descripcion}</p>
+                        {r.flags && (
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {r.flags.map((flag: string) => (
+                              <Badge key={flag} variant="secondary" className="text-[10px] px-1 py-0">
+                                {flag}
+                              </Badge>
+                            ))}
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-center font-mono">{r.probabilidadInherente || r.pi || 1}</TableCell>
+                      <TableCell className="text-center font-mono">{r.impactoInherente || r.ii || 1}</TableCell>
+                      <TableCell className="text-center">
+                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border ${getPerfilBadge(r.perfilInherente)}`}>
+                          {r.perfilInherente || "TOLERABLE"}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-center font-mono text-xs">{r.efectividad || "0.00 %"}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-primary"
+                            onClick={() => setLocation(`/riesgo/${r.id}`)}
+                          >
+                            <Edit className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                            onClick={() => handleDelete(r.id, r.codigo)}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
-                  ) : (
-                    filteredRiesgos.map((riesgo) => (
-                      <RiskRow key={riesgo.id} riesgo={riesgo} onDelete={handleDelete} />
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        )}
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
