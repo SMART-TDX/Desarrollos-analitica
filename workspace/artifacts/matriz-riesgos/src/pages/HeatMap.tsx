@@ -1,9 +1,57 @@
-import { useState } from "react";
-import { useGetMapaCalor, getGetMapaCalorQueryKey } from "@workspace/api-client-react";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui";
+import { useState, useEffect } from "react";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 
-const BASE_URL = import.meta.env.BASE_URL?.replace(/\/$/, "") || "";
-const API = `${BASE_URL}/api`;
+const RIESGOS_KEY = "laft_riesgos_v1";
+const EVENTOS_KEY = "laft_eventos_v1";
+
+const DEFAULT_RIESGOS = [
+  {
+    id: "1",
+    codigo: "R-LAFT001",
+    descripcion: "Infiltración de recursos de origen ilícito a través de nuevos clientes.",
+    probabilidadInherente: 2,
+    impactoInherente: 3,
+    perfilInherente: "TOLERABLE",
+    probabilidadResidual: 1,
+    impactoResidual: 2,
+    perfilResidual: "ACEPTABLE"
+  },
+  {
+    id: "2",
+    codigo: "R-LAFT002",
+    descripcion: "Pago a proveedores no verificados en listas restrictivas.",
+    probabilidadInherente: 3,
+    impactoInherente: 4,
+    perfilInherente: "MODERADO",
+    probabilidadResidual: 2,
+    impactoResidual: 3,
+    perfilResidual: "TOLERABLE"
+  }
+];
+
+const DEFAULT_EVENTOS = [
+  {
+    id: "1",
+    codigo: "E-LAFT001",
+    descripcion: "Transacción inusual detectada en canal digital no reportada a tiempo.",
+    probabilidad: 3,
+    impacto: 3,
+    perfil: "TOLERABLE",
+    probabilidadResidual: 2,
+    impactoResidual: 2,
+    perfilResidual: "ACEPTABLE"
+  }
+];
+
+type HeatItem = {
+  riesgoId?: number | string;
+  eventoId?: number | string;
+  codigo: string;
+  descripcion: string;
+  probabilidad: number;
+  impacto: number;
+  perfil: string;
+};
 
 // Zone color by prob x impact score
 function zoneColor(prob: number, impact: number): string {
@@ -23,18 +71,6 @@ function zoneLabel(prob: number, impact: number): string {
   if (s <= 19) return "ALTO";
   return "CRITICO";
 }
-
-type HeatItem = {
-  riesgoId?: number;
-  eventoId?: number;
-  codigo: string;
-  descripcion: string;
-  probabilidad: number;
-  impacto: number;
-  perfil: string;
-  riesgoId2?: number;
-  codigoRiesgo?: string;
-};
 
 const RIESGO_PROB_LABELS: Record<number, string> = {
   1: "Raro", 2: "Poco probable", 3: "Posible", 4: "Probable", 5: "Casi con certeza",
@@ -142,8 +178,8 @@ function HeatGrid({
             <ul className="space-y-0.5">
               {tooltip.items.map((it, idx) => (
                 <li key={idx} className="font-mono truncate">
-                  <span className="text-primary">{it.codigo}</span>{" "}
-                  <span className="text-muted-foreground">{it.descripcion.slice(0, 70)}…</span>
+                  <span className="text-primary font-bold mr-1">{it.codigo}:</span>
+                  <span className="text-muted-foreground">{it.descripcion}</span>
                 </li>
               ))}
             </ul>
@@ -154,53 +190,74 @@ function HeatGrid({
   );
 }
 
-// Custom hook for eventos heat map (not in generated client yet)
-function useEventosMapaCalor() {
-  const [data, setData] = useState<{ inherente: HeatItem[]; residual: HeatItem[] } | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-
-  const fetch_ = async () => {
-    setIsLoading(true);
-    try {
-      const res = await fetch(`${API}/dashboard/mapa-calor-eventos`);
-      if (res.ok) setData(await res.json());
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  return { data, isLoading, refetch: fetch_ };
-}
-
 export default function HeatMap() {
   const [activeMap, setActiveMap] = useState<"riesgos" | "eventos">("riesgos");
+  const [riesgosMap, setRiesgosMap] = useState<{ inherente: HeatItem[]; residual: HeatItem[] }>({ inherente: [], residual: [] });
+  const [eventosMap, setEventosMap] = useState<{ inherente: HeatItem[]; residual: HeatItem[] }>({ inherente: [], residual: [] });
 
-  const { data: riesgosData, isLoading: riesgosLoading } = useGetMapaCalor({
-    query: { queryKey: getGetMapaCalorQueryKey() },
-  });
-
-  const [eventosData, setEventosData] = useState<{ inherente: HeatItem[]; residual: HeatItem[] } | null>(null);
-  const [eventosLoading, setEventosLoading] = useState(false);
-  const [eventosLoaded, setEventosLoaded] = useState(false);
-
-  const loadEventos = async () => {
-    if (eventosLoaded) return;
-    setEventosLoading(true);
+  useEffect(() => {
+    // 1. Cargar Riesgos desde localStorage
+    let rawRiesgos = [];
     try {
-      const res = await fetch(`${API}/dashboard/mapa-calor-eventos`);
-      if (res.ok) setEventosData(await res.json());
-      setEventosLoaded(true);
-    } finally {
-      setEventosLoading(false);
+      const saved = localStorage.getItem(RIESGOS_KEY);
+      rawRiesgos = saved ? JSON.parse(saved) : DEFAULT_RIESGOS;
+      if (!Array.isArray(rawRiesgos) || rawRiesgos.length === 0) {
+        rawRiesgos = DEFAULT_RIESGOS;
+        localStorage.setItem(RIESGOS_KEY, JSON.stringify(DEFAULT_RIESGOS));
+      }
+    } catch {
+      rawRiesgos = DEFAULT_RIESGOS;
     }
-  };
 
-  const handleTabChange = (tab: "riesgos" | "eventos") => {
-    setActiveMap(tab);
-    if (tab === "eventos") loadEventos();
-  };
+    const riesgosInherentes: HeatItem[] = rawRiesgos.map((r: any) => ({
+      codigo: r.codigo || "R-LAFT",
+      descripcion: r.descripcion || "",
+      probabilidad: Number(r.probabilidadInherente || 1),
+      impacto: Number(r.impactoInherente || 1),
+      perfil: r.perfilInherente || "ACEPTABLE",
+    }));
 
-  const isLoading = activeMap === "riesgos" ? riesgosLoading : eventosLoading;
+    const riesgosResiduales: HeatItem[] = rawRiesgos.map((r: any) => ({
+      codigo: r.codigo || "R-LAFT",
+      descripcion: r.descripcion || "",
+      probabilidad: Number(r.probabilidadResidual || 1),
+      impacto: Number(r.impactoResidual || 1),
+      perfil: r.perfilResidual || "ACEPTABLE",
+    }));
+
+    setRiesgosMap({ inherente: riesgosInherentes, residual: riesgosResiduales });
+
+    // 2. Cargar Eventos desde localStorage
+    let rawEventos = [];
+    try {
+      const saved = localStorage.getItem(EVENTOS_KEY);
+      rawEventos = saved ? JSON.parse(saved) : DEFAULT_EVENTOS;
+      if (!Array.isArray(rawEventos) || rawEventos.length === 0) {
+        rawEventos = DEFAULT_EVENTOS;
+        localStorage.setItem(EVENTOS_KEY, JSON.stringify(DEFAULT_EVENTOS));
+      }
+    } catch {
+      rawEventos = DEFAULT_EVENTOS;
+    }
+
+    const eventosInherentes: HeatItem[] = rawEventos.map((e: any) => ({
+      codigo: e.codigo || "E-LAFT",
+      descripcion: e.descripcion || "",
+      probabilidad: Number(e.probabilidad || e.probabilidadInherente || 1),
+      impacto: Number(e.impacto || e.impactoInherente || 1),
+      perfil: e.perfil || e.perfilInherente || "ACEPTABLE",
+    }));
+
+    const eventosResiduales: HeatItem[] = rawEventos.map((e: any) => ({
+      codigo: e.codigo || "E-LAFT",
+      descripcion: e.descripcion || "",
+      probabilidad: Number(e.probabilidadResidual || e.probabilidad || 1),
+      impacto: Number(e.impactoResidual || e.impacto || 1),
+      perfil: e.perfilResidual || e.perfil || "ACEPTABLE",
+    }));
+
+    setEventosMap({ inherente: eventosInherentes, residual: eventosResiduales });
+  }, []);
 
   return (
     <div className="flex flex-col h-full bg-background overflow-y-auto">
@@ -212,13 +269,13 @@ export default function HeatMap() {
         <div className="flex border-b">
           <button
             className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors ${activeMap === "riesgos" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
-            onClick={() => handleTabChange("riesgos")}
+            onClick={() => setActiveMap("riesgos")}
           >
             Mapa de Riesgos
           </button>
           <button
             className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors ${activeMap === "eventos" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
-            onClick={() => handleTabChange("eventos")}
+            onClick={() => setActiveMap("eventos")}
           >
             Mapa de Eventos de Riesgo
           </button>
@@ -226,52 +283,46 @@ export default function HeatMap() {
       </div>
 
       <div className="flex-1 p-6 overflow-auto">
-        {isLoading ? (
-          <div className="flex items-center justify-center h-64 text-muted-foreground">Generando mapas de calor...</div>
-        ) : activeMap === "riesgos" ? (
-          riesgosData && (
-            <div>
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-                <HeatGrid
-                  data={riesgosData.inherente as HeatItem[]}
-                  title="Perfil Inherente — Riesgos"
-                  probLabels={RIESGO_PROB_LABELS}
-                  emptyMessage="Sin riesgos configurados"
-                />
-                <HeatGrid
-                  data={riesgosData.residual as HeatItem[]}
-                  title="Perfil Residual — Riesgos"
-                  probLabels={RIESGO_PROB_LABELS}
-                  emptyMessage="Sin riesgos configurados"
-                />
-              </div>
-              <div className="mt-2 text-xs text-muted-foreground bg-muted/30 rounded px-3 py-2">
-                <strong>Escala de Probabilidad:</strong> 1=Raro · 2=Poco probable · 3=Posible · 4=Probable · 5=Casi con certeza
-              </div>
+        {activeMap === "riesgos" ? (
+          <div>
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+              <HeatGrid
+                data={riesgosMap.inherente}
+                title="Perfil Inherente — Riesgos"
+                probLabels={RIESGO_PROB_LABELS}
+                emptyMessage="Sin riesgos configurados"
+              />
+              <HeatGrid
+                data={riesgosMap.residual}
+                title="Perfil Residual — Riesgos"
+                probLabels={RIESGO_PROB_LABELS}
+                emptyMessage="Sin riesgos configurados"
+              />
             </div>
-          )
+            <div className="mt-2 text-xs text-muted-foreground bg-muted/30 rounded px-3 py-2">
+              <strong>Escala de Probabilidad:</strong> 1=Raro · 2=Poco probable · 3=Posible · 4=Probable · 5=Casi con certeza
+            </div>
+          </div>
         ) : (
-          eventosData && (
-            <div>
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-                <HeatGrid
-                  data={eventosData.inherente}
-                  title="Perfil Inherente — Eventos de Riesgo"
-                  probLabels={EVENTO_PROB_LABELS}
-                  emptyMessage="Sin eventos registrados. Añada eventos en la sección Eventos."
-                />
-                <HeatGrid
-                  data={eventosData.residual}
-                  title="Perfil Residual — Eventos de Riesgo"
-                  probLabels={EVENTO_PROB_LABELS}
-                  emptyMessage="Sin eventos con calificación residual."
-                />
-              </div>
-              <div className="mt-2 text-xs text-muted-foreground bg-muted/30 rounded px-3 py-2">
-                <strong>Escala de Probabilidad:</strong> 1=Raro · 2=Improbable · 3=Posible · 4=Probable · 5=Casi certeza
-              </div>
+          <div>
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+              <HeatGrid
+                data={eventosMap.inherente}
+                title="Perfil Inherente — Eventos de Riesgo"
+                probLabels={EVENTO_PROB_LABELS}
+                emptyMessage="Sin eventos registrados."
+              />
+              <HeatGrid
+                data={eventosMap.residual}
+                title="Perfil Residual — Eventos de Riesgo"
+                probLabels={EVENTO_PROB_LABELS}
+                emptyMessage="Sin eventos con calificación residual."
+              />
             </div>
-          )
+            <div className="mt-2 text-xs text-muted-foreground bg-muted/30 rounded px-3 py-2">
+              <strong>Escala de Probabilidad:</strong> 1=Raro · 2=Improbable · 3=Posible · 4=Probable · 5=Casi certeza
+            </div>
+          </div>
         )}
 
         {/* Legend */}
