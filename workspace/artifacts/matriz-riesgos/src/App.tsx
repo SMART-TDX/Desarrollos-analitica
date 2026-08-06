@@ -1,6 +1,7 @@
 import { Layout } from "@/components/Layout";
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Route, Switch, Router as WouterRouter } from 'wouter';
+import { useHashLocation } from 'wouter/use-hash-location';
 import { Toaster } from 'sonner';
 
 import Dashboard from "./pages/Dashboard";
@@ -54,7 +55,7 @@ function Router() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}>
+      <WouterRouter hook={useHashLocation}>
         <Router />
       </WouterRouter>
       <Toaster position="top-right" richColors />
