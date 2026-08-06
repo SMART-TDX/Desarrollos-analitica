@@ -1,10 +1,29 @@
-import { useGetDashboardResumen, getGetDashboardResumenQueryKey } from "@workspace/api-client-react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, Badge } from "@/components/ui";
 import { ShieldAlert, CheckCircle, AlertOctagon, Activity } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend } from "recharts";
-import { formatPerfil, getPerfilColor } from "@/utils/format";
 
-const COLORS = {
+const RIESGOS_KEY = "laft_riesgos_v1";
+const CONTROLES_KEY = "laft_controles_v1";
+const EVENTOS_KEY = "laft_eventos_v1";
+
+const DEFAULT_RIESGOS = [
+  { id: 1, codigo: "R-LAFT001", proceso: "Gestión Comercial", perfilInherente: "TOLERABLE" },
+  { id: 2, codigo: "R-LAFT002", proceso: "GESTION ADMINISTRATIVA Y FINANCIERA", perfilInherente: "MODERADO" },
+  { id: 3, codigo: "R-LAFT003", proceso: "Gestión Comercial", perfilInherente: "MODERADO" },
+  { id: 4, codigo: "R-LAFT004", proceso: "GESTION ADMINISTRATIVA Y FINANCIERA", perfilInherente: "TOLERABLE" },
+  { id: 5, codigo: "R-LAFT005", proceso: "GESTION ADMINISTRATIVA Y FINANCIERA", perfilInherente: "MODERADO" },
+];
+
+const DEFAULT_CONTROLES = [
+  { id: 1, codigo: "CTR-LAFT-01", estado: "ACTIVO" },
+  { id: 2, codigo: "CTR-LAFT-02", estado: "ACTIVO" },
+  { id: 3, codigo: "CTR-LAFT-03", estado: "ACTIVO" },
+  { id: 4, codigo: "CTR-LAFT-04", estado: "ACTIVO" },
+  { id: 5, codigo: "CTR-LAFT-05", estado: "ACTIVO" },
+];
+
+const COLORS: Record<string, string> = {
   Aceptable: "#16a34a",
   Bajo: "#16a34a",
   Tolerable: "#f59e0b",
@@ -15,21 +34,96 @@ const COLORS = {
 };
 
 export default function Dashboard() {
-  const { data, isLoading } = useGetDashboardResumen({ 
-    query: { queryKey: getGetDashboardResumenQueryKey() } 
+  const [resumen, setResumen] = useState<{
+    totalRiesgos: number;
+    totalControles: number;
+    controlesActivos: number;
+    eventosPorEstado: { estado: string; count: number }[];
+    riesgosPorPerfil: { perfil: string; count: number }[];
+    riesgosPorProceso: { proceso: string; count: number }[];
+  }>({
+    totalRiesgos: 0,
+    totalControles: 0,
+    controlesActivos: 0,
+    eventosPorEstado: [],
+    riesgosPorPerfil: [],
+    riesgosPorProceso: [],
   });
 
-  if (isLoading) {
-    return <div className="p-8 text-muted-foreground flex items-center justify-center h-full">Cargando dashboard...</div>;
-  }
+  useEffect(() => {
+    // 1. Obtener Riesgos
+    const savedRiesgos = localStorage.getItem(RIESGOS_KEY);
+    let riesgos = savedRiesgos ? JSON.parse(savedRiesgos) : [];
+    if (!Array.isArray(riesgos) || riesgos.length === 0) {
+      riesgos = DEFAULT_RIESGOS;
+    }
 
-  const resumen = data;
-  if (!resumen) return null;
+    // 2. Obtener Controles
+    const savedControles = localStorage.getItem(CONTROLES_KEY);
+    let controles = savedControles ? JSON.parse(savedControles) : [];
+    if (!Array.isArray(controles) || controles.length === 0) {
+      controles = DEFAULT_CONTROLES;
+    }
+
+    // 3. Obtener Eventos
+    const savedEventos = localStorage.getItem(EVENTOS_KEY);
+    const eventos = savedEventos ? JSON.parse(savedEventos) : [];
+
+    // --- Calcular Perfiles ---
+    const perfilCounts: Record<string, number> = {};
+    riesgos.forEach((r: any) => {
+      const pRaw = r.perfilInherente || r.perfilResidual || r.perfil || "Tolerable";
+      // Capitalizar palabra (ej. "MODERADO" -> "Moderado")
+      const p = pRaw.charAt(0).toUpperCase() + pRaw.slice(1).toLowerCase();
+      perfilCounts[p] = (perfilCounts[p] || 0) + 1;
+    });
+
+    const riesgosPorPerfil = Object.entries(perfilCounts).map(([perfil, count]) => ({
+      perfil,
+      count
+    }));
+
+    // --- Calcular Procesos ---
+    const procesoCounts: Record<string, number> = {};
+    riesgos.forEach((r: any) => {
+      const proc = r.proceso || "Sin Clasificar";
+      procesoCounts[proc] = (procesoCounts[proc] || 0) + 1;
+    });
+
+    const riesgosPorProceso = Object.entries(procesoCounts).map(([proceso, count]) => ({
+      proceso,
+      count
+    }));
+
+    // --- Calcular Controles Activos ---
+    const controlesActivos = controles.filter((c: any) => (c.estado || "ACTIVO") === "ACTIVO").length;
+
+    // --- Calcular Eventos por Estado ---
+    const eventoCounts: Record<string, number> = {};
+    eventos.forEach((e: any) => {
+      const est = e.estado || "REGISTRADO";
+      eventoCounts[est] = (eventoCounts[est] || 0) + 1;
+    });
+
+    const eventosPorEstado = Object.entries(eventoCounts).map(([estado, count]) => ({
+      estado,
+      count
+    }));
+
+    setResumen({
+      totalRiesgos: riesgos.length,
+      totalControles: controles.length,
+      controlesActivos,
+      eventosPorEstado,
+      riesgosPorPerfil,
+      riesgosPorProceso
+    });
+  }, []);
 
   const pieData = resumen.riesgosPorPerfil.map(item => ({
     name: item.perfil,
     value: item.count,
-    color: COLORS[item.perfil as keyof typeof COLORS] || "#64748b"
+    color: COLORS[item.perfil] || "#64748b"
   }));
 
   return (
@@ -82,7 +176,7 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-destructive">
-              {resumen.riesgosPorPerfil.filter(r => r.perfil === "Crítico" || r.perfil === "Extremo" || r.perfil === "Alto").reduce((acc, curr) => acc + curr.count, 0)}
+              {resumen.riesgosPorPerfil.filter(r => ["Crítico", "Extremo", "Alto"].includes(r.perfil)).reduce((acc, curr) => acc + curr.count, 0)}
             </div>
           </CardContent>
         </Card>
