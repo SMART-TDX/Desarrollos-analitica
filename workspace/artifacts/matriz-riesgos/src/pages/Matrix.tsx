@@ -22,12 +22,12 @@ const DEFAULT_RIESGOS: RiskItem[] = [
     id: "1",
     codigo: "R-LAFT001",
     proceso: "Gestión Comercial",
-    descripcion: "Posibilidad de vincular clientes o contrapartes relacionadas con actividades ilícitas.",
-    banderas: ["LAFT", "OP", "PIERNA", "REPS", "ESTAFA"],
-    probabilidadInherente: 3,
+    descripcion: "Infiltración de recursos de origen ilícito a través de nuevos clientes.",
+    banderas: ["CLIENTE", "LAFT"],
+    probabilidadInherente: 2,
     impactoInherente: 3,
     perfilInherente: "TOLERABLE",
-    efectividad: 39,
+    efectividad: 60,
     probabilidadResidual: 1,
     impactoResidual: 2,
     perfilResidual: "ACEPTABLE"
@@ -36,41 +36,27 @@ const DEFAULT_RIESGOS: RiskItem[] = [
     id: "2",
     codigo: "R-LAFT002",
     proceso: "Gestión Administrativa y Financiera",
-    descripcion: "Posibilidad de recibir recursos provenientes de actividades de lavado de activos.",
-    banderas: ["OP", "PIERNA", "REPS", "ESTAFA"],
+    descripcion: "Pago a proveedores no verificados en listas restrictivas.",
+    banderas: ["PROVEEDOR", "OP"],
     probabilidadInherente: 3,
     impactoInherente: 4,
     perfilInherente: "MODERADO",
-    efectividad: 36,
-    probabilidadResidual: 1,
-    impactoResidual: 2,
-    perfilResidual: "ACEPTABLE"
+    efectividad: 50,
+    probabilidadResidual: 2,
+    impactoResidual: 3,
+    perfilResidual: "TOLERABLE"
   },
   {
     id: "3",
-    codigo: "R-LAFT003",
-    proceso: "Gestión Operativa",
-    descripcion: "Posibilidad de vincular y transar con proveedores o terceros no verificados.",
-    banderas: ["LAFT", "OP", "PIERNA", "REPS", "ESTAFA"],
-    probabilidadInherente: 2,
-    impactoInherente: 5,
-    perfilInherente: "MODERADO",
-    efectividad: 41,
-    probabilidadResidual: 1,
-    impactoResidual: 3,
-    perfilResidual: "ACEPTABLE"
-  },
-  {
-    id: "4",
     codigo: "R-LAFT004",
-    proceso: "Gestión Administrativa y Financiera",
-    descripcion: "Posibilidad de adquirir bienes o servicios con recursos de dudosa procedencia.",
-    banderas: ["LAFT", "OP", "PIERNA", "REPS"],
-    probabilidadInherente: 2,
-    impactoInherente: 4,
-    perfilInherente: "TOLERABLE",
-    efectividad: 39,
-    probabilidadResidual: 1,
+    proceso: "GESTION ADMINISTRATIVA Y FINANCIERA",
+    descripcion: "Operaciones sospechosas no detectadas a tiempo.",
+    banderas: ["LAFT"],
+    probabilidadInherente: 5,
+    impactoInherente: 3,
+    perfilInherente: "ALTO",
+    efectividad: 40,
+    probabilidadResidual: 2,
     impactoResidual: 2,
     perfilResidual: "ACEPTABLE"
   }
@@ -123,7 +109,6 @@ export default function Matrix() {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          // Normalizar banderas si vienen como strings simples
           const normalized = parsed.map((item: any) => ({
             ...item,
             banderas: Array.isArray(item.banderas)
@@ -141,13 +126,11 @@ export default function Matrix() {
     localStorage.setItem(RIESGOS_KEY, JSON.stringify(DEFAULT_RIESGOS));
   }, []);
 
-  // Save changes to localStorage
   const saveToStorage = (updatedList: RiskItem[]) => {
     setRiesgos(updatedList);
     localStorage.setItem(RIESGOS_KEY, JSON.stringify(updatedList));
   };
 
-  // Open modal for Create
   const handleOpenCreate = () => {
     setEditingRisk(null);
     setFormData({
@@ -157,14 +140,13 @@ export default function Matrix() {
       banderas: ["LAFT", "OP"],
       probabilidadInherente: 3,
       impactoInherente: 3,
-      efectividad: 35,
+      efectividad: 50,
       probabilidadResidual: 1,
       impactoResidual: 2,
     });
     setIsModalOpen(true);
   };
 
-  // Open modal for Edit
   const handleOpenEdit = (risk: RiskItem) => {
     setEditingRisk(risk);
     setFormData({
@@ -181,7 +163,6 @@ export default function Matrix() {
     setIsModalOpen(true);
   };
 
-  // Delete risk
   const handleDelete = (id: string) => {
     if (window.confirm("¿Está seguro de que desea eliminar este riesgo de la matriz?")) {
       const updated = riesgos.filter((r) => r.id !== id);
@@ -189,14 +170,12 @@ export default function Matrix() {
     }
   };
 
-  // Submit Modal Form
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const perfilInh = getPerfil(Number(formData.probabilidadInherente), Number(formData.impactoInherente)).label;
     const perfilRes = getPerfil(Number(formData.probabilidadResidual), Number(formData.impactoResidual)).label;
 
     if (editingRisk) {
-      // Update
       const updated = riesgos.map((r) =>
         r.id === editingRisk.id
           ? {
@@ -217,7 +196,6 @@ export default function Matrix() {
       );
       saveToStorage(updated);
     } else {
-      // Create
       const newRisk: RiskItem = {
         id: Date.now().toString(),
         codigo: formData.codigo,
@@ -237,7 +215,6 @@ export default function Matrix() {
     setIsModalOpen(false);
   };
 
-  // Toggle flag selection
   const toggleFlag = (flag: string) => {
     if (formData.banderas.includes(flag)) {
       setFormData({ ...formData, banderas: formData.banderas.filter((f) => f !== flag) });
@@ -246,7 +223,6 @@ export default function Matrix() {
     }
   };
 
-  // Export CSV / Excel
   const exportExcel = () => {
     const headers = ["Código", "Proceso", "Descripción", "Banderas", "P.I.", "I.I.", "Perfil Inh.", "Efectividad %", "P.R.", "I.R.", "Perfil Res."];
     const rows = riesgos.map((r) => [
@@ -272,7 +248,6 @@ export default function Matrix() {
     document.body.removeChild(link);
   };
 
-  // Filtered search
   const filteredRiesgos = riesgos.filter(
     (r) =>
       r.codigo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -281,14 +256,33 @@ export default function Matrix() {
   );
 
   return (
-    <div className="p-6 max-w-[1600px] mx-auto bg-background min-h-screen">
+    <div className="p-4 md:p-6 w-full max-w-full overflow-x-hidden bg-background min-h-screen">
+      {/* Estilos CSS para Scrollbar Horizontal Visible y Forzada */}
+      <style>{`
+        .table-scroll-container::-webkit-scrollbar {
+          height: 12px;
+        }
+        .table-scroll-container::-webkit-scrollbar-track {
+          background: #e2e8f0;
+          border-radius: 6px;
+        }
+        .table-scroll-container::-webkit-scrollbar-thumb {
+          background: #0f766e;
+          border-radius: 6px;
+          border: 2px solid #e2e8f0;
+        }
+        .table-scroll-container::-webkit-scrollbar-thumb:hover {
+          background: #0d9488;
+        }
+      `}</style>
+
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Matriz de Riesgos</h1>
           <p className="text-muted-foreground text-sm">Vista consolidada de todos los riesgos evaluados.</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={() => window.print()}
             className="flex items-center gap-1.5 px-3 py-2 border rounded-md text-sm font-medium hover:bg-muted transition-colors"
@@ -333,24 +327,24 @@ export default function Matrix() {
         />
       </div>
 
-      {/* Matrix Table */}
-      <div className="border rounded-lg bg-card overflow-hidden shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm border-collapse">
+      {/* Contenedor principal de la Tabla con scrollbar horizontal visible */}
+      <div className="border rounded-lg bg-card shadow-sm overflow-hidden w-full">
+        <div className="table-scroll-container overflow-x-auto w-full pb-2">
+          <table className="min-w-[1250px] w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="border-b bg-muted/50 text-muted-foreground text-xs uppercase font-semibold">
-                <th className="p-3 w-28">Código</th>
-                <th className="p-3 w-40">Proceso</th>
-                <th className="p-3 min-w-[240px]">Descripción</th>
-                <th className="p-3 min-w-[180px]">Banderas</th>
-                <th className="p-3 text-center w-12">PI</th>
-                <th className="p-3 text-center w-12">II</th>
-                <th className="p-3 text-center w-28">Perfil Inh.</th>
-                <th className="p-3 text-center w-24">Efectividad</th>
-                <th className="p-3 text-center w-12">PR</th>
-                <th className="p-3 text-center w-12">IR</th>
-                <th className="p-3 text-center w-28">Perfil Res.</th>
-                <th className="p-3 text-center w-24 font-bold text-foreground">Acciones</th>
+              <tr className="border-b bg-muted/60 text-muted-foreground uppercase font-bold tracking-wider">
+                <th className="p-2.5 w-24">Código</th>
+                <th className="p-2.5 w-36">Proceso</th>
+                <th className="p-2.5 w-64">Descripción</th>
+                <th className="p-2.5 w-44">Banderas</th>
+                <th className="p-2.5 text-center w-10">P.I.</th>
+                <th className="p-2.5 text-center w-10">I.I.</th>
+                <th className="p-2.5 text-center w-28">Perfil Inh.</th>
+                <th className="p-2.5 text-center w-20">Efectividad</th>
+                <th className="p-2.5 text-center w-10">P.R.</th>
+                <th className="p-2.5 text-center w-10">I.R.</th>
+                <th className="p-2.5 text-center w-28">Perfil Res.</th>
+                <th className="p-2.5 text-center w-24 bg-muted/80 font-bold text-foreground">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -367,11 +361,11 @@ export default function Matrix() {
                   const flags = Array.isArray(item.banderas) ? item.banderas : ["LAFT"];
 
                   return (
-                    <tr key={item.id} className="hover:bg-muted/30 transition-colors">
-                      <td className="p-3 font-bold text-xs whitespace-nowrap">{item.codigo}</td>
-                      <td className="p-3 text-xs text-muted-foreground">{item.proceso}</td>
-                      <td className="p-3 text-xs line-clamp-2 max-w-[320px]">{item.descripcion}</td>
-                      <td className="p-3">
+                    <tr key={item.id} className="hover:bg-muted/40 transition-colors">
+                      <td className="p-2.5 font-bold text-xs whitespace-nowrap">{item.codigo}</td>
+                      <td className="p-2.5 text-xs text-muted-foreground">{item.proceso}</td>
+                      <td className="p-2.5 text-xs line-clamp-2 max-w-[260px]">{item.descripcion}</td>
+                      <td className="p-2.5">
                         <div className="flex flex-wrap gap-1">
                           {flags.map((f, i) => (
                             <span
@@ -383,30 +377,30 @@ export default function Matrix() {
                           ))}
                         </div>
                       </td>
-                      <td className="p-3 text-center font-medium text-xs">{item.probabilidadInherente}</td>
-                      <td className="p-3 text-center font-medium text-xs">{item.impactoInherente}</td>
-                      <td className="p-3 text-center">
-                        <span className={`text-[11px] font-bold px-2 py-1 rounded-md inline-block min-w-[80px] ${perfilInh.bg}`}>
+                      <td className="p-2.5 text-center font-medium text-xs">{item.probabilidadInherente}</td>
+                      <td className="p-2.5 text-center font-medium text-xs">{item.impactoInherente}</td>
+                      <td className="p-2.5 text-center">
+                        <span className={`text-[10px] font-bold px-2 py-1 rounded-md inline-block min-w-[75px] ${perfilInh.bg}`}>
                           {perfilInh.label}
                         </span>
                       </td>
-                      <td className="p-3 text-center text-xs font-mono">
-                        {item.efectividad < 1 ? (item.efectividad * 100).toFixed(2) : item.efectividad}%
+                      <td className="p-2.5 text-center text-xs font-mono font-semibold">
+                        {item.efectividad < 1 ? Math.round(item.efectividad * 100) : item.efectividad}%
                       </td>
-                      <td className="p-3 text-center font-medium text-xs">{item.probabilidadResidual}</td>
-                      <td className="p-3 text-center font-medium text-xs">{item.impactoResidual}</td>
-                      <td className="p-3 text-center">
-                        <span className={`text-[11px] font-bold px-2 py-1 rounded-md inline-block min-w-[80px] ${perfilRes.bg}`}>
+                      <td className="p-2.5 text-center font-medium text-xs">{item.probabilidadResidual}</td>
+                      <td className="p-2.5 text-center font-medium text-xs">{item.impactoResidual}</td>
+                      <td className="p-2.5 text-center">
+                        <span className={`text-[10px] font-bold px-2 py-1 rounded-md inline-block min-w-[75px] ${perfilRes.bg}`}>
                           {perfilRes.label}
                         </span>
                       </td>
                       {/* Acciones Column */}
-                      <td className="p-3 text-center whitespace-nowrap">
+                      <td className="p-2.5 text-center whitespace-nowrap bg-muted/20">
                         <div className="flex items-center justify-center gap-2">
                           <button
                             onClick={() => handleOpenEdit(item)}
                             title="Editar riesgo"
-                            className="p-1.5 text-muted-foreground hover:text-teal-600 hover:bg-teal-50 dark:hover:bg-teal-950 rounded transition-colors"
+                            className="p-1.5 text-muted-foreground hover:text-teal-700 hover:bg-teal-100 dark:hover:bg-teal-950 rounded transition-colors border border-transparent hover:border-teal-300"
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -415,7 +409,7 @@ export default function Matrix() {
                           <button
                             onClick={() => handleDelete(item.id)}
                             title="Eliminar riesgo"
-                            className="p-1.5 text-muted-foreground hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950 rounded transition-colors"
+                            className="p-1.5 text-muted-foreground hover:text-red-600 hover:bg-red-100 dark:hover:bg-red-950 rounded transition-colors border border-transparent hover:border-red-300"
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -442,7 +436,7 @@ export default function Matrix() {
               </h3>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="text-muted-foreground hover:text-foreground text-xl font-bold"
+                className="text-muted-foreground hover:text-foreground text-xl font-bold px-2"
               >
                 ×
               </button>
