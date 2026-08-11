@@ -42,35 +42,49 @@ const DEFAULT_CONTROLES: ControlItem[] = [
     descripcion: "Chequeo de información pública en medios de comunicación o fuentes abiertas.",
     clase: "PREVENTIVO",
     ponderacion: 42.5
-  },
-  {
-    codigo: "CTR-LAFT-12",
-    descripcion: "Aplicación del procedimiento para identificación y consulta transaccional.",
-    clase: "DETECTIVO",
-    ponderacion: 37.8
   }
 ];
 
 const DEFAULT_RIESGOS: RiskItem[] = [
   {
     id: "1",
-    codigo: "R-LAFT003",
+    codigo: "R-LAFT001",
     proceso: "Gestión Comercial",
     subproceso: "COMERCIAL-TELEMERCADEO-VENTAS",
-    descripcion: "Posibilidad de vincular y prestarle servicios a Clientes que se encuentran incluidos en las listas vinculantes y listas de Naciones Unidas.",
-    banderas: ["Laft", "Operativo", "Legal", "Reputacional", "Contagio"],
-    factorRiesgo: "ESTUDIANTES",
-    tipologia: "Cliente que no pasa por el proceso de due diligence de la academia",
-    quePuedeSuceder: "El cliente se encuentra en alguna de las listas restrictivas al momento de la validacion documental",
-    porQuePuedeSuceder: "No se realiza verificacion de listas para todos los clientes que se vinculan a la academia",
+    descripcion: "Infiltración de recursos de origen ilícito a través de nuevos clientes.",
+    banderas: ["CLIENTE", "Laft"],
+    factorRiesgo: "CLIENTE",
+    tipologia: "Cliente sin verificar",
+    quePuedeSuceder: "Vinculación de fondos ilícitos",
+    porQuePuedeSuceder: "Omitir lista restrictiva",
     probabilidadInherente: 2,
-    impactoInherente: 5,
-    perfilInherente: "MODERADO(10)",
+    impactoInherente: 3,
+    perfilInherente: "TOLERABLE(6)",
     controles: DEFAULT_CONTROLES,
-    efectividad: 50,
+    efectividad: 60,
     probabilidadResidual: 1,
     impactoResidual: 2,
     perfilResidual: "ACEPTABLE"
+  },
+  {
+    id: "2",
+    codigo: "R-LAFT002",
+    proceso: "Gestión Administrativa y Financiera",
+    subproceso: "ADMINISTRATIVO-COMPRAS",
+    descripcion: "Pago a proveedores no verificados en listas restrictivas.",
+    banderas: ["PROVEEDOR", "Operativo"],
+    factorRiesgo: "PROVEEDOR",
+    tipologia: "Proveedor fantasma",
+    quePuedeSuceder: "Desvío de fondos",
+    porQuePuedeSuceder: "No validar listas",
+    probabilidadInherente: 3,
+    impactoInherente: 4,
+    perfilInherente: "MODERADO(12)",
+    controles: DEFAULT_CONTROLES,
+    efectividad: 50,
+    probabilidadResidual: 2,
+    impactoResidual: 3,
+    perfilResidual: "TOLERABLE"
   }
 ];
 
@@ -119,11 +133,11 @@ export default function Matrix() {
 
   // Form State
   const [formData, setFormData] = useState({
-    codigo: "R-LAFT003",
+    codigo: "",
     proceso: "Gestión Comercial",
     subproceso: "COMERCIAL-TELEMERCADEO-VENTAS",
     descripcion: "",
-    banderas: ["Laft", "Operativo", "Legal", "Reputacional", "Contagio"] as string[],
+    banderas: ["Laft"] as string[],
     factorRiesgo: "ESTUDIANTES",
     tipologia: "",
     quePuedeSuceder: "",
@@ -161,12 +175,12 @@ export default function Matrix() {
       codigo: `R-LAFT00${riesgos.length + 1}`,
       proceso: "Gestión Comercial",
       subproceso: "COMERCIAL-TELEMERCADEO-VENTAS",
-      descripcion: "Posibilidad de vincular y prestarle servicios a Clientes que se encuentran incluidos en las listas vinculantes y listas de Naciones Unidas",
-      banderas: ["Laft", "Operativo", "Legal", "Reputacional", "Contagio"],
+      descripcion: "",
+      banderas: ["Laft", "Operativo"],
       factorRiesgo: "ESTUDIANTES",
-      tipologia: "Cliente que no pasa por el proceso de due diligence de la academia",
-      quePuedeSuceder: "El cliente se encuentra en alguna de las listas restrictivas al momento de la validacion documental",
-      porQuePuedeSuceder: "No se realiza verificacion de listas para todos los clientes que se vinculan a la academia",
+      tipologia: "",
+      quePuedeSuceder: "",
+      porQuePuedeSuceder: "",
       probabilidadInherente: 2,
       impactoInherente: 5,
       controles: DEFAULT_CONTROLES,
@@ -230,13 +244,7 @@ export default function Matrix() {
 
     if (editingRisk) {
       const updated = riesgos.map((r) =>
-        r.id === editingRisk.id
-          ? {
-              ...r,
-              ...formData,
-              perfilInherente: perfilInh,
-            }
-          : r
+        r.id === editingRisk.id ? { ...r, ...formData, perfilInherente: perfilInh } : r
       );
       saveToStorage(updated);
     } else {
@@ -264,25 +272,38 @@ export default function Matrix() {
   const perfilInhCalc = getPerfilInherente(formData.probabilidadInherente, formData.impactoInherente);
 
   return (
-    <div className="p-4 md:p-6 w-full bg-background min-h-screen">
+    <div className="w-full space-y-6 pb-12">
+      <style>{`
+        .custom-scroll::-webkit-scrollbar {
+          height: 10px;
+          width: 10px;
+        }
+        .custom-scroll::-webkit-scrollbar-track {
+          background: #f1f5f9;
+          border-radius: 5px;
+        }
+        .custom-scroll::-webkit-scrollbar-thumb {
+          background: #0d9488;
+          border-radius: 5px;
+        }
+      `}</style>
+
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Matriz de Riesgos</h1>
           <p className="text-muted-foreground text-sm">Vista consolidada de todos los riesgos evaluados.</p>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleOpenCreate}
-            className="flex items-center gap-1.5 px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white rounded-md text-sm font-medium shadow-sm transition-colors"
-          >
-            <span className="text-lg font-bold">+</span> Nuevo Riesgo
-          </button>
-        </div>
+        <button
+          onClick={handleOpenCreate}
+          className="flex items-center gap-1.5 px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white rounded-md text-sm font-medium shadow-sm transition-colors"
+        >
+          <span className="text-lg font-bold">+</span> Nuevo Riesgo
+        </button>
       </div>
 
       {/* Search */}
-      <div className="relative mb-6 max-w-md">
+      <div className="relative max-w-md">
         <svg className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
         </svg>
@@ -295,50 +316,50 @@ export default function Matrix() {
         />
       </div>
 
-      {/* Tabla Matriz */}
-      <div className="border rounded-lg bg-card shadow-sm overflow-hidden">
-        <div className="overflow-x-auto w-full">
-          <table className="w-full text-left text-xs border-collapse">
+      {/* Tabla Matriz con Scrollbar Horizontal Forzado */}
+      <div className="border rounded-lg bg-card shadow-sm overflow-hidden w-full">
+        <div className="custom-scroll overflow-x-auto w-full pb-3">
+          <table className="min-w-[1300px] w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="border-b bg-muted/50 text-muted-foreground uppercase font-bold">
-                <th className="p-3">Código</th>
-                <th className="p-3">Proceso</th>
-                <th className="p-3">Descripción</th>
-                <th className="p-3">Banderas</th>
-                <th className="p-3 text-center">P.I.</th>
-                <th className="p-3 text-center">I.I.</th>
-                <th className="p-3 text-center">Perfil Inh.</th>
-                <th className="p-3 text-center">P.R.</th>
-                <th className="p-3 text-center">I.R.</th>
-                <th className="p-3 text-center">Perfil Res.</th>
-                <th className="p-3 text-center w-24">Acciones</th>
+              <tr className="border-b bg-muted/60 text-muted-foreground uppercase font-bold tracking-wider">
+                <th className="p-3 w-28">Código</th>
+                <th className="p-3 w-44">Proceso</th>
+                <th className="p-3 min-w-[280px]">Descripción</th>
+                <th className="p-3 w-48">Banderas</th>
+                <th className="p-3 text-center w-12">P.I.</th>
+                <th className="p-3 text-center w-12">I.I.</th>
+                <th className="p-3 text-center w-32">Perfil Inh.</th>
+                <th className="p-3 text-center w-12">P.R.</th>
+                <th className="p-3 text-center w-12">I.R.</th>
+                <th className="p-3 text-center w-32">Perfil Res.</th>
+                <th className="p-3 text-center w-24 bg-muted/80 font-bold text-foreground">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {filteredRiesgos.map((item) => (
                 <tr key={item.id} className="hover:bg-muted/30 transition-colors">
-                  <td className="p-3 font-bold">{item.codigo}</td>
-                  <td className="p-3 text-muted-foreground">{item.proceso}</td>
-                  <td className="p-3 max-w-[280px] truncate" title={item.descripcion}>{item.descripcion}</td>
+                  <td className="p-3 font-bold text-xs whitespace-nowrap">{item.codigo}</td>
+                  <td className="p-3 text-xs text-muted-foreground">{item.proceso}</td>
+                  <td className="p-3 text-xs line-clamp-2 max-w-[280px]" title={item.descripcion}>{item.descripcion}</td>
                   <td className="p-3">
                     <div className="flex flex-wrap gap-1">
                       {(item.banderas || []).map((b, i) => (
-                        <span key={i} className="px-1.5 py-0.5 text-[10px] bg-slate-100 border rounded font-semibold text-slate-700">
+                        <span key={i} className="px-1.5 py-0.5 text-[10px] bg-slate-100 dark:bg-slate-800 border rounded font-semibold text-slate-700 dark:text-slate-300">
                           {b}
                         </span>
                       ))}
                     </div>
                   </td>
-                  <td className="p-3 text-center font-bold">{item.probabilidadInherente}</td>
-                  <td className="p-3 text-center font-bold">{item.impactoInherente}</td>
-                  <td className="p-3 text-center font-bold text-amber-800">{item.perfilInherente}</td>
-                  <td className="p-3 text-center font-bold">{item.probabilidadResidual || 1}</td>
-                  <td className="p-3 text-center font-bold">{item.impactoResidual || 2}</td>
-                  <td className="p-3 text-center font-bold text-emerald-800">{item.perfilResidual || "ACEPTABLE"}</td>
-                  <td className="p-3 text-center">
+                  <td className="p-3 text-center font-bold text-xs">{item.probabilidadInherente}</td>
+                  <td className="p-3 text-center font-bold text-xs">{item.impactoInherente}</td>
+                  <td className="p-3 text-center font-bold text-xs text-amber-800">{item.perfilInherente}</td>
+                  <td className="p-3 text-center font-bold text-xs">{item.probabilidadResidual || 1}</td>
+                  <td className="p-3 text-center font-bold text-xs">{item.impactoResidual || 2}</td>
+                  <td className="p-3 text-center font-bold text-xs text-emerald-800">{item.perfilResidual || "ACEPTABLE"}</td>
+                  <td className="p-3 text-center whitespace-nowrap bg-muted/20">
                     <div className="flex items-center justify-center gap-2">
-                      <button onClick={() => handleOpenEdit(item)} className="p-1 hover:text-teal-600">✏️</button>
-                      <button onClick={() => handleDelete(item.id)} className="p-1 hover:text-red-600">🗑️</button>
+                      <button onClick={() => handleOpenEdit(item)} className="p-1 hover:text-teal-600 text-base" title="Editar">✏️</button>
+                      <button onClick={() => handleDelete(item.id)} className="p-1 hover:text-red-600 text-base" title="Eliminar">🗑️</button>
                     </div>
                   </td>
                 </tr>
@@ -348,7 +369,7 @@ export default function Matrix() {
         </div>
       </div>
 
-      {/* Ventana Modal / Formulario Completo */}
+      {/* Modal / Formulario Completo */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 overflow-y-auto">
           <div className="bg-background border rounded-xl shadow-2xl w-full max-w-4xl max-h-[92vh] overflow-y-auto my-6">
@@ -575,7 +596,7 @@ export default function Matrix() {
                 </div>
               </div>
 
-              {/* Acciones del Formulario */}
+              {/* Acciones */}
               <div className="flex justify-end gap-3 pt-4 border-t">
                 <button
                   type="button"
