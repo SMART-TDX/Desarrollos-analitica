@@ -1,29 +1,163 @@
-import { useState } from "react";
-import {
-  useGetEventos, useGetEventosSagrilaf, useCreateEvento, useCreateEventoSagrilaf,
-  useDeleteEvento, useDeleteEventoSagrilaf, useGetRiesgos,
-  getGetEventosQueryKey, getGetEventosSagrilafQueryKey, getGetRiesgosQueryKey,
-} from "@workspace/api-client-react";
-import { Badge, Button, Input, Label, Textarea, Card, CardContent, CardHeader, CardTitle } from "@/components/ui";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/table";
-import { useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import React, { useState, useEffect } from "react";
 import { Plus, X, Trash2 } from "lucide-react";
 
+const EVENTOS_RIESGO_KEY = "laft_eventos_riesgo_v1";
+const EVENTOS_SAGRILAF_KEY = "laft_eventos_sagrilaf_v1";
+
+// ── Datos Semilla para Eventos SAGRILAFT (Basados en tu imagen) ────────────────
+const DEFAULT_EVENTOS_SAGRILAF = [
+  {
+    id: "1",
+    codigo: "EVENTO-1",
+    tipo: "LAFT",
+    factor: "CLI",
+    etapa: "VIN",
+    evento: "Documento auténtico obtenido de fuente ilícita o falsificado en debida diligencia.",
+    probabilidad: 2,
+    impacto: 3,
+    nivel: 6,
+    apetito: 2,
+    estado: "Prioritario",
+    fechaCreacion: "2026-07-21"
+  },
+  {
+    id: "10",
+    codigo: "EVENTO-10",
+    tipo: "REPS",
+    factor: "CLI",
+    etapa: "POR",
+    evento: "Relación indirecta con investigaciones de listas o noticias restrictivas.",
+    probabilidad: 1,
+    impacto: 3,
+    nivel: 3,
+    apetito: 2,
+    estado: "Controlado",
+    fechaCreacion: "2026-07-21"
+  },
+  {
+    id: "11",
+    codigo: "EVENTO-11",
+    tipo: "LAFT",
+    factor: "EMP",
+    etapa: "LUN",
+    evento: "Omisión deliberada de Reporte de Operación Sospechosa (ROS).",
+    probabilidad: 2,
+    impacto: 3,
+    nivel: 6,
+    apetito: 2,
+    estado: "Prioritario",
+    fechaCreacion: "2026-07-21"
+  },
+  {
+    id: "17",
+    codigo: "EVENTO-17",
+    tipo: "TEC",
+    factor: "TEC",
+    etapa: "AIRE LIBRE",
+    evento: "Incumplimiento de Debida Diligencia por fallas continuas en la plataforma tecnológica.",
+    probabilidad: 2,
+    impacto: 3,
+    nivel: 6,
+    apetito: 2,
+    estado: "En seguimiento",
+    fechaCreacion: "2026-07-21"
+  },
+  {
+    id: "2",
+    codigo: "EVENTO-2",
+    tipo: "LAFT",
+    factor: "EMP",
+    etapa: "LUN",
+    evento: "Empleado facilita operación sospechosa omitiendo controles obligatorios.",
+    probabilidad: 2,
+    impacto: 4,
+    nivel: 8,
+    apetito: 2,
+    estado: "Prioritario",
+    fechaCreacion: "2026-07-21"
+  },
+  {
+    id: "3",
+    codigo: "EVENTO-3",
+    tipo: "LAFT",
+    factor: "PRV",
+    etapa: "ESTAFA",
+    evento: "Proveedor incluido en listas restrictivas o vinculados a procesos sancionatorios.",
+    probabilidad: 2,
+    impacto: 3,
+    nivel: 6,
+    apetito: 2,
+    estado: "Controlado",
+    fechaCreacion: "2026-07-21"
+  },
+  {
+    id: "4",
+    codigo: "EVENTO-4",
+    tipo: "REPS",
+    factor: "CLI",
+    etapa: "POR",
+    evento: "Estudiante o cliente vinculado a caso de investigación judicial de conocimiento público.",
+    probabilidad: 1,
+    impacto: 3,
+    nivel: 3,
+    apetito: 2,
+    estado: "Controlado",
+    fechaCreacion: "2026-07-21"
+  },
+  {
+    id: "5",
+    codigo: "EVENTO-5",
+    tipo: "LAFT",
+    factor: "CLI",
+    etapa: "VIN",
+    evento: "Fraccionamiento de pagos para eludir umbrales de reporte de debida diligencia.",
+    probabilidad: 3,
+    impacto: 4,
+    nivel: 12,
+    apetito: 2,
+    estado: "Prioritario",
+    fechaCreacion: "2026-07-21"
+  }
+];
+
+// ── Datos Semilla para Eventos de Riesgo ──────────────────────────────────────
+const DEFAULT_EVENTOS_RIESGO = [
+  {
+    id: "1",
+    codigoEvento: "EVT-001",
+    tipoEvento: "LAFT",
+    fechaEvento: "2026-07-20",
+    descripcion: "Transacción inusual detectada en canal digital no reportada oportunamente.",
+    tipoIncidencia: "Operativa",
+    codigoRiesgo: "R-LAFT001",
+    probabilidad: 3,
+    impacto: 3,
+    probabilidadResidual: 1,
+    impactoResidual: 2,
+    estado: "Prioritario"
+  },
+  {
+    id: "2",
+    codigoEvento: "EVT-002",
+    tipoEvento: "OPERATIVO",
+    fechaEvento: "2026-07-21",
+    descripcion: "Indisponibilidad temporal en el servicio de consulta de listas restrictivas.",
+    tipoIncidencia: "Tecnológica",
+    codigoRiesgo: "R-LAFT002",
+    probabilidad: 2,
+    impacto: 3,
+    probabilidadResidual: 1,
+    impactoResidual: 2,
+    estado: "En seguimiento"
+  }
+];
+
 const PROB_LABELS_EVENTO: Record<number, string> = {
-  1: "1 — Raro",
-  2: "2 — Improbable",
-  3: "3 — Posible",
-  4: "4 — Probable",
-  5: "5 — Casi certeza",
+  1: "1 — Raro", 2: "2 — Improbable", 3: "3 — Posible", 4: "4 — Probable", 5: "5 — Casi certeza",
 };
 
 const IMP_LABELS: Record<number, string> = {
-  1: "1 — Insignificante",
-  2: "2 — Menor",
-  3: "3 — Moderado",
-  4: "4 — Mayor",
-  5: "5 — Catastrófico",
+  1: "1 — Insignificante", 2: "2 — Menor", 3: "3 — Moderado", 4: "4 — Mayor", 5: "5 — Catastrófico",
 };
 
 function perfilLabel(p: number | null, i: number | null): { label: string; color: string } {
@@ -45,7 +179,7 @@ function Select({ name, value, options, onChange, placeholder = "-- Seleccione -
       name={name}
       value={value}
       onChange={onChange}
-      className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+      className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
     >
       <option value="">{placeholder}</option>
       {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -53,424 +187,608 @@ function Select({ name, value, options, onChange, placeholder = "-- Seleccione -
   );
 }
 
-// ── Eventos de Riesgo Tab ──────────────────────────────────────────────────────
+// ── Tab: Eventos de Riesgo ──────────────────────────────────────────────────
 function EventosRiesgoTab() {
-  const queryClient = useQueryClient();
-  const { data: eventos = [], isLoading } = useGetEventos({ query: { queryKey: getGetEventosQueryKey() } });
-  const { data: riesgos = [] } = useGetRiesgos(undefined, { query: { queryKey: getGetRiesgosQueryKey() } });
-  const createMutation = useCreateEvento();
-  const deleteMutation = useDeleteEvento();
-
+  const [eventos, setEventos] = useState<any[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
     codigoEvento: "", tipoEvento: "LAFT", descripcion: "", tipoIncidencia: "",
     probabilidad: 1, impacto: 1, probabilidadResidual: 1, impactoResidual: 1,
-    riesgoId: "", estado: "Abierto", fechaEvento: new Date().toISOString().split("T")[0],
+    codigoRiesgo: "R-LAFT001", estado: "Abierto", fechaEvento: new Date().toISOString().split("T")[0],
   });
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(EVENTOS_RIESGO_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setEventos(parsed);
+          return;
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    setEventos(DEFAULT_EVENTOS_RIESGO);
+    localStorage.setItem(EVENTOS_RIESGO_KEY, JSON.stringify(DEFAULT_EVENTOS_RIESGO));
+  }, []);
+
+  const saveStorage = (newList: any[]) => {
+    setEventos(newList);
+    localStorage.setItem(EVENTOS_RIESGO_KEY, JSON.stringify(newList));
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    const numFields = ["probabilidad", "impacto", "probabilidadResidual", "impactoResidual", "riesgoId"];
+    const numFields = ["probabilidad", "impacto", "probabilidadResidual", "impactoResidual"];
     setForm((p) => ({ ...p, [name]: numFields.includes(name) ? (value === "" ? "" : Number(value)) : value }));
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
     if (!form.codigoEvento || !form.descripcion) {
-      toast.error("Complete Código y Descripción");
+      alert("Complete Código y Descripción");
       return;
     }
-    const data: any = {
+    const newEvt = {
+      id: Date.now().toString(),
       ...form,
-      riesgoId: form.riesgoId ? parseInt(String(form.riesgoId)) : null,
       probabilidad: Number(form.probabilidad),
       impacto: Number(form.impacto),
       probabilidadResidual: Number(form.probabilidadResidual),
       impactoResidual: Number(form.impactoResidual),
     };
-    createMutation.mutate({ data }, {
-      onSuccess: () => {
-        toast.success("Evento de riesgo registrado");
-        queryClient.invalidateQueries({ queryKey: getGetEventosQueryKey() });
-        setShowForm(false);
-        setForm({ codigoEvento: "", tipoEvento: "LAFT", descripcion: "", tipoIncidencia: "", probabilidad: 1, impacto: 1, probabilidadResidual: 1, impactoResidual: 1, riesgoId: "", estado: "Abierto", fechaEvento: new Date().toISOString().split("T")[0] });
-      },
-      onError: () => toast.error("Error al registrar evento"),
+    saveStorage([newEvt, ...eventos]);
+    setShowForm(false);
+    setForm({
+      codigoEvento: "", tipoEvento: "LAFT", descripcion: "", tipoIncidencia: "",
+      probabilidad: 1, impacto: 1, probabilidadResidual: 1, impactoResidual: 1,
+      codigoRiesgo: "R-LAFT001", estado: "Abierto", fechaEvento: new Date().toISOString().split("T")[0],
     });
   };
 
-  const handleDelete = (id: number, codigo: string) => {
+  const handleDelete = (id: string, codigo: string) => {
     if (!confirm(`¿Eliminar evento ${codigo}?`)) return;
-    deleteMutation.mutate({ id }, {
-      onSuccess: () => { toast.success("Evento eliminado"); queryClient.invalidateQueries({ queryKey: getGetEventosQueryKey() }); },
-      onError: () => toast.error("Error al eliminar"),
-    });
+    saveStorage(eventos.filter((ev) => ev.id !== id));
   };
 
-  const inherentePerfil = perfilLabel(form.probabilidad, form.impacto);
-  const residualPerfil = perfilLabel(form.probabilidadResidual, form.impactoResidual);
+  const inherentePerfil = perfilLabel(Number(form.probabilidad), Number(form.impacto));
+  const residualPerfil = perfilLabel(Number(form.probabilidadResidual), Number(form.impactoResidual));
 
   return (
     <div>
       <div className="flex justify-end mb-4">
-        <Button className="gap-2" onClick={() => setShowForm(!showForm)}>
+        <button
+          onClick={() => setShowForm(!showForm)}
+          className="flex items-center gap-2 px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white rounded-md text-sm font-medium transition-colors"
+        >
           {showForm ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
           {showForm ? "Cancelar" : "Añadir Evento de Riesgo"}
-        </Button>
+        </button>
       </div>
 
       {showForm && (
-        <Card className="mb-4">
-          <CardHeader className="pb-3"><CardTitle className="text-base">Nuevo Evento de Riesgo</CardTitle></CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-1.5">
-                <Label>Código del Evento *</Label>
-                <Input name="codigoEvento" value={form.codigoEvento} onChange={handleChange} placeholder="EVT-001" />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Tipo de Evento</Label>
-                <Select name="tipoEvento" value={form.tipoEvento} onChange={handleChange}
-                  options={["LAFT", "OPERATIVO", "LEGAL", "REPUTACIONAL"].map((v) => ({ value: v, label: v }))} />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Fecha</Label>
-                <Input name="fechaEvento" type="date" value={form.fechaEvento} onChange={handleChange} />
-              </div>
+        <form onSubmit={handleSubmit} className="border rounded-lg p-5 mb-6 bg-card shadow-sm space-y-4">
+          <h3 className="font-bold text-base text-foreground mb-2">Nuevo Evento de Riesgo</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-xs font-semibold mb-1">Código del Evento *</label>
+              <input
+                name="codigoEvento"
+                required
+                value={form.codigoEvento}
+                onChange={handleChange}
+                placeholder="EVT-003"
+                className="w-full px-3 py-1.5 border rounded text-sm bg-background"
+              />
             </div>
-            <div className="space-y-1.5">
-              <Label>Descripción *</Label>
-              <Textarea name="descripcion" value={form.descripcion} onChange={handleChange} rows={2} />
+            <div>
+              <label className="block text-xs font-semibold mb-1">Tipo de Evento</label>
+              <Select
+                name="tipoEvento"
+                value={form.tipoEvento}
+                onChange={handleChange}
+                options={["LAFT", "OPERATIVO", "LEGAL", "REPUTACIONAL"].map((v) => ({ value: v, label: v }))}
+              />
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label>Tipo de Incidencia</Label>
-                <Input name="tipoIncidencia" value={form.tipoIncidencia} onChange={handleChange} />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Riesgo Asociado</Label>
-                <Select name="riesgoId" value={form.riesgoId} onChange={handleChange}
-                  options={riesgos.map((r) => ({ value: r.id, label: `${r.codigo} — ${r.descripcion.slice(0, 50)}` }))}
-                  placeholder="-- Sin asociar --" />
-              </div>
+            <div>
+              <label className="block text-xs font-semibold mb-1">Fecha</label>
+              <input
+                name="fechaEvento"
+                type="date"
+                value={form.fechaEvento}
+                onChange={handleChange}
+                className="w-full px-3 py-1.5 border rounded text-sm bg-background"
+              />
             </div>
+          </div>
 
-            {/* Inherente */}
-            <div className="border rounded-lg p-4 bg-muted/20">
-              <p className="text-sm font-semibold mb-3 text-muted-foreground uppercase tracking-wide">Calificación Inherente</p>
-              <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-1.5">
-                  <Label>Probabilidad</Label>
-                  <Select name="probabilidad" value={form.probabilidad} onChange={handleChange}
-                    options={[1,2,3,4,5].map((v) => ({ value: v, label: PROB_LABELS_EVENTO[v] }))} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Impacto</Label>
-                  <Select name="impacto" value={form.impacto} onChange={handleChange}
-                    options={[1,2,3,4,5].map((v) => ({ value: v, label: IMP_LABELS[v] }))} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Perfil</Label>
-                  <div className={`flex h-9 items-center px-3 rounded-md font-bold text-sm ${inherentePerfil.color}`}>
-                    {inherentePerfil.label} ({Number(form.probabilidad) * Number(form.impacto)})
-                  </div>
+          <div>
+            <label className="block text-xs font-semibold mb-1">Descripción *</label>
+            <textarea
+              name="descripcion"
+              required
+              rows={2}
+              value={form.descripcion}
+              onChange={handleChange}
+              className="w-full px-3 py-1.5 border rounded text-sm bg-background"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold mb-1">Tipo de Incidencia</label>
+              <input
+                name="tipoIncidencia"
+                value={form.tipoIncidencia}
+                onChange={handleChange}
+                className="w-full px-3 py-1.5 border rounded text-sm bg-background"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold mb-1">Riesgo Asociado</label>
+              <input
+                name="codigoRiesgo"
+                value={form.codigoRiesgo}
+                onChange={handleChange}
+                placeholder="Ej. R-LAFT001"
+                className="w-full px-3 py-1.5 border rounded text-sm bg-background"
+              />
+            </div>
+          </div>
+
+          {/* Inherente */}
+          <div className="border rounded-lg p-3 bg-muted/20">
+            <p className="text-xs font-bold mb-2 text-teal-700 uppercase">Calificación Inherente</p>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="block text-xs mb-1">Probabilidad</label>
+                <Select
+                  name="probabilidad"
+                  value={form.probabilidad}
+                  onChange={handleChange}
+                  options={[1, 2, 3, 4, 5].map((v) => ({ value: v, label: PROB_LABELS_EVENTO[v] }))}
+                />
+              </div>
+              <div>
+                <label className="block text-xs mb-1">Impacto</label>
+                <Select
+                  name="impacto"
+                  value={form.impacto}
+                  onChange={handleChange}
+                  options={[1, 2, 3, 4, 5].map((v) => ({ value: v, label: IMP_LABELS[v] }))}
+                />
+              </div>
+              <div>
+                <label className="block text-xs mb-1">Perfil</label>
+                <div className={`flex h-9 items-center px-3 rounded font-bold text-xs ${inherentePerfil.color}`}>
+                  {inherentePerfil.label} ({Number(form.probabilidad) * Number(form.impacto)})
                 </div>
               </div>
             </div>
+          </div>
 
-            {/* Residual */}
-            <div className="border rounded-lg p-4 bg-muted/20">
-              <p className="text-sm font-semibold mb-3 text-muted-foreground uppercase tracking-wide">Calificación Residual</p>
-              <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-1.5">
-                  <Label>Probabilidad Residual</Label>
-                  <Select name="probabilidadResidual" value={form.probabilidadResidual} onChange={handleChange}
-                    options={[1,2,3,4,5].map((v) => ({ value: v, label: PROB_LABELS_EVENTO[v] }))} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Impacto Residual</Label>
-                  <Select name="impactoResidual" value={form.impactoResidual} onChange={handleChange}
-                    options={[1,2,3,4,5].map((v) => ({ value: v, label: IMP_LABELS[v] }))} />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Perfil Residual</Label>
-                  <div className={`flex h-9 items-center px-3 rounded-md font-bold text-sm ${residualPerfil.color}`}>
-                    {residualPerfil.label} ({Number(form.probabilidadResidual) * Number(form.impactoResidual)})
-                  </div>
+          {/* Residual */}
+          <div className="border rounded-lg p-3 bg-muted/20">
+            <p className="text-xs font-bold mb-2 text-teal-700 uppercase">Calificación Residual</p>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="block text-xs mb-1">Probabilidad Residual</label>
+                <Select
+                  name="probabilidadResidual"
+                  value={form.probabilidadResidual}
+                  onChange={handleChange}
+                  options={[1, 2, 3, 4, 5].map((v) => ({ value: v, label: PROB_LABELS_EVENTO[v] }))}
+                />
+              </div>
+              <div>
+                <label className="block text-xs mb-1">Impacto Residual</label>
+                <Select
+                  name="impactoResidual"
+                  value={form.impactoResidual}
+                  onChange={handleChange}
+                  options={[1, 2, 3, 4, 5].map((v) => ({ value: v, label: IMP_LABELS[v] }))}
+                />
+              </div>
+              <div>
+                <label className="block text-xs mb-1">Perfil Residual</label>
+                <div className={`flex h-9 items-center px-3 rounded font-bold text-xs ${residualPerfil.color}`}>
+                  {residualPerfil.label} ({Number(form.probabilidadResidual) * Number(form.impactoResidual)})
                 </div>
               </div>
             </div>
+          </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label>Estado</Label>
-                <Select name="estado" value={form.estado} onChange={handleChange}
-                  options={["Abierto", "En seguimiento", "Cerrado", "Prioritario"].map((v) => ({ value: v, label: v }))} />
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => setShowForm(false)}>Cancelar</Button>
-              <Button onClick={handleSubmit} disabled={createMutation.isPending}>Guardar Evento</Button>
-            </div>
-          </CardContent>
-        </Card>
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={() => setShowForm(false)}
+              className="px-4 py-2 border rounded text-xs font-semibold hover:bg-muted"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white rounded text-xs font-semibold"
+            >
+              Guardar Evento
+            </button>
+          </div>
+        </form>
       )}
 
-      {isLoading ? (
-        <div className="p-8 text-center text-muted-foreground">Cargando eventos...</div>
-      ) : eventos.length === 0 ? (
-        <div className="p-8 text-center text-muted-foreground border rounded-md mt-2">No hay eventos de riesgo registrados.</div>
-      ) : (
-        <div className="border rounded-md bg-card">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Fecha</TableHead>
-                <TableHead>Código</TableHead>
-                <TableHead>Tipo</TableHead>
-                <TableHead>Descripción</TableHead>
-                <TableHead>Riesgo</TableHead>
-                <TableHead>P.I.</TableHead><TableHead>I.I.</TableHead><TableHead>Perfil Inh.</TableHead>
-                <TableHead>P.R.</TableHead><TableHead>I.R.</TableHead><TableHead>Perfil Res.</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead className="w-10"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+      {/* Tabla Eventos de Riesgo */}
+      <div className="border rounded-lg bg-card overflow-hidden shadow-sm">
+        <div className="overflow-x-auto w-full">
+          <table className="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr className="border-b bg-muted/50 text-muted-foreground uppercase font-bold">
+                <th className="p-3">Fecha</th>
+                <th className="p-3">Código</th>
+                <th className="p-3">Tipo</th>
+                <th className="p-3">Descripción</th>
+                <th className="p-3">Riesgo</th>
+                <th className="p-3 text-center">P.I.</th>
+                <th className="p-3 text-center">I.I.</th>
+                <th className="p-3 text-center">Perfil Inh.</th>
+                <th className="p-3 text-center">P.R.</th>
+                <th className="p-3 text-center">I.R.</th>
+                <th className="p-3 text-center">Perfil Res.</th>
+                <th className="p-3">Estado</th>
+                <th className="p-3 text-center w-10">Acciones</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
               {eventos.map((ev) => {
                 const pi = perfilLabel(ev.probabilidad, ev.impacto);
                 const pr = perfilLabel(ev.probabilidadResidual ?? null, ev.impactoResidual ?? null);
                 return (
-                  <TableRow key={ev.id}>
-                    <TableCell className="text-xs">{ev.fechaEvento ? new Date(ev.fechaEvento).toLocaleDateString("es-CO") : "-"}</TableCell>
-                    <TableCell className="font-mono text-xs">{ev.codigoEvento}</TableCell>
-                    <TableCell><Badge variant="outline">{ev.tipoEvento}</Badge></TableCell>
-                    <TableCell className="max-w-[200px] truncate text-sm" title={ev.descripcion}>{ev.descripcion}</TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground">{ev.codigoRiesgo || "—"}</TableCell>
-                    <TableCell className="text-center">{ev.probabilidad}</TableCell>
-                    <TableCell className="text-center">{ev.impacto}</TableCell>
-                    <TableCell><span className={`px-2 py-0.5 rounded text-xs font-bold ${pi.color}`}>{pi.label}</span></TableCell>
-                    <TableCell className="text-center">{ev.probabilidadResidual ?? "—"}</TableCell>
-                    <TableCell className="text-center">{ev.impactoResidual ?? "—"}</TableCell>
-                    <TableCell><span className={`px-2 py-0.5 rounded text-xs font-bold ${pr.color}`}>{pr.label}</span></TableCell>
-                    <TableCell><Badge variant="outline">{ev.estado || "Abierto"}</Badge></TableCell>
-                    <TableCell>
-                      <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                        onClick={() => handleDelete(ev.id, ev.codigoEvento)}>
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
+                  <tr key={ev.id} className="hover:bg-muted/30 transition-colors">
+                    <td className="p-3 whitespace-nowrap">{ev.fechaEvento || "-"}</td>
+                    <td className="p-3 font-mono font-bold">{ev.codigoEvento}</td>
+                    <td className="p-3"><span className="border px-2 py-0.5 rounded text-[10px] font-semibold">{ev.tipoEvento}</span></td>
+                    <td className="p-3 max-w-[220px] truncate" title={ev.descripcion}>{ev.descripcion}</td>
+                    <td className="p-3 font-mono text-muted-foreground">{ev.codigoRiesgo || "—"}</td>
+                    <td className="p-3 text-center font-bold">{ev.probabilidad}</td>
+                    <td className="p-3 text-center font-bold">{ev.impacto}</td>
+                    <td className="p-3 text-center"><span className={`px-2 py-0.5 rounded text-[10px] font-bold ${pi.color}`}>{pi.label}</span></td>
+                    <td className="p-3 text-center font-bold">{ev.probabilidadResidual ?? "—"}</td>
+                    <td className="p-3 text-center font-bold">{ev.impactoResidual ?? "—"}</td>
+                    <td className="p-3 text-center"><span className={`px-2 py-0.5 rounded text-[10px] font-bold ${pr.color}`}>{pr.label}</span></td>
+                    <td className="p-3"><span className="border px-2 py-0.5 rounded text-[10px]">{ev.estado || "Abierto"}</span></td>
+                    <td className="p-3 text-center">
+                      <button
+                        onClick={() => handleDelete(ev.id, ev.codigoEvento)}
+                        className="p-1 text-muted-foreground hover:text-red-600 rounded"
+                        title="Eliminar"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
                 );
               })}
-            </TableBody>
-          </Table>
+            </tbody>
+          </table>
         </div>
-      )}
+      </div>
     </div>
   );
 }
 
-// ── Eventos SAGRILAF Tab ───────────────────────────────────────────────────────
+// ── Tab: Eventos SAGRILAFT ───────────────────────────────────────────────────
 function EventosSagrilafTab() {
-  const queryClient = useQueryClient();
-  const { data: eventos = [], isLoading } = useGetEventosSagrilaf({ query: { queryKey: getGetEventosSagrilafQueryKey() } });
-  const createMutation = useCreateEventoSagrilaf();
-  const deleteMutation = useDeleteEventoSagrilaf();
-
+  const [eventos, setEventos] = useState<any[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
     codigo: "", tipo: "LAFT", factor: "CLI", etapa: "VIN", evento: "",
-    probabilidad: 1, impacto: 1, nivel: 1, apetito: 2, brecha: 0,
-    estado: "Prioritario", efectividadControl: 0, controlesTipicos: "",
+    probabilidad: 1, impacto: 1, nivel: 1, apetito: 2, estado: "Prioritario"
   });
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(EVENTOS_SAGRILAF_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setEventos(parsed);
+          return;
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    setEventos(DEFAULT_EVENTOS_SAGRILAF);
+    localStorage.setItem(EVENTOS_SAGRILAF_KEY, JSON.stringify(DEFAULT_EVENTOS_SAGRILAF));
+  }, []);
+
+  const saveStorage = (newList: any[]) => {
+    setEventos(newList);
+    localStorage.setItem(EVENTOS_SAGRILAF_KEY, JSON.stringify(newList));
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    const numFields = ["probabilidad", "impacto", "nivel", "apetito", "brecha", "efectividadControl"];
+    const numFields = ["probabilidad", "impacto", "apetito"];
     setForm((p) => {
       const newForm = { ...p, [name]: numFields.includes(name) ? Number(value) : value };
       if (name === "probabilidad" || name === "impacto") {
         newForm.nivel = Number(newForm.probabilidad) * Number(newForm.impacto);
-        newForm.brecha = Math.max(0, newForm.nivel - Number(newForm.apetito));
       }
       return newForm;
     });
   };
 
-  const handleSubmit = () => {
-    if (!form.codigo || !form.evento) { toast.error("Complete Código y Evento"); return; }
-    createMutation.mutate({ data: form as any }, {
-      onSuccess: () => {
-        toast.success("Evento SAGRILAFT registrado (fecha de creación auto-asignada)");
-        queryClient.invalidateQueries({ queryKey: getGetEventosSagrilafQueryKey() });
-        setShowForm(false);
-        setForm({ codigo: "", tipo: "LAFT", factor: "CLI", etapa: "VIN", evento: "", probabilidad: 1, impacto: 1, nivel: 1, apetito: 2, brecha: 0, estado: "Prioritario", efectividadControl: 0, controlesTipicos: "" });
-      },
-      onError: () => toast.error("Error al registrar evento"),
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.codigo || !form.evento) {
+      alert("Complete Código y Evento");
+      return;
+    }
+    const newEvt = {
+      id: Date.now().toString(),
+      ...form,
+      nivel: Number(form.probabilidad) * Number(form.impacto),
+      fechaCreacion: new Date().toLocaleDateString("es-CO")
+    };
+    saveStorage([newEvt, ...eventos]);
+    setShowForm(false);
+    setForm({
+      codigo: "", tipo: "LAFT", factor: "CLI", etapa: "VIN", evento: "",
+      probabilidad: 1, impacto: 1, nivel: 1, apetito: 2, estado: "Prioritario"
     });
   };
 
-  const handleDelete = (id: number, codigo: string) => {
-    if (!confirm(`¿Eliminar ${codigo}?`)) return;
-    deleteMutation.mutate({ id }, {
-      onSuccess: () => { toast.success("Eliminado"); queryClient.invalidateQueries({ queryKey: getGetEventosSagrilafQueryKey() }); },
-    });
+  const handleDelete = (id: string, codigo: string) => {
+    if (!confirm(`¿Eliminar evento ${codigo}?`)) return;
+    saveStorage(eventos.filter((ev) => ev.id !== id));
   };
 
   return (
     <div>
       <div className="flex justify-end mb-4">
-        <Button className="gap-2" onClick={() => setShowForm(!showForm)}>
+        <button
+          onClick={() => setShowForm(!showForm)}
+          className="flex items-center gap-2 px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white rounded-md text-sm font-medium transition-colors"
+        >
           {showForm ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
           {showForm ? "Cancelar" : "Añadir Evento SAGRILAFT"}
-        </Button>
+        </button>
       </div>
 
       {showForm && (
-        <Card className="mb-4">
-          <CardHeader className="pb-3"><CardTitle className="text-base">Nuevo Evento SAGRILAFT</CardTitle></CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="space-y-1.5">
-                <Label>Código *</Label>
-                <Input name="codigo" value={form.codigo} onChange={handleChange} placeholder="EVENT-20" />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Tipo</Label>
-                <Select name="tipo" value={form.tipo} onChange={handleChange}
-                  options={["LAFT","REP","OPE","TEC","LEG"].map((v) => ({ value: v, label: v }))} />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Factor</Label>
-                <Select name="factor" value={form.factor} onChange={handleChange}
-                  options={[{value:"CLI",label:"CLI - Cliente"},{value:"EMP",label:"EMP - Empleado"},{value:"PRV",label:"PRV - Proveedor"},{value:"TEC",label:"TEC - Tecnológico"},{value:"OTR",label:"OTR - Otro"}]} />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Etapa</Label>
-                <Select name="etapa" value={form.etapa} onChange={handleChange}
-                  options={[{value:"VIN",label:"VIN - Vinculación"},{value:"MON",label:"MON - Monitoreo"},{value:"CON",label:"CON - Contratación"},{value:"PER",label:"PER - Permanencia"},{value:"OPE",label:"OPE - Operación"}]} />
+        <form onSubmit={handleSubmit} className="border rounded-lg p-5 mb-6 bg-card shadow-sm space-y-4">
+          <h3 className="font-bold text-base text-foreground mb-2">Nuevo Evento SAGRILAFT</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div>
+              <label className="block text-xs font-semibold mb-1">Código *</label>
+              <input
+                name="codigo"
+                required
+                value={form.codigo}
+                onChange={handleChange}
+                placeholder="EVENTO-20"
+                className="w-full px-3 py-1.5 border rounded text-sm bg-background"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold mb-1">Tipo</label>
+              <Select
+                name="tipo"
+                value={form.tipo}
+                onChange={handleChange}
+                options={["LAFT", "REPS", "OPE", "TEC", "LEG"].map((v) => ({ value: v, label: v }))}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold mb-1">Factor</label>
+              <Select
+                name="factor"
+                value={form.factor}
+                onChange={handleChange}
+                options={[
+                  { value: "CLI", label: "CLI - Cliente" },
+                  { value: "EMP", label: "EMP - Empleado" },
+                  { value: "PRV", label: "PRV - Proveedor" },
+                  { value: "TEC", label: "TEC - Tecnológico" },
+                  { value: "OTR", label: "OTR - Otro" }
+                ]}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold mb-1">Etapa</label>
+              <Select
+                name="etapa"
+                value={form.etapa}
+                onChange={handleChange}
+                options={[
+                  { value: "VIN", label: "VIN - Vinculación" },
+                  { value: "POR", label: "POR - Monitoreo" },
+                  { value: "LUN", label: "LUN - Operación" },
+                  { value: "ESTAFA", label: "ESTAFA - Riesgo" }
+                ]}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold mb-1">Descripción del Evento *</label>
+            <textarea
+              name="evento"
+              required
+              rows={2}
+              value={form.evento}
+              onChange={handleChange}
+              className="w-full px-3 py-1.5 border rounded text-sm bg-background"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div>
+              <label className="block text-xs font-semibold mb-1">Probabilidad (1-5)</label>
+              <Select
+                name="probabilidad"
+                value={form.probabilidad}
+                onChange={handleChange}
+                options={[1, 2, 3, 4, 5].map((v) => ({ value: v, label: PROB_LABELS_EVENTO[v] }))}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold mb-1">Impacto (1-5)</label>
+              <Select
+                name="impacto"
+                value={form.impacto}
+                onChange={handleChange}
+                options={[1, 2, 3, 4, 5].map((v) => ({ value: v, label: IMP_LABELS[v] }))}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold mb-1">Nivel (Auto)</label>
+              <div className="flex h-9 items-center px-3 rounded bg-muted font-bold text-sm">
+                {Number(form.probabilidad) * Number(form.impacto)}
               </div>
             </div>
-            <div className="space-y-1.5">
-              <Label>Descripción del Evento *</Label>
-              <Textarea name="evento" value={form.evento} onChange={handleChange} rows={2} />
+            <div>
+              <label className="block text-xs font-semibold mb-1">Apetito de Riesgo</label>
+              <input
+                name="apetito"
+                type="number"
+                min={1}
+                max={25}
+                value={form.apetito}
+                onChange={handleChange}
+                className="w-full px-3 py-1.5 border rounded text-sm bg-background"
+              />
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="space-y-1.5">
-                <Label>Probabilidad (1-5)</Label>
-                <Select name="probabilidad" value={form.probabilidad} onChange={handleChange}
-                  options={[1,2,3,4,5].map((v) => ({ value: v, label: PROB_LABELS_EVENTO[v] }))} />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Impacto (1-5)</Label>
-                <Select name="impacto" value={form.impacto} onChange={handleChange}
-                  options={[1,2,3,4,5].map((v) => ({ value: v, label: IMP_LABELS[v] }))} />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Nivel (auto)</Label>
-                <div className="flex h-9 items-center px-3 rounded-md bg-muted/50 text-sm font-mono">{form.nivel}</div>
-              </div>
-              <div className="space-y-1.5">
-                <Label>Apetito de Riesgo</Label>
-                <Input name="apetito" type="number" min={1} max={25} value={form.apetito} onChange={handleChange} />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label>Estado</Label>
-                <Select name="estado" value={form.estado} onChange={handleChange}
-                  options={["Prioritario","En seguimiento","Controlado","Cerrado"].map((v) => ({ value: v, label: v }))} />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Controles Típicos</Label>
-                <Input name="controlesTipicos" value={form.controlesTipicos} onChange={handleChange} placeholder="Ej. Validación listas, DD..." />
-              </div>
-            </div>
-            <p className="text-xs text-muted-foreground bg-blue-50 border border-blue-200 rounded px-3 py-2">
-              📅 La <strong>fecha de creación</strong> se asignará automáticamente al guardar.
-            </p>
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => setShowForm(false)}>Cancelar</Button>
-              <Button onClick={handleSubmit} disabled={createMutation.isPending}>Guardar</Button>
-            </div>
-          </CardContent>
-        </Card>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold mb-1">Estado</label>
+            <Select
+              name="estado"
+              value={form.estado}
+              onChange={handleChange}
+              options={["Prioritario", "En seguimiento", "Controlado", "Cerrado"].map((v) => ({ value: v, label: v }))}
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={() => setShowForm(false)}
+              className="px-4 py-2 border rounded text-xs font-semibold hover:bg-muted"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white rounded text-xs font-semibold"
+            >
+              Guardar Evento
+            </button>
+          </div>
+        </form>
       )}
 
-      {isLoading ? (
-        <div className="p-8 text-center text-muted-foreground">Cargando eventos SAGRILAFT...</div>
-      ) : eventos.length === 0 ? (
-        <div className="p-8 text-center text-muted-foreground border rounded-md mt-2">No hay eventos SAGRILAFT registrados.</div>
-      ) : (
-        <div className="border rounded-md bg-card">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Código</TableHead>
-                <TableHead>Tipo</TableHead>
-                <TableHead>Factor</TableHead>
-                <TableHead>Etapa</TableHead>
-                <TableHead>Evento</TableHead>
-                <TableHead>P</TableHead><TableHead>I</TableHead><TableHead>Nivel</TableHead>
-                <TableHead>Apetito</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead>Creado</TableHead>
-                <TableHead className="w-10"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+      {/* Tabla Eventos SAGRILAFT */}
+      <div className="border rounded-lg bg-card overflow-hidden shadow-sm">
+        <div className="overflow-x-auto w-full">
+          <table className="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr className="border-b bg-muted/50 text-muted-foreground uppercase font-bold">
+                <th className="p-3">Código</th>
+                <th className="p-3">Tipo</th>
+                <th className="p-3">Factor</th>
+                <th className="p-3">Etapa</th>
+                <th className="p-3">Evento</th>
+                <th className="p-3 text-center">P</th>
+                <th className="p-3 text-center">I</th>
+                <th className="p-3 text-center font-bold">Nivel</th>
+                <th className="p-3 text-center">Apetito</th>
+                <th className="p-3">Estado</th>
+                <th className="p-3">Creado</th>
+                <th className="p-3 text-center w-10">Acciones</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
               {eventos.map((ev) => (
-                <TableRow key={ev.id}>
-                  <TableCell className="font-mono text-xs">{ev.codigo}</TableCell>
-                  <TableCell><Badge variant="outline">{ev.tipo}</Badge></TableCell>
-                  <TableCell className="text-xs">{ev.factor}</TableCell>
-                  <TableCell className="text-xs">{ev.etapa}</TableCell>
-                  <TableCell className="max-w-[240px] truncate text-sm" title={ev.evento}>{ev.evento}</TableCell>
-                  <TableCell className="text-center">{ev.probabilidad}</TableCell>
-                  <TableCell className="text-center">{ev.impacto}</TableCell>
-                  <TableCell className="text-center font-bold">{ev.nivel}</TableCell>
-                  <TableCell className="text-center">{ev.apetito ?? "—"}</TableCell>
-                  <TableCell><Badge variant="outline">{ev.estado || "Activo"}</Badge></TableCell>
-                  <TableCell className="text-xs text-muted-foreground">
-                    {ev.fechaCreacion ? new Date(ev.fechaCreacion).toLocaleDateString("es-CO") : "—"}
-                  </TableCell>
-                  <TableCell>
-                    <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                      onClick={() => handleDelete(ev.id, ev.codigo)}>
-                      <Trash2 className="w-3 h-3" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
+                <tr key={ev.id} className="hover:bg-muted/30 transition-colors">
+                  <td className="p-3 font-mono font-bold whitespace-nowrap">{ev.codigo}</td>
+                  <td className="p-3">
+                    <span className="border px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 dark:bg-slate-800">
+                      {ev.tipo}
+                    </span>
+                  </td>
+                  <td className="p-3 font-semibold text-muted-foreground">{ev.factor}</td>
+                  <td className="p-3 font-semibold text-muted-foreground">{ev.etapa}</td>
+                  <td className="p-3 max-w-[280px] truncate" title={ev.evento}>{ev.evento}</td>
+                  <td className="p-3 text-center font-bold">{ev.probabilidad}</td>
+                  <td className="p-3 text-center font-bold">{ev.impacto}</td>
+                  <td className="p-3 text-center font-bold text-sm text-teal-700 dark:text-teal-400">{ev.nivel}</td>
+                  <td className="p-3 text-center">{ev.apetito ?? "—"}</td>
+                  <td className="p-3">
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                      ev.estado === "Prioritario" ? "bg-red-100 text-red-800" :
+                      ev.estado === "En seguimiento" ? "bg-yellow-100 text-yellow-800" :
+                      "bg-green-100 text-green-800"
+                    }`}>
+                      {ev.estado || "Activo"}
+                    </span>
+                  </td>
+                  <td className="p-3 text-muted-foreground whitespace-nowrap">{ev.fechaCreacion || "21/7/2026"}</td>
+                  <td className="p-3 text-center">
+                    <button
+                      onClick={() => handleDelete(ev.id, ev.codigo)}
+                      className="p-1 text-muted-foreground hover:text-red-600 rounded"
+                      title="Eliminar"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </td>
+                </tr>
               ))}
-            </TableBody>
-          </Table>
+            </tbody>
+          </table>
         </div>
-      )}
+      </div>
     </div>
   );
 }
 
+// ── Componente Principal Events ──────────────────────────────────────────────
 export default function Events() {
-  const [activeTab, setActiveTab] = useState<"riesgo" | "sagrilaf">("riesgo");
+  const [activeTab, setActiveTab] = useState<"riesgo" | "sagrilaf">("sagrilaf");
+
   return (
-    <div className="flex flex-col h-full bg-background">
+    <div className="flex flex-col h-full bg-background overflow-y-auto">
       <div className="flex-none p-6 border-b pb-0">
         <h1 className="text-2xl font-bold text-foreground mb-1">Registro de Eventos</h1>
-        <p className="text-muted-foreground text-sm mb-6">Base de datos de materialización de riesgos e incidencias LAFT.</p>
+        <p className="text-muted-foreground text-sm mb-6">
+          Base de datos de materialización de riesgos e incidencias LAFT.
+        </p>
         <div className="flex border-b">
-          {(["riesgo", "sagrilaf"] as const).map((tab) => (
-            <button key={tab}
-              className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors ${activeTab === tab ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
-              onClick={() => setActiveTab(tab)}
-            >
-              {tab === "riesgo" ? "Eventos de Riesgo" : "Eventos SAGRILAFT"}
-            </button>
-          ))}
+          <button
+            className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors ${
+              activeTab === "sagrilaf" ? "border-primary text-primary font-bold" : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+            onClick={() => setActiveTab("sagrilaf")}
+          >
+            Eventos SAGRILAFT
+          </button>
+          <button
+            className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors ${
+              activeTab === "riesgo" ? "border-primary text-primary font-bold" : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+            onClick={() => setActiveTab("riesgo")}
+          >
+            Eventos de Riesgo
+          </button>
         </div>
       </div>
+
       <div className="flex-1 p-6 overflow-auto">
-        {activeTab === "riesgo" ? <EventosRiesgoTab /> : <EventosSagrilafTab />}
+        {activeTab === "sagrilaf" ? <EventosSagrilafTab /> : <EventosRiesgoTab />}
       </div>
     </div>
   );
