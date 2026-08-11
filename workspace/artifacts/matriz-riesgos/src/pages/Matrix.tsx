@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 
 const RIESGOS_KEY = "laft_riesgos_v1";
+const PARAMETROS_KEY = "laft_parametros_v1";
 
 interface ControlItem {
   codigo: string;
@@ -29,6 +30,24 @@ interface RiskItem {
   impactoResidual: number;
   perfilResidual: string;
 }
+
+// Parámetros por defecto si la memoria de parámetros está vacía
+const DEFAULT_PROCESOS = [
+  "GESTION ADMINISTRATIVA Y FINANCIERA",
+  "Gestión Académica",
+  "Gestión Comercial",
+  "Gestión Humana",
+  "Gestión Jurídica",
+  "Gestión de Tecnología"
+];
+
+const DEFAULT_SUBPROCESOS = [
+  "CARTERA",
+  "COMERCIAL-TELEMERCADEO-VENTAS",
+  "COMERCIAL-TELEMERCADEO-VENTAS-CORPORATIVO Y PERSONALIZADO-EXAMENES INTERNACIONALES-INSTITUTO-SMART ONLINE",
+  "COMPRAS",
+  "CONTABILIDAD"
+];
 
 const DEFAULT_CONTROLES: ControlItem[] = [
   {
@@ -65,26 +84,6 @@ const DEFAULT_RIESGOS: RiskItem[] = [
     probabilidadResidual: 1,
     impactoResidual: 2,
     perfilResidual: "ACEPTABLE"
-  },
-  {
-    id: "2",
-    codigo: "R-LAFT002",
-    proceso: "Gestión Administrativa y Financiera",
-    subproceso: "ADMINISTRATIVO-COMPRAS",
-    descripcion: "Pago a proveedores no verificados en listas restrictivas.",
-    banderas: ["PROVEEDOR", "Operativo"],
-    factorRiesgo: "PROVEEDOR",
-    tipologia: "Proveedor fantasma",
-    quePuedeSuceder: "Desvío de fondos",
-    porQuePuedeSuceder: "No validar listas",
-    probabilidadInherente: 3,
-    impactoInherente: 4,
-    perfilInherente: "MODERADO(12)",
-    controles: DEFAULT_CONTROLES,
-    efectividad: 50,
-    probabilidadResidual: 2,
-    impactoResidual: 3,
-    perfilResidual: "TOLERABLE"
   }
 ];
 
@@ -131,6 +130,10 @@ export default function Matrix() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRisk, setEditingRisk] = useState<RiskItem | null>(null);
 
+  // Listas de Parámetros Dinámicas
+  const [listaProcesos, setListaProcesos] = useState<string[]>(DEFAULT_PROCESOS);
+  const [listaSubprocesos, setListaSubprocesos] = useState<string[]>(DEFAULT_SUBPROCESOS);
+
   // Form State
   const [formData, setFormData] = useState({
     codigo: "",
@@ -147,7 +150,31 @@ export default function Matrix() {
     controles: DEFAULT_CONTROLES as ControlItem[],
   });
 
+  // Cargar parámetros y riesgos desde localStorage
   useEffect(() => {
+    // 1. Cargar Parámetros
+    try {
+      const savedParams = localStorage.getItem(PARAMETROS_KEY);
+      if (savedParams) {
+        const parsed = JSON.parse(savedParams);
+        if (parsed.procesos && Array.isArray(parsed.procesos) && parsed.procesos.length > 0) {
+          setListaProcesos(parsed.procesos);
+        }
+        if (parsed.subprocesos && Array.isArray(parsed.subprocesos) && parsed.subprocesos.length > 0) {
+          setListaSubprocesos(parsed.subprocesos);
+        }
+      } else {
+        // Fallbacks si la sección de parámetros usó llaves separadas
+        const savedProc = localStorage.getItem("laft_procesos");
+        if (savedProc) setListaProcesos(JSON.parse(savedProc));
+        const savedSubproc = localStorage.getItem("laft_subprocesos");
+        if (savedSubproc) setListaSubprocesos(JSON.parse(savedSubproc));
+      }
+    } catch (e) {
+      console.error("Error al cargar parámetros:", e);
+    }
+
+    // 2. Cargar Riesgos
     try {
       const saved = localStorage.getItem(RIESGOS_KEY);
       if (saved) {
@@ -162,7 +189,7 @@ export default function Matrix() {
     }
     setRiesgos(DEFAULT_RIESGOS);
     localStorage.setItem(RIESGOS_KEY, JSON.stringify(DEFAULT_RIESGOS));
-  }, []);
+  }, [isModalOpen]);
 
   const saveToStorage = (updatedList: RiskItem[]) => {
     setRiesgos(updatedList);
@@ -173,8 +200,8 @@ export default function Matrix() {
     setEditingRisk(null);
     setFormData({
       codigo: `R-LAFT00${riesgos.length + 1}`,
-      proceso: "Gestión Comercial",
-      subproceso: "COMERCIAL-TELEMERCADEO-VENTAS",
+      proceso: listaProcesos[0] || "Gestión Comercial",
+      subproceso: listaSubprocesos[0] || "COMERCIAL-TELEMERCADEO-VENTAS",
       descripcion: "",
       banderas: ["Laft", "Operativo"],
       factorRiesgo: "ESTUDIANTES",
@@ -192,8 +219,8 @@ export default function Matrix() {
     setEditingRisk(item);
     setFormData({
       codigo: item.codigo,
-      proceso: item.proceso,
-      subproceso: item.subproceso || "COMERCIAL-TELEMERCADEO-VENTAS",
+      proceso: item.proceso || listaProcesos[0],
+      subproceso: item.subproceso || listaSubprocesos[0],
       descripcion: item.descripcion,
       banderas: item.banderas || ["Laft"],
       factorRiesgo: item.factorRiesgo || "ESTUDIANTES",
@@ -302,7 +329,7 @@ export default function Matrix() {
         </button>
       </div>
 
-      {/* Search */}
+      {/* Buscador */}
       <div className="relative max-w-md">
         <svg className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -316,7 +343,7 @@ export default function Matrix() {
         />
       </div>
 
-      {/* Tabla Matriz con Scrollbar Horizontal Forzado */}
+      {/* Tabla Matriz */}
       <div className="border rounded-lg bg-card shadow-sm overflow-hidden w-full">
         <div className="custom-scroll overflow-x-auto w-full pb-3">
           <table className="min-w-[1300px] w-full text-left text-xs border-collapse">
@@ -369,7 +396,7 @@ export default function Matrix() {
         </div>
       </div>
 
-      {/* Modal / Formulario Completo */}
+      {/* Modal / Formulario Completo Conectado a Parámetros */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 overflow-y-auto">
           <div className="bg-background border rounded-xl shadow-2xl w-full max-w-4xl max-h-[92vh] overflow-y-auto my-6">
@@ -403,26 +430,34 @@ export default function Matrix() {
                       className="w-full px-3 py-2 border rounded-md text-sm bg-background"
                     />
                   </div>
+
+                  {/* Campo Proceso Conectado Dinámicamente a Parámetros */}
                   <div>
                     <label className="block text-xs font-semibold mb-1 text-foreground">Proceso *</label>
-                    <input
-                      type="text"
+                    <select
                       required
                       value={formData.proceso}
                       onChange={(e) => setFormData({ ...formData, proceso: e.target.value })}
                       className="w-full px-3 py-2 border rounded-md text-sm bg-background"
-                    />
+                    >
+                      {listaProcesos.map((p, idx) => (
+                        <option key={idx} value={p}>{p}</option>
+                      ))}
+                    </select>
                   </div>
+
+                  {/* Campo Subproceso Conectado Dinámicamente a Parámetros */}
                   <div>
-                    <label className="block text-xs font-semibold mb-1 text-foreground">Subproceso</label>
+                    <label className="block text-xs font-semibold mb-1 text-foreground">Subproceso *</label>
                     <select
+                      required
                       value={formData.subproceso}
                       onChange={(e) => setFormData({ ...formData, subproceso: e.target.value })}
                       className="w-full px-3 py-2 border rounded-md text-sm bg-background"
                     >
-                      <option value="COMERCIAL-TELEMERCADEO-VENTAS">COMERCIAL-TELEMERCADEO-VENTAS</option>
-                      <option value="OPERACIONES-LOGISTICA">OPERACIONES-LOGISTICA</option>
-                      <option value="ADMINISTRATIVO-COMPRAS">ADMINISTRATIVO-COMPRAS</option>
+                      {listaSubprocesos.map((sp, idx) => (
+                        <option key={idx} value={sp}>{sp}</option>
+                      ))}
                     </select>
                   </div>
                 </div>
@@ -596,7 +631,7 @@ export default function Matrix() {
                 </div>
               </div>
 
-              {/* Acciones */}
+              {/* Acciones del Formulario */}
               <div className="flex justify-end gap-3 pt-4 border-t">
                 <button
                   type="button"
