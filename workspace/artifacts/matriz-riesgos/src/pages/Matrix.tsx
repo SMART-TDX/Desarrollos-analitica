@@ -2,85 +2,113 @@ import React, { useState, useEffect } from "react";
 
 const RIESGOS_KEY = "laft_riesgos_v1";
 
+interface ControlItem {
+  codigo: string;
+  descripcion: string;
+  clase: "PREVENTIVO" | "DETECTIVO" | "CORRECTIVO";
+  ponderacion: number;
+}
+
 interface RiskItem {
   id: string;
   codigo: string;
   proceso: string;
+  subproceso: string;
   descripcion: string;
   banderas: string[];
+  factorRiesgo: string;
+  tipologia: string;
+  quePuedeSuceder: string;
+  porQuePuedeSuceder: string;
   probabilidadInherente: number;
   impactoInherente: number;
   perfilInherente: string;
+  controles: ControlItem[];
   efectividad: number;
   probabilidadResidual: number;
   impactoResidual: number;
   perfilResidual: string;
 }
 
+const DEFAULT_CONTROLES: ControlItem[] = [
+  {
+    codigo: "CTR-LAFT-01",
+    descripcion: "Consulta en las listas para todas las personas naturales y jurídicas a vincular.",
+    clase: "PREVENTIVO",
+    ponderacion: 42.5
+  },
+  {
+    codigo: "CTR-LAFT-04",
+    descripcion: "Chequeo de información pública en medios de comunicación o fuentes abiertas.",
+    clase: "PREVENTIVO",
+    ponderacion: 42.5
+  },
+  {
+    codigo: "CTR-LAFT-12",
+    descripcion: "Aplicación del procedimiento para identificación y consulta transaccional.",
+    clase: "DETECTIVO",
+    ponderacion: 37.8
+  }
+];
+
 const DEFAULT_RIESGOS: RiskItem[] = [
   {
     id: "1",
-    codigo: "R-LAFT001",
+    codigo: "R-LAFT003",
     proceso: "Gestión Comercial",
-    descripcion: "Infiltración de recursos de origen ilícito a través de nuevos clientes.",
-    banderas: ["CLIENTE", "LAFT"],
+    subproceso: "COMERCIAL-TELEMERCADEO-VENTAS",
+    descripcion: "Posibilidad de vincular y prestarle servicios a Clientes que se encuentran incluidos en las listas vinculantes y listas de Naciones Unidas.",
+    banderas: ["Laft", "Operativo", "Legal", "Reputacional", "Contagio"],
+    factorRiesgo: "ESTUDIANTES",
+    tipologia: "Cliente que no pasa por el proceso de due diligence de la academia",
+    quePuedeSuceder: "El cliente se encuentra en alguna de las listas restrictivas al momento de la validacion documental",
+    porQuePuedeSuceder: "No se realiza verificacion de listas para todos los clientes que se vinculan a la academia",
     probabilidadInherente: 2,
-    impactoInherente: 3,
-    perfilInherente: "TOLERABLE",
-    efectividad: 60,
-    probabilidadResidual: 1,
-    impactoResidual: 2,
-    perfilResidual: "ACEPTABLE"
-  },
-  {
-    id: "2",
-    codigo: "R-LAFT002",
-    proceso: "Gestión Administrativa y Financiera",
-    descripcion: "Pago a proveedores no verificados en listas restrictivas.",
-    banderas: ["PROVEEDOR", "OP"],
-    probabilidadInherente: 3,
-    impactoInherente: 4,
-    perfilInherente: "MODERADO",
+    impactoInherente: 5,
+    perfilInherente: "MODERADO(10)",
+    controles: DEFAULT_CONTROLES,
     efectividad: 50,
-    probabilidadResidual: 2,
-    impactoResidual: 3,
-    perfilResidual: "TOLERABLE"
-  },
-  {
-    id: "3",
-    codigo: "R-LAFT004",
-    proceso: "GESTION ADMINISTRATIVA Y FINANCIERA",
-    descripcion: "Operaciones sospechosas no detectadas a tiempo.",
-    banderas: ["LAFT"],
-    probabilidadInherente: 5,
-    impactoInherente: 3,
-    perfilInherente: "ALTO",
-    efectividad: 40,
-    probabilidadResidual: 2,
+    probabilidadResidual: 1,
     impactoResidual: 2,
     perfilResidual: "ACEPTABLE"
   }
 ];
 
-const AVAILABLE_FLAGS = ["LAFT", "OP", "PIERNA", "REPS", "ESTAFA", "CLIENTE", "PROVEEDOR"];
+const PROB_OPTIONS = [
+  { val: 1, label: "1 — Raro" },
+  { val: 2, label: "2 — Poco probable" },
+  { val: 3, label: "3 — Posible" },
+  { val: 4, label: "4 — Probable" },
+  { val: 5, label: "5 — Casi con certeza" },
+];
 
-const FLAG_COLORS: Record<string, string> = {
-  LAFT: "bg-blue-100 text-blue-800 border-blue-200",
-  OP: "bg-slate-200 text-slate-800 border-slate-300",
-  PIERNA: "bg-amber-100 text-amber-900 border-amber-200",
-  REPS: "bg-purple-100 text-purple-800 border-purple-200",
-  ESTAFA: "bg-pink-100 text-pink-800 border-pink-200",
-  CLIENTE: "bg-cyan-100 text-cyan-800 border-cyan-200",
-  PROVEEDOR: "bg-emerald-100 text-emerald-800 border-emerald-200",
-};
+const IMP_OPTIONS = [
+  { val: 1, label: "1 — Insignificante" },
+  { val: 2, label: "2 — Menor" },
+  { val: 3, label: "3 — Moderado" },
+  { val: 4, label: "4 — Mayor" },
+  { val: 5, label: "5 — Catastrófico" },
+];
 
-function getPerfil(prob: number, imp: number) {
+const BANDERAS_LIST = ["Laft", "Operativo", "Legal", "Reputacional", "Contagio"];
+
+function getPerfilInherente(prob: number, imp: number) {
   const score = prob * imp;
-  if (score <= 4) return { label: "ACEPTABLE", bg: "bg-emerald-600 text-white" };
-  if (score <= 9) return { label: "TOLERABLE", bg: "bg-amber-500 text-white" };
-  if (score <= 14) return { label: "MODERADO", bg: "bg-orange-500 text-white" };
-  if (score <= 19) return { label: "ALTO", bg: "bg-red-500 text-white" };
-  return { label: "CRITICO", bg: "bg-red-700 text-white" };
+  let label = "ACEPTABLE";
+  let bg = "bg-emerald-100 text-emerald-800 border-emerald-300";
+
+  if (score >= 15) {
+    label = "CRÍTICO";
+    bg = "bg-red-200 text-red-900 border-red-400";
+  } else if (score >= 10) {
+    label = "MODERADO";
+    bg = "bg-amber-100 text-amber-900 border-amber-300";
+  } else if (score >= 5) {
+    label = "TOLERABLE";
+    bg = "bg-yellow-100 text-yellow-900 border-yellow-300";
+  }
+
+  return { label: `${label}(${score})`, bg };
 }
 
 export default function Matrix() {
@@ -91,36 +119,32 @@ export default function Matrix() {
 
   // Form State
   const [formData, setFormData] = useState({
-    codigo: "",
-    proceso: "",
+    codigo: "R-LAFT003",
+    proceso: "Gestión Comercial",
+    subproceso: "COMERCIAL-TELEMERCADEO-VENTAS",
     descripcion: "",
-    banderas: [] as string[],
-    probabilidadInherente: 3,
-    impactoInherente: 3,
-    efectividad: 30,
-    probabilidadResidual: 1,
-    impactoResidual: 2,
+    banderas: ["Laft", "Operativo", "Legal", "Reputacional", "Contagio"] as string[],
+    factorRiesgo: "ESTUDIANTES",
+    tipologia: "",
+    quePuedeSuceder: "",
+    porQuePuedeSuceder: "",
+    probabilidadInherente: 2,
+    impactoInherente: 5,
+    controles: DEFAULT_CONTROLES as ControlItem[],
   });
 
-  // Load risks from localStorage
   useEffect(() => {
     try {
       const saved = localStorage.getItem(RIESGOS_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const normalized = parsed.map((item: any) => ({
-            ...item,
-            banderas: Array.isArray(item.banderas)
-              ? item.banderas
-              : item.flags ? [item.flags] : ["LAFT"]
-          }));
-          setRiesgos(normalized);
+          setRiesgos(parsed);
           return;
         }
       }
-    } catch {
-      // Fallback
+    } catch (e) {
+      console.error(e);
     }
     setRiesgos(DEFAULT_RIESGOS);
     localStorage.setItem(RIESGOS_KEY, JSON.stringify(DEFAULT_RIESGOS));
@@ -135,62 +159,82 @@ export default function Matrix() {
     setEditingRisk(null);
     setFormData({
       codigo: `R-LAFT00${riesgos.length + 1}`,
-      proceso: "Gestión Operativa",
-      descripcion: "",
-      banderas: ["LAFT", "OP"],
-      probabilidadInherente: 3,
-      impactoInherente: 3,
-      efectividad: 50,
-      probabilidadResidual: 1,
-      impactoResidual: 2,
+      proceso: "Gestión Comercial",
+      subproceso: "COMERCIAL-TELEMERCADEO-VENTAS",
+      descripcion: "Posibilidad de vincular y prestarle servicios a Clientes que se encuentran incluidos en las listas vinculantes y listas de Naciones Unidas",
+      banderas: ["Laft", "Operativo", "Legal", "Reputacional", "Contagio"],
+      factorRiesgo: "ESTUDIANTES",
+      tipologia: "Cliente que no pasa por el proceso de due diligence de la academia",
+      quePuedeSuceder: "El cliente se encuentra en alguna de las listas restrictivas al momento de la validacion documental",
+      porQuePuedeSuceder: "No se realiza verificacion de listas para todos los clientes que se vinculan a la academia",
+      probabilidadInherente: 2,
+      impactoInherente: 5,
+      controles: DEFAULT_CONTROLES,
     });
     setIsModalOpen(true);
   };
 
-  const handleOpenEdit = (risk: RiskItem) => {
-    setEditingRisk(risk);
+  const handleOpenEdit = (item: RiskItem) => {
+    setEditingRisk(item);
     setFormData({
-      codigo: risk.codigo,
-      proceso: risk.proceso,
-      descripcion: risk.descripcion,
-      banderas: Array.isArray(risk.banderas) ? risk.banderas : ["LAFT"],
-      probabilidadInherente: risk.probabilidadInherente || 1,
-      impactoInherente: risk.impactoInherente || 1,
-      efectividad: risk.efectividad || 0,
-      probabilidadResidual: risk.probabilidadResidual || 1,
-      impactoResidual: risk.impactoResidual || 1,
+      codigo: item.codigo,
+      proceso: item.proceso,
+      subproceso: item.subproceso || "COMERCIAL-TELEMERCADEO-VENTAS",
+      descripcion: item.descripcion,
+      banderas: item.banderas || ["Laft"],
+      factorRiesgo: item.factorRiesgo || "ESTUDIANTES",
+      tipologia: item.tipologia || "",
+      quePuedeSuceder: item.quePuedeSuceder || "",
+      porQuePuedeSuceder: item.porQuePuedeSuceder || "",
+      probabilidadInherente: item.probabilidadInherente || 2,
+      impactoInherente: item.impactoInherente || 5,
+      controles: item.controles || DEFAULT_CONTROLES,
     });
     setIsModalOpen(true);
   };
 
   const handleDelete = (id: string) => {
-    if (window.confirm("¿Está seguro de que desea eliminar este riesgo de la matriz?")) {
+    if (window.confirm("¿Está seguro de que desea eliminar este riesgo?")) {
       const updated = riesgos.filter((r) => r.id !== id);
       saveToStorage(updated);
     }
   };
 
+  const handleCheckboxBandera = (bandera: string) => {
+    if (formData.banderas.includes(bandera)) {
+      setFormData({ ...formData, banderas: formData.banderas.filter((b) => b !== bandera) });
+    } else {
+      setFormData({ ...formData, banderas: [...formData.banderas, bandera] });
+    }
+  };
+
+  const handleAddControl = () => {
+    const nextNum = formData.controles.length + 1;
+    const newCtrl: ControlItem = {
+      codigo: `CTR-LAFT-${nextNum < 10 ? '0' + nextNum : nextNum}`,
+      descripcion: "Nuevo control de verificación y seguimiento automático.",
+      clase: "PREVENTIVO",
+      ponderacion: 40.0
+    };
+    setFormData({ ...formData controles: [...formData.controles, newCtrl] });
+  };
+
+  const handleRemoveControl = (index: number) => {
+    const updatedCtrls = formData.controles.filter((_, i) => i !== index);
+    setFormData({ ...formData, controles: updatedCtrls });
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const perfilInh = getPerfil(Number(formData.probabilidadInherente), Number(formData.impactoInherente)).label;
-    const perfilRes = getPerfil(Number(formData.probabilidadResidual), Number(formData.impactoResidual)).label;
+    const perfilInh = getPerfilInherente(formData.probabilidadInherente, formData.impactoInherente).label;
 
     if (editingRisk) {
       const updated = riesgos.map((r) =>
         r.id === editingRisk.id
           ? {
               ...r,
-              codigo: formData.codigo,
-              proceso: formData.proceso,
-              descripcion: formData.descripcion,
-              banderas: formData.banderas,
-              probabilidadInherente: Number(formData.probabilidadInherente),
-              impactoInherente: Number(formData.impactoInherente),
+              ...formData,
               perfilInherente: perfilInh,
-              efectividad: Number(formData.efectividad),
-              probabilidadResidual: Number(formData.probabilidadResidual),
-              impactoResidual: Number(formData.impactoResidual),
-              perfilResidual: perfilRes,
             }
           : r
       );
@@ -198,54 +242,16 @@ export default function Matrix() {
     } else {
       const newRisk: RiskItem = {
         id: Date.now().toString(),
-        codigo: formData.codigo,
-        proceso: formData.proceso,
-        descripcion: formData.descripcion,
-        banderas: formData.banderas,
-        probabilidadInherente: Number(formData.probabilidadInherente),
-        impactoInherente: Number(formData.impactoInherente),
+        ...formData,
         perfilInherente: perfilInh,
-        efectividad: Number(formData.efectividad),
-        probabilidadResidual: Number(formData.probabilidadResidual),
-        impactoResidual: Number(formData.impactoResidual),
-        perfilResidual: perfilRes,
+        efectividad: 50,
+        probabilidadResidual: 1,
+        impactoResidual: 2,
+        perfilResidual: "ACEPTABLE"
       };
       saveToStorage([...riesgos, newRisk]);
     }
     setIsModalOpen(false);
-  };
-
-  const toggleFlag = (flag: string) => {
-    if (formData.banderas.includes(flag)) {
-      setFormData({ ...formData, banderas: formData.banderas.filter((f) => f !== flag) });
-    } else {
-      setFormData({ ...formData, banderas: [...formData.banderas, flag] });
-    }
-  };
-
-  const exportExcel = () => {
-    const headers = ["Código", "Proceso", "Descripción", "Banderas", "P.I.", "I.I.", "Perfil Inh.", "Efectividad %", "P.R.", "I.R.", "Perfil Res."];
-    const rows = riesgos.map((r) => [
-      r.codigo,
-      `"${r.proceso}"`,
-      `"${r.descripcion}"`,
-      `"${(r.banderas || []).join(", ")}"`,
-      r.probabilidadInherente,
-      r.impactoInherente,
-      r.perfilInherente,
-      `${r.efectividad}%`,
-      r.probabilidadResidual,
-      r.impactoResidual,
-      r.perfilResidual,
-    ]);
-    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "Matriz_de_Riesgos_LAFT.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
   };
 
   const filteredRiesgos = riesgos.filter(
@@ -255,65 +261,27 @@ export default function Matrix() {
       r.descripcion?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  return (
-    <div className="p-4 md:p-6 w-full max-w-full overflow-x-hidden bg-background min-h-screen">
-      {/* Estilos CSS para Scrollbar Horizontal Visible y Forzada */}
-      <style>{`
-        .table-scroll-container::-webkit-scrollbar {
-          height: 12px;
-        }
-        .table-scroll-container::-webkit-scrollbar-track {
-          background: #e2e8f0;
-          border-radius: 6px;
-        }
-        .table-scroll-container::-webkit-scrollbar-thumb {
-          background: #0f766e;
-          border-radius: 6px;
-          border: 2px solid #e2e8f0;
-        }
-        .table-scroll-container::-webkit-scrollbar-thumb:hover {
-          background: #0d9488;
-        }
-      `}</style>
+  const perfilInhCalc = getPerfilInherente(formData.probabilidadInherente, formData.impactoInherente);
 
+  return (
+    <div className="p-4 md:p-6 w-full bg-background min-h-screen">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Matriz de Riesgos</h1>
           <p className="text-muted-foreground text-sm">Vista consolidada de todos los riesgos evaluados.</p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <button
-            onClick={() => window.print()}
-            className="flex items-center gap-1.5 px-3 py-2 border rounded-md text-sm font-medium hover:bg-muted transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            PDF
-          </button>
-          <button
-            onClick={exportExcel}
-            className="flex items-center gap-1.5 px-3 py-2 border rounded-md text-sm font-medium hover:bg-muted transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
-            Sobresalir / Excel
-          </button>
+        <div className="flex items-center gap-2">
           <button
             onClick={handleOpenCreate}
-            className="flex items-center gap-1.5 px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white rounded-md text-sm font-medium transition-colors shadow-sm"
+            className="flex items-center gap-1.5 px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white rounded-md text-sm font-medium shadow-sm transition-colors"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
-            </svg>
-            Nuevo Riesgo
+            <span className="text-lg font-bold">+</span> Nuevo Riesgo
           </button>
         </div>
       </div>
 
-      {/* Search Input */}
+      {/* Search */}
       <div className="relative mb-6 max-w-md">
         <svg className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -327,278 +295,303 @@ export default function Matrix() {
         />
       </div>
 
-      {/* Contenedor principal de la Tabla con scrollbar horizontal visible */}
-      <div className="border rounded-lg bg-card shadow-sm overflow-hidden w-full">
-        <div className="table-scroll-container overflow-x-auto w-full pb-2">
-          <table className="min-w-[1250px] w-full text-left text-xs border-collapse">
+      {/* Tabla Matriz */}
+      <div className="border rounded-lg bg-card shadow-sm overflow-hidden">
+        <div className="overflow-x-auto w-full">
+          <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="border-b bg-muted/60 text-muted-foreground uppercase font-bold tracking-wider">
-                <th className="p-2.5 w-24">Código</th>
-                <th className="p-2.5 w-36">Proceso</th>
-                <th className="p-2.5 w-64">Descripción</th>
-                <th className="p-2.5 w-44">Banderas</th>
-                <th className="p-2.5 text-center w-10">P.I.</th>
-                <th className="p-2.5 text-center w-10">I.I.</th>
-                <th className="p-2.5 text-center w-28">Perfil Inh.</th>
-                <th className="p-2.5 text-center w-20">Efectividad</th>
-                <th className="p-2.5 text-center w-10">P.R.</th>
-                <th className="p-2.5 text-center w-10">I.R.</th>
-                <th className="p-2.5 text-center w-28">Perfil Res.</th>
-                <th className="p-2.5 text-center w-24 bg-muted/80 font-bold text-foreground">Acciones</th>
+              <tr className="border-b bg-muted/50 text-muted-foreground uppercase font-bold">
+                <th className="p-3">Código</th>
+                <th className="p-3">Proceso</th>
+                <th className="p-3">Descripción</th>
+                <th className="p-3">Banderas</th>
+                <th className="p-3 text-center">P.I.</th>
+                <th className="p-3 text-center">I.I.</th>
+                <th className="p-3 text-center">Perfil Inh.</th>
+                <th className="p-3 text-center">P.R.</th>
+                <th className="p-3 text-center">I.R.</th>
+                <th className="p-3 text-center">Perfil Res.</th>
+                <th className="p-3 text-center w-24">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {filteredRiesgos.length === 0 ? (
-                <tr>
-                  <td colSpan={12} className="p-8 text-center text-muted-foreground italic">
-                    No se encontraron riesgos registrados.
+              {filteredRiesgos.map((item) => (
+                <tr key={item.id} className="hover:bg-muted/30 transition-colors">
+                  <td className="p-3 font-bold">{item.codigo}</td>
+                  <td className="p-3 text-muted-foreground">{item.proceso}</td>
+                  <td className="p-3 max-w-[280px] truncate" title={item.descripcion}>{item.descripcion}</td>
+                  <td className="p-3">
+                    <div className="flex flex-wrap gap-1">
+                      {(item.banderas || []).map((b, i) => (
+                        <span key={i} className="px-1.5 py-0.5 text-[10px] bg-slate-100 border rounded font-semibold text-slate-700">
+                          {b}
+                        </span>
+                      ))}
+                    </div>
+                  </td>
+                  <td className="p-3 text-center font-bold">{item.probabilidadInherente}</td>
+                  <td className="p-3 text-center font-bold">{item.impactoInherente}</td>
+                  <td className="p-3 text-center font-bold text-amber-800">{item.perfilInherente}</td>
+                  <td className="p-3 text-center font-bold">{item.probabilidadResidual || 1}</td>
+                  <td className="p-3 text-center font-bold">{item.impactoResidual || 2}</td>
+                  <td className="p-3 text-center font-bold text-emerald-800">{item.perfilResidual || "ACEPTABLE"}</td>
+                  <td className="p-3 text-center">
+                    <div className="flex items-center justify-center gap-2">
+                      <button onClick={() => handleOpenEdit(item)} className="p-1 hover:text-teal-600">✏️</button>
+                      <button onClick={() => handleDelete(item.id)} className="p-1 hover:text-red-600">🗑️</button>
+                    </div>
                   </td>
                 </tr>
-              ) : (
-                filteredRiesgos.map((item) => {
-                  const perfilInh = getPerfil(item.probabilidadInherente, item.impactoInherente);
-                  const perfilRes = getPerfil(item.probabilidadResidual, item.impactoResidual);
-                  const flags = Array.isArray(item.banderas) ? item.banderas : ["LAFT"];
-
-                  return (
-                    <tr key={item.id} className="hover:bg-muted/40 transition-colors">
-                      <td className="p-2.5 font-bold text-xs whitespace-nowrap">{item.codigo}</td>
-                      <td className="p-2.5 text-xs text-muted-foreground">{item.proceso}</td>
-                      <td className="p-2.5 text-xs line-clamp-2 max-w-[260px]">{item.descripcion}</td>
-                      <td className="p-2.5">
-                        <div className="flex flex-wrap gap-1">
-                          {flags.map((f, i) => (
-                            <span
-                              key={i}
-                              className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${FLAG_COLORS[f] || "bg-gray-100 text-gray-700 border-gray-200"}`}
-                            >
-                              {f}
-                            </span>
-                          ))}
-                        </div>
-                      </td>
-                      <td className="p-2.5 text-center font-medium text-xs">{item.probabilidadInherente}</td>
-                      <td className="p-2.5 text-center font-medium text-xs">{item.impactoInherente}</td>
-                      <td className="p-2.5 text-center">
-                        <span className={`text-[10px] font-bold px-2 py-1 rounded-md inline-block min-w-[75px] ${perfilInh.bg}`}>
-                          {perfilInh.label}
-                        </span>
-                      </td>
-                      <td className="p-2.5 text-center text-xs font-mono font-semibold">
-                        {item.efectividad < 1 ? Math.round(item.efectividad * 100) : item.efectividad}%
-                      </td>
-                      <td className="p-2.5 text-center font-medium text-xs">{item.probabilidadResidual}</td>
-                      <td className="p-2.5 text-center font-medium text-xs">{item.impactoResidual}</td>
-                      <td className="p-2.5 text-center">
-                        <span className={`text-[10px] font-bold px-2 py-1 rounded-md inline-block min-w-[75px] ${perfilRes.bg}`}>
-                          {perfilRes.label}
-                        </span>
-                      </td>
-                      {/* Acciones Column */}
-                      <td className="p-2.5 text-center whitespace-nowrap bg-muted/20">
-                        <div className="flex items-center justify-center gap-2">
-                          <button
-                            onClick={() => handleOpenEdit(item)}
-                            title="Editar riesgo"
-                            className="p-1.5 text-muted-foreground hover:text-teal-700 hover:bg-teal-100 dark:hover:bg-teal-950 rounded transition-colors border border-transparent hover:border-teal-300"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                          </button>
-                          <button
-                            onClick={() => handleDelete(item.id)}
-                            title="Eliminar riesgo"
-                            className="p-1.5 text-muted-foreground hover:text-red-600 hover:bg-red-100 dark:hover:bg-red-950 rounded transition-colors border border-transparent hover:border-red-300"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
+              ))}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* Modal Edit / Create */}
+      {/* Ventana Modal / Formulario Completo (Imágenes 1 y 2) */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-y-auto">
-          <div className="bg-card border rounded-lg shadow-xl w-full max-w-2xl overflow-hidden my-8">
-            <div className="px-6 py-4 border-b flex justify-between items-center bg-muted/20">
-              <h3 className="text-lg font-bold">
-                {editingRisk ? `Editar Riesgo: ${editingRisk.codigo}` : "Nuevo Riesgo LAFT"}
-              </h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 overflow-y-auto">
+          <div className="bg-background border rounded-xl shadow-2xl w-full max-w-4xl max-h-[92vh] overflow-y-auto my-6">
+            
+            <div className="sticky top-0 bg-background z-10 border-b px-6 py-4 flex justify-between items-center">
+              <h2 className="text-xl font-bold text-foreground">
+                {editingRisk ? `Editar Riesgo: ${editingRisk.codigo}` : "Nuevo Riesgo"}
+              </h2>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="text-muted-foreground hover:text-foreground text-xl font-bold px-2"
+                className="text-muted-foreground hover:text-foreground text-2xl font-bold px-2"
               >
                 ×
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold mb-1">Código</label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.codigo}
-                    onChange={(e) => setFormData({ ...formData, codigo: e.target.value })}
-                    className="w-full px-3 py-2 border rounded text-sm bg-background"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold mb-1">Proceso</label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.proceso}
-                    onChange={(e) => setFormData({ ...formData, proceso: e.target.value })}
-                    className="w-full px-3 py-2 border rounded text-sm bg-background"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold mb-1">Descripción del Riesgo</label>
-                <textarea
-                  required
-                  rows={3}
-                  value={formData.descripcion}
-                  onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
-                  className="w-full px-3 py-2 border rounded text-sm bg-background"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold mb-1">Banderas / Factores de Riesgo</label>
-                <div className="flex flex-wrap gap-2 mt-1">
-                  {AVAILABLE_FLAGS.map((flag) => {
-                    const isSelected = formData.banderas.includes(flag);
-                    return (
-                      <button
-                        type="button"
-                        key={flag}
-                        onClick={() => toggleFlag(flag)}
-                        className={`text-xs px-2.5 py-1 rounded-md font-semibold border transition-all ${
-                          isSelected
-                            ? `${FLAG_COLORS[flag] || "bg-teal-700 text-white"} ring-2 ring-teal-500`
-                            : "bg-muted text-muted-foreground border-transparent hover:border-border"
-                        }`}
-                      >
-                        {isSelected ? `✓ ${flag}` : `+ ${flag}`}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="border-t pt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-3 bg-muted/20 p-3 rounded-md">
-                  <h4 className="font-bold text-xs uppercase text-teal-700">Riesgo Inherente</h4>
+            <form onSubmit={handleSubmit} className="p-6 space-y-6">
+              
+              {/* Sección 1: Identificación del Riesgo */}
+              <div className="border rounded-lg p-5 bg-card shadow-sm space-y-4">
+                <h3 className="font-bold text-base text-foreground">Identificación del Riesgo</h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-xs font-medium mb-1">Probabilidad Inherente (1-5)</label>
+                    <label className="block text-xs font-semibold mb-1 text-foreground">Código *</label>
                     <input
-                      type="number"
-                      min={1}
-                      max={5}
+                      type="text"
                       required
+                      value={formData.codigo}
+                      onChange={(e) => setFormData({ ...formData, codigo: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-md text-sm bg-background"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold mb-1 text-foreground">Proceso *</label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.proceso}
+                      onChange={(e) => setFormData({ ...formData, proceso: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-md text-sm bg-background"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold mb-1 text-foreground">Subproceso</label>
+                    <select
+                      value={formData.subproceso}
+                      onChange={(e) => setFormData({ ...formData, subproceso: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-md text-sm bg-background"
+                    >
+                      <option value="COMERCIAL-TELEMERCADEO-VENTAS">COMERCIAL-TELEMERCADEO-VENTAS</option>
+                      <option value="OPERACIONES-LOGISTICA">OPERACIONES-LOGISTICA</option>
+                      <option value="ADMINISTRATIVO-COMPRAS">ADMINISTRATIVO-COMPRAS</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold mb-1 text-foreground">Descripción del Riesgo *</label>
+                  <textarea
+                    required
+                    rows={3}
+                    value={formData.descripcion}
+                    onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-md text-sm bg-background"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold mb-2 text-foreground">Clasificación (Banderas)</label>
+                  <div className="flex flex-wrap items-center gap-6">
+                    {BANDERAS_LIST.map((b) => (
+                      <label key={b} className="flex items-center gap-2 cursor-pointer text-sm font-medium">
+                        <input
+                          type="checkbox"
+                          checked={formData.banderas.includes(b)}
+                          onChange={() => handleCheckboxBandera(b)}
+                          className="w-4 h-4 rounded text-teal-600 focus:ring-teal-500"
+                        />
+                        <span>{b}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Sección 2: Análisis Cualitativo */}
+              <div className="border rounded-lg p-5 bg-card shadow-sm space-y-4">
+                <h3 className="font-bold text-base text-foreground">Análisis Cualitativo</h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold mb-1 text-foreground">Factor de Riesgo</label>
+                    <select
+                      value={formData.factorRiesgo}
+                      onChange={(e) => setFormData({ ...formData, factorRiesgo: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-md text-sm bg-background"
+                    >
+                      <option value="ESTUDIANTES">ESTUDIANTES</option>
+                      <option value="CLIENTE">CLIENTE</option>
+                      <option value="PROVEEDOR">PROVEEDOR</option>
+                      <option value="EMPLEADO">EMPLEADO</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold mb-1 text-foreground">Tipología</label>
+                    <input
+                      type="text"
+                      value={formData.tipologia}
+                      onChange={(e) => setFormData({ ...formData, tipologia: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-md text-sm bg-background"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold mb-1 text-foreground">¿Qué puede suceder?</label>
+                    <textarea
+                      rows={2}
+                      value={formData.quePuedeSuceder}
+                      onChange={(e) => setFormData({ ...formData, quePuedeSuceder: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-md text-sm bg-background"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold mb-1 text-foreground">¿Por qué puede suceder?</label>
+                    <textarea
+                      rows={2}
+                      value={formData.porQuePuedeSuceder}
+                      onChange={(e) => setFormData({ ...formData, porQuePuedeSuceder: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-md text-sm bg-background"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Sección 3: Evaluación Inherente */}
+              <div className="border rounded-lg p-5 bg-card shadow-sm space-y-4">
+                <h3 className="font-bold text-base text-foreground">Evaluación Inherente</h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                  <div>
+                    <label className="block text-xs font-semibold mb-1 text-foreground">Probabilidad Inherente</label>
+                    <select
                       value={formData.probabilidadInherente}
                       onChange={(e) => setFormData({ ...formData, probabilidadInherente: Number(e.target.value) })}
-                      className="w-full px-3 py-1.5 border rounded text-sm bg-background"
-                    />
+                      className="w-full px-3 py-2 border rounded-md text-sm bg-background"
+                    >
+                      {PROB_OPTIONS.map((o) => (
+                        <option key={o.val} value={o.val}>{o.label}</option>
+                      ))}
+                    </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium mb-1">Impacto Inherente (1-5)</label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={5}
-                      required
+                    <label className="block text-xs font-semibold mb-1 text-foreground">Impacto Inherente</label>
+                    <select
                       value={formData.impactoInherente}
                       onChange={(e) => setFormData({ ...formData, impactoInherente: Number(e.target.value) })}
-                      className="w-full px-3 py-1.5 border rounded text-sm bg-background"
-                    />
+                      className="w-full px-3 py-2 border rounded-md text-sm bg-background"
+                    >
+                      {IMP_OPTIONS.map((o) => (
+                        <option key={o.val} value={o.val}>{o.label}</option>
+                      ))}
+                    </select>
                   </div>
-                  <div className="text-xs">
-                    <span className="font-semibold">Perfil Inherente: </span>
-                    <span className="font-bold text-teal-800">
-                      {getPerfil(formData.probabilidadInherente, formData.impactoInherente).label}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="space-y-3 bg-muted/20 p-3 rounded-md">
-                  <h4 className="font-bold text-xs uppercase text-teal-700">Controles & Residual</h4>
                   <div>
-                    <label className="block text-xs font-medium mb-1">Efectividad de Controles (%)</label>
-                    <input
-                      type="number"
-                      min={0}
-                      max={100}
-                      required
-                      value={formData.efectividad}
-                      onChange={(e) => setFormData({ ...formData, efectividad: Number(e.target.value) })}
-                      className="w-full px-3 py-1.5 border rounded text-sm bg-background"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="block text-xs font-medium mb-1">Prob. Residual</label>
-                      <input
-                        type="number"
-                        min={1}
-                        max={5}
-                        required
-                        value={formData.probabilidadResidual}
-                        onChange={(e) => setFormData({ ...formData, probabilidadResidual: Number(e.target.value) })}
-                        className="w-full px-3 py-1.5 border rounded text-sm bg-background"
-                      />
+                    <label className="block text-xs font-semibold mb-1 text-foreground">Perfil Inherente</label>
+                    <div className={`px-4 py-2 rounded-md font-bold text-sm border text-center ${perfilInhCalc.bg}`}>
+                      {perfilInhCalc.label}
                     </div>
-                    <div>
-                      <label className="block text-xs font-medium mb-1">Impacto Residual</label>
-                      <input
-                        type="number"
-                        min={1}
-                        max={5}
-                        required
-                        value={formData.impactoResidual}
-                        onChange={(e) => setFormData({ ...formData, impactoResidual: Number(e.target.value) })}
-                        className="w-full px-3 py-1.5 border rounded text-sm bg-background"
-                      />
-                    </div>
-                  </div>
-                  <div className="text-xs">
-                    <span className="font-semibold">Perfil Residual: </span>
-                    <span className="font-bold text-emerald-800">
-                      {getPerfil(formData.probabilidadResidual, formData.impactoResidual).label}
-                    </span>
                   </div>
                 </div>
               </div>
 
-              <div className="pt-4 border-t flex justify-end gap-3">
+              {/* Sección 4: Controles Asociados */}
+              <div className="border rounded-lg p-5 bg-card shadow-sm space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-bold text-base text-foreground">Controles Asociados</h3>
+                  <button
+                    type="button"
+                    onClick={handleAddControl}
+                    className="flex items-center gap-1 px-3 py-1.5 border rounded-md text-xs font-semibold hover:bg-muted transition-colors"
+                  >
+                    + Agregar control
+                  </button>
+                </div>
+
+                <div className="border rounded-lg overflow-hidden">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b bg-muted/40 text-muted-foreground uppercase font-bold">
+                        <th className="p-3 w-32">Código</th>
+                        <th className="p-3">Descripción</th>
+                        <th className="p-3 w-32">Clase</th>
+                        <th className="p-3 w-28 text-right">Ponderación</th>
+                        <th className="p-3 w-10 text-center"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {formData.controles.map((ctrl, idx) => (
+                        <tr key={idx} className="hover:bg-muted/20">
+                          <td className="p-3 font-mono font-bold">{ctrl.codigo}</td>
+                          <td className="p-3">{ctrl.descripcion}</td>
+                          <td className="p-3">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 border text-slate-800">
+                              {ctrl.clase}
+                            </span>
+                          </td>
+                          <td className="p-3 text-right font-semibold">{ctrl.ponderacion.toFixed(1).replace(".", ",")} %</td>
+                          <td className="p-3 text-center">
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveControl(idx)}
+                              className="text-muted-foreground hover:text-red-600 font-bold text-sm"
+                            >
+                              ✕
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Acciones del Formulario */}
+              <div className="flex justify-end gap-3 pt-4 border-t">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 border rounded-md text-sm font-medium hover:bg-muted"
+                  className="px-5 py-2 border rounded-md text-sm font-medium hover:bg-muted"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white rounded-md text-sm font-medium shadow-sm"
+                  className="px-5 py-2 bg-teal-700 hover:bg-teal-800 text-white rounded-md text-sm font-bold shadow-sm"
                 >
-                  Guardar Cambios
+                  Guardar Riesgo
                 </button>
               </div>
+
             </form>
           </div>
         </div>
