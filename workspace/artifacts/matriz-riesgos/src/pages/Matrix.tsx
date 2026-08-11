@@ -216,7 +216,7 @@ export default function Matrix() {
       clase: "PREVENTIVO",
       ponderacion: 40.0
     };
-    setFormData({ ...formData controles: [...formData.controles, newCtrl] });
+    setFormData({ ...formData, controles: [...formData.controles, newCtrl] });
   };
 
   const handleRemoveControl = (index: number) => {
@@ -348,7 +348,7 @@ export default function Matrix() {
         </div>
       </div>
 
-      {/* Ventana Modal / Formulario Completo (Imágenes 1 y 2) */}
+      {/* Ventana Modal / Formulario Completo */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 overflow-y-auto">
           <div className="bg-background border rounded-xl shadow-2xl w-full max-w-4xl max-h-[92vh] overflow-y-auto my-6">
