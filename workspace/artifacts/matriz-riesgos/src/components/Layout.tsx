@@ -1,7 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { 
   LayoutDashboard, Table as TableIcon, ShieldCheck, Activity, 
-  AlertTriangle, Target, Map, Settings, Menu 
+  AlertTriangle, Target, Map, Settings, Menu, X 
 } from "lucide-react";
 import React, { useState } from "react";
 
@@ -24,21 +24,34 @@ export function Layout({ children }: { children: React.ReactNode }) {
     <div className="flex h-screen w-full overflow-hidden bg-background">
       {/* Panel Lateral (Sidebar) */}
       <aside
+        style={{ backgroundColor: "#0b1320" }}
         className={`${
-          sidebarOpen ? "w-64" : "w-0 hidden"
-        } transition-all duration-300 flex-shrink-0 border-r border-sidebar-border bg-sidebar text-sidebar-foreground flex flex-col overflow-hidden`}
+          sidebarOpen ? "w-64" : "w-0 hidden opacity-0"
+        } transition-all duration-300 flex-shrink-0 border-r border-slate-800 text-white flex flex-col overflow-hidden`}
       >
-        <div className="h-16 flex items-center px-6 border-b border-sidebar-border shrink-0">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded bg-primary flex items-center justify-center text-primary-foreground font-bold text-lg">
+        {/* Encabezado Sidebar */}
+        <div className="h-16 flex items-center justify-between px-5 border-b border-slate-800 shrink-0">
+          <div className="flex items-center gap-3">
+            <div 
+              style={{ backgroundColor: "#c91212" }}
+              className="w-8 h-8 rounded flex items-center justify-center text-white font-bold text-base shadow"
+            >
               M
             </div>
-            <span className="font-semibold text-lg tracking-tight whitespace-nowrap">
+            <span className="font-bold text-base tracking-tight text-white whitespace-nowrap">
               Matriz de Riesgos
             </span>
           </div>
+          <button
+            onClick={() => setSidebarOpen(false)}
+            className="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800 transition-colors"
+            title="Ocultar menú"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
+        {/* Navegación */}
         <nav className="flex-1 overflow-y-auto py-4 px-3 flex flex-col gap-1">
           {NAV_ITEMS.map((item) => {
             const isActive =
@@ -48,10 +61,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <Link 
                 key={item.href} 
                 href={item.href}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-md transition-colors text-sm font-medium whitespace-nowrap ${
+                style={isActive ? { backgroundColor: "#c91212", color: "#ffffff" } : {}}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-md transition-colors text-sm font-semibold whitespace-nowrap ${
                   isActive 
-                    ? "bg-sidebar-primary text-sidebar-primary-foreground" 
-                    : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                    ? "shadow-md" 
+                    : "text-slate-300 hover:bg-slate-800/80 hover:text-white"
                 }`}
               >
                 <item.icon className="w-4 h-4 shrink-0" />
@@ -61,30 +75,28 @@ export function Layout({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-        <div className="p-4 border-t border-sidebar-border shrink-0 text-xs text-sidebar-foreground/50 whitespace-nowrap">
-          Matriz de Riesgos
+        <div className="p-4 border-t border-slate-800 shrink-0 text-xs text-slate-500 whitespace-nowrap">
+          Matriz de Riesgos SAGRILAFT
         </div>
       </aside>
 
-      {/* Ámbit Principal */}
-      <main className="flex-1 flex flex-col min-w-0 bg-background overflow-hidden">
+      {/* Área Principal */}
+      <main className="flex-1 flex flex-col min-w-0 bg-background overflow-hidden h-screen">
         {/* Barra superior con las 3 rayitas (Menu) */}
-        <header className="h-14 border-b border-sidebar-border bg-background flex items-center px-4 shrink-0 gap-3">
+        <header className="h-14 border-b border-border bg-card flex items-center px-4 shrink-0 gap-3 shadow-sm">
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="p-2 rounded-md hover:bg-sidebar-accent text-sidebar-foreground transition-colors"
-            title={sidebarOpen ? "Ocultar panel lateral" : "Mostrar panel lateral"}
+            className="p-2 rounded-md border border-input hover:bg-muted text-foreground transition-colors flex items-center justify-center"
+            title={sidebarOpen ? "Ocultar menú lateral" : "Mostrar menú lateral"}
           >
             <Menu className="w-5 h-5" />
           </button>
-          {!sidebarOpen && (
-            <span className="font-semibold text-sm text-sidebar-foreground/80">
-              Matriz de Riesgos
-            </span>
-          )}
+          <span className="font-semibold text-sm text-muted-foreground">
+            {sidebarOpen ? "Panel Principal" : "Vista Completa (Menú Oculto)"}
+          </span>
         </header>
 
-        {/* Área donde se renderizan las páginas con scroll vertical y horizontal HABILITADO */}
+        {/* Área donde se renderizan las tablas con scroll habilitado */}
         <div className="flex-1 overflow-y-auto overflow-x-auto p-4 md:p-6">
           {children}
         </div>
