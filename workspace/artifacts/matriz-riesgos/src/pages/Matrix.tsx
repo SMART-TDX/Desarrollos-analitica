@@ -31,7 +31,6 @@ interface RiskItem {
   perfilResidual: string;
 }
 
-// Parámetros por defecto si la memoria de parámetros está vacía
 const DEFAULT_PROCESOS = [
   "GESTION ADMINISTRATIVA Y FINANCIERA",
   "Gestión Académica",
@@ -130,7 +129,7 @@ export default function Matrix() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRisk, setEditingRisk] = useState<RiskItem | null>(null);
 
-  // Listas de Parámetros Dinámicas
+  // Parámetros Dinámicos
   const [listaProcesos, setListaProcesos] = useState<string[]>(DEFAULT_PROCESOS);
   const [listaSubprocesos, setListaSubprocesos] = useState<string[]>(DEFAULT_SUBPROCESOS);
 
@@ -150,7 +149,6 @@ export default function Matrix() {
     controles: DEFAULT_CONTROLES as ControlItem[],
   });
 
-  // Cargar parámetros y riesgos desde localStorage
   useEffect(() => {
     // 1. Cargar Parámetros
     try {
@@ -163,15 +161,9 @@ export default function Matrix() {
         if (parsed.subprocesos && Array.isArray(parsed.subprocesos) && parsed.subprocesos.length > 0) {
           setListaSubprocesos(parsed.subprocesos);
         }
-      } else {
-        // Fallbacks si la sección de parámetros usó llaves separadas
-        const savedProc = localStorage.getItem("laft_procesos");
-        if (savedProc) setListaProcesos(JSON.parse(savedProc));
-        const savedSubproc = localStorage.getItem("laft_subprocesos");
-        if (savedSubproc) setListaSubprocesos(JSON.parse(savedSubproc));
       }
     } catch (e) {
-      console.error("Error al cargar parámetros:", e);
+      console.error(e);
     }
 
     // 2. Cargar Riesgos
@@ -194,6 +186,49 @@ export default function Matrix() {
   const saveToStorage = (updatedList: RiskItem[]) => {
     setRiesgos(updatedList);
     localStorage.setItem(RIESGOS_KEY, JSON.stringify(updatedList));
+  };
+
+  const exportExcel = () => {
+    const headers = [
+      "Código",
+      "Proceso",
+      "Subproceso",
+      "Descripción",
+      "Banderas",
+      "Factor de Riesgo",
+      "Tipología",
+      "P.I.",
+      "I.I.",
+      "Perfil Inh.",
+      "Efectividad %",
+      "P.R.",
+      "I.R.",
+      "Perfil Res."
+    ];
+    const rows = riesgos.map((r) => [
+      r.codigo,
+      `"${r.proceso}"`,
+      `"${r.subproceso || ''}"`,
+      `"${r.descripcion}"`,
+      `"${(r.banderas || []).join(", ")}"`,
+      `"${r.factorRiesgo || ''}"`,
+      `"${r.tipologia || ''}"`,
+      r.probabilidadInherente,
+      r.impactoInherente,
+      r.perfilInherente,
+      `${r.efectividad}%`,
+      r.probabilidadResidual || 1,
+      r.impactoResidual || 2,
+      r.perfilResidual || 'ACEPTABLE',
+    ]);
+    const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "Matriz_de_Riesgos_LAFT.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const handleOpenCreate = () => {
@@ -315,18 +350,38 @@ export default function Matrix() {
         }
       `}</style>
 
-      {/* Header */}
+      {/* Header con Botones PDF y Excel */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Matriz de Riesgos</h1>
           <p className="text-muted-foreground text-sm">Vista consolidada de todos los riesgos evaluados.</p>
         </div>
-        <button
-          onClick={handleOpenCreate}
-          className="flex items-center gap-1.5 px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white rounded-md text-sm font-medium shadow-sm transition-colors"
-        >
-          <span className="text-lg font-bold">+</span> Nuevo Riesgo
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => window.print()}
+            className="flex items-center gap-1.5 px-3 py-2 border rounded-md text-sm font-medium hover:bg-muted transition-colors bg-card"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            PDF
+          </button>
+          <button
+            onClick={exportExcel}
+            className="flex items-center gap-1.5 px-3 py-2 border rounded-md text-sm font-medium hover:bg-muted transition-colors bg-card"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            Sobresalir / Excel
+          </button>
+          <button
+            onClick={handleOpenCreate}
+            className="flex items-center gap-1.5 px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white rounded-md text-sm font-medium shadow-sm transition-colors"
+          >
+            <span className="text-lg font-bold">+</span> Nuevo Riesgo
+          </button>
+        </div>
       </div>
 
       {/* Buscador */}
@@ -396,7 +451,7 @@ export default function Matrix() {
         </div>
       </div>
 
-      {/* Modal / Formulario Completo Conectado a Parámetros */}
+      {/* Modal / Formulario Completo */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 overflow-y-auto">
           <div className="bg-background border rounded-xl shadow-2xl w-full max-w-4xl max-h-[92vh] overflow-y-auto my-6">
@@ -431,7 +486,6 @@ export default function Matrix() {
                     />
                   </div>
 
-                  {/* Campo Proceso Conectado Dinámicamente a Parámetros */}
                   <div>
                     <label className="block text-xs font-semibold mb-1 text-foreground">Proceso *</label>
                     <select
@@ -446,7 +500,6 @@ export default function Matrix() {
                     </select>
                   </div>
 
-                  {/* Campo Subproceso Conectado Dinámicamente a Parámetros */}
                   <div>
                     <label className="block text-xs font-semibold mb-1 text-foreground">Subproceso *</label>
                     <select
@@ -631,7 +684,7 @@ export default function Matrix() {
                 </div>
               </div>
 
-              {/* Acciones del Formulario */}
+              {/* Acciones */}
               <div className="flex justify-end gap-3 pt-4 border-t">
                 <button
                   type="button"
