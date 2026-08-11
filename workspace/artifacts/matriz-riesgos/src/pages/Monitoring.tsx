@@ -1,18 +1,79 @@
-import { useGetMonitoreos, getGetMonitoreosQueryKey } from "@workspace/api-client-react";
-import { Button, Input, Card, CardContent } from "@/components/ui";
+import { useState, useEffect } from "react";
+import { Input } from "@/components/ui";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/table";
 import { Search, Activity } from "lucide-react";
-import { useState } from "react";
+
+const MONITOREO_KEY = "laft_monitoreo_v1";
+
+const DEFAULT_MONITOREOS = [
+  {
+    id: "1",
+    codigo: "MONT-LAFT001",
+    aspectoMonitorear: "Verificación de cumplimiento documental de debida diligencia",
+    indicador: "Numerosos casos con inconsistencias o documentación incompleta",
+    periodicidad: "Durante la solicitud",
+    responsable: "SAGRILAFT / Comercial/Compras/Mercadeo"
+  },
+  {
+    id: "2",
+    codigo: "MONT-LAFT002",
+    aspectoMonitorear: "Verificación de cumplimiento Actualización de Datos de la debida diligencia",
+    indicador: "Numero de casos actualizados vs. total del periodo",
+    periodicidad: "Anual",
+    responsable: "SAGRILAFT / Comercial/Compras/Mercadeo"
+  },
+  {
+    id: "3",
+    codigo: "MONT-LAFT003",
+    aspectoMonitorear: "Monitoreo, seguimiento y consolidación de transacciones del cliente.",
+    indicador: "Análisis del perfil de riesgo transaccional del cliente",
+    periodicidad: "Mensual",
+    responsable: "SAGRILAFT"
+  },
+  {
+    id: "4",
+    codigo: "MONT-LAFT004",
+    aspectoMonitorear: "Verificación listas restrictivas y LAFT",
+    indicador: "Numero de clientes verificados en listas restrictivas",
+    periodicidad: "Permanente",
+    responsable: "SAGRILAFT"
+  },
+  {
+    id: "5",
+    codigo: "MONT-LAFT005",
+    aspectoMonitorear: "Control de pagos en efectivo y canales de recaudo",
+    indicador: "Número de transacciones en efectivo que superan el umbral",
+    periodicidad: "Mensual",
+    responsable: "Cartera / Sagrilaft"
+  }
+];
 
 export default function Monitoring() {
   const [searchTerm, setSearchTerm] = useState("");
-  const { data: monitoreos = [], isLoading } = useGetMonitoreos({
-    query: { queryKey: getGetMonitoreosQueryKey() }
-  });
+  const [monitoreos, setMonitoreos] = useState<any[]>([]);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(MONITOREO_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setMonitoreos(parsed);
+          return;
+        }
+      }
+    } catch (e) {
+      console.error("Error leyendo localStorage:", e);
+    }
+    // Inicializar datos semilla si no hay guardados
+    setMonitoreos(DEFAULT_MONITOREOS);
+    localStorage.setItem(MONITOREO_KEY, JSON.stringify(DEFAULT_MONITOREOS));
+  }, []);
 
   const filtered = monitoreos.filter(m => 
-    m.codigo.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    m.aspectoMonitorear.toLowerCase().includes(searchTerm.toLowerCase())
+    (m.codigo || "").toLowerCase().includes(searchTerm.toLowerCase()) || 
+    (m.aspectoMonitorear || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (m.indicador || "").toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -43,7 +104,7 @@ export default function Monitoring() {
           <Table>
             <TableHeader className="bg-muted/50">
               <TableRow>
-                <TableHead className="w-[120px]">Riesgo Asoc.</TableHead>
+                <TableHead className="w-[140px]">Riesgo Asoc.</TableHead>
                 <TableHead>Aspecto a Monitorear</TableHead>
                 <TableHead>Indicador</TableHead>
                 <TableHead>Periodicidad</TableHead>
@@ -51,11 +112,7 @@ export default function Monitoring() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">Cargando plan de monitoreo...</TableCell>
-                </TableRow>
-              ) : filtered.length === 0 ? (
+              {filtered.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center py-12">
                     <Activity className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
@@ -64,12 +121,12 @@ export default function Monitoring() {
                   </TableCell>
                 </TableRow>
               ) : (
-                filtered.map(item => (
-                  <TableRow key={item.id}>
-                    <TableCell className="font-mono font-medium text-xs">{item.codigo}</TableCell>
-                    <TableCell className="max-w-[250px]">{item.aspectoMonitorear}</TableCell>
-                    <TableCell className="max-w-[200px] truncate" title={item.indicador || ""}>{item.indicador || "-"}</TableCell>
-                    <TableCell>{item.periodicidad || "-"}</TableCell>
+                filtered.map((item, idx) => (
+                  <TableRow key={item.id || idx}>
+                    <TableCell className="font-mono font-bold text-xs">{item.codigo}</TableCell>
+                    <TableCell className="max-w-[280px]">{item.aspectoMonitorear}</TableCell>
+                    <TableCell className="max-w-[250px]" title={item.indicador || ""}>{item.indicador || "-"}</TableCell>
+                    <TableCell className="font-medium text-xs text-teal-700 dark:text-teal-400">{item.periodicidad || "-"}</TableCell>
                     <TableCell>{item.responsable || "-"}</TableCell>
                   </TableRow>
                 ))
