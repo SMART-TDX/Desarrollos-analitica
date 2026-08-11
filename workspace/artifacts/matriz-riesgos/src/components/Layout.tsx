@@ -33,7 +33,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <div className="h-16 flex items-center justify-between px-5 border-b border-red-800/80 shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded bg-white text-[#c91212] font-extrabold flex items-center justify-center text-base shadow-sm">
-              M
+              SG
             </div>
             <span className="font-bold text-base tracking-tight text-white whitespace-nowrap">
               Matriz de Riesgos
