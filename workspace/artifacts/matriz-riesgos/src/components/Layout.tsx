@@ -22,18 +22,23 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background">
-      {/* Panel Lateral (Sidebar) con Fondo Rojo #c91212 */}
+      {/* Panel Lateral con Fondo Rojo */}
       <aside
         style={{ backgroundColor: "#c91212" }}
         className={`${
           sidebarOpen ? "w-64" : "w-0 hidden opacity-0"
         } transition-all duration-300 flex-shrink-0 border-r border-red-900 text-white flex flex-col overflow-hidden shadow-lg`}
       >
-        {/* Encabezado Sidebar */}
-        <div className="h-16 flex items-center justify-between px-5 border-b border-red-800/80 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded bg-white text-[#c91212] font-extrabold flex items-center justify-center text-base shadow-sm">
-              SG
+        {/* Encabezado Sidebar con Logo Smart desde carpeta public */}
+        <div className="h-16 flex items-center justify-between px-4 border-b border-red-800/80 shrink-0">
+          <div className="flex items-center gap-2.5">
+            {/* Contenedor blanco para resaltar el logo */}
+            <div className="bg-white p-1 rounded-md shadow-sm flex items-center justify-center min-w-[38px] h-9 overflow-hidden">
+              <img 
+                src="./logosmart.png" 
+                alt="Logo Smart" 
+                className="h-7 w-auto object-contain"
+              />
             </div>
             <span className="font-bold text-base tracking-tight text-white whitespace-nowrap">
               Matriz de Riesgos
@@ -93,7 +98,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </span>
         </header>
 
-        {/* Contenido con scroll habilitado */}
+        {/* Contenido principal */}
         <div className="flex-1 overflow-y-auto overflow-x-auto p-4 md:p-6">
           {children}
         </div>
