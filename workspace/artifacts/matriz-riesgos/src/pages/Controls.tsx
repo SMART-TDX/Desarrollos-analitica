@@ -1,97 +1,386 @@
 import React, { useState, useEffect } from "react";
 
-export const CONTROLES_KEY = "laft_controles_v1";
+export const CONTROLES_KEY = "laft_controles_v5_force";
 
 export interface CatalogControl {
   id: string;
   codigo: string;
   descripcion: string;
-  clase: "PREVENTIVO" | "DETECTIVO" | "CORRECTIVO";
+  clase: string;
   pesoClase: number;
-  tipo: "AUTOMÁTICO" | "SEMIAUTOMÁTICO" | "MANUAL";
+  tipo: string;
   pesoTipo: number;
-  frecuencia: "PERMANENTE" | "DIARIO" | "MENSUAL" | "OCASIONAL";
+  frecuencia: string;
   pesoFrecuencia: number;
-  formalidad: "FORMAL / DOCUMENTADO" | "NO FORMALIZADO";
+  formalidad: string;
   pesoFormalidad: number;
   ponderacion: number;
 }
-
-const PESOS_CLASE = { PREVENTIVO: 15.0, DETECTIVO: 10.0, CORRECTIVO: 5.0 };
-const PESOS_TIPO = { AUTOMÁTICO: 15.0, SEMIAUTOMÁTICO: 10.0, MANUAL: 5.0 };
-const PESOS_FRECUENCIA = { PERMANENTE: 10.0, DIARIO: 8.0, MENSUAL: 5.0, OCASIONAL: 2.5 };
-const PESOS_FORMALIDAD = { "FORMAL / DOCUMENTADO": 7.5, "NO FORMALIZADO": 2.5 };
 
 export const DEFAULT_CATALOG_CONTROLES: CatalogControl[] = [
   {
     id: "1",
     codigo: "CTR-LAFT-01",
-    descripcion: "Consulta en las listas restrictivas para todas las personas asociadas.",
+    descripcion: "Consulta en las listas para todas las personas naturales o jurídicas que se vinculen con la compañía y solicitud de Certificación SAGRILAFT",
     clase: "PREVENTIVO",
-    pesoClase: 15.0,
+    pesoClase: 45,
     tipo: "SEMIAUTOMÁTICO",
-    pesoTipo: 10.0,
+    pesoTipo: 35,
     frecuencia: "PERMANENTE",
-    pesoFrecuencia: 10.0,
-    formalidad: "FORMAL / DOCUMENTADO",
-    pesoFormalidad: 7.5,
-    ponderacion: 42.5
+    pesoFrecuencia: 45,
+    formalidad: "DODI",
+    pesoFormalidad: 45,
+    ponderacion: 43
   },
   {
     id: "2",
     codigo: "CTR-LAFT-02",
-    descripcion: "Aceptación de cláusula SAGRILAFT sobre prevención del riesgo.",
+    descripcion: "Aceptacion de clausula SAGRILAFT sobre origen y destino de los recursos, incluida en los contratos Smart",
     clase: "PREVENTIVO",
-    pesoClase: 15.0,
+    pesoClase: 45,
     tipo: "SEMIAUTOMÁTICO",
-    pesoTipo: 10.0,
+    pesoTipo: 35,
     frecuencia: "PERMANENTE",
-    pesoFrecuencia: 10.0,
-    formalidad: "FORMAL / DOCUMENTADO",
-    pesoFormalidad: 7.5,
-    ponderacion: 42.5
+    pesoFrecuencia: 45,
+    formalidad: "DODI",
+    pesoFormalidad: 45,
+    ponderacion: 43
   },
   {
     id: "3",
     codigo: "CTR-LAFT-03",
-    descripcion: "Aprobación por parte de gerencia para vinculación de clientes especiales.",
+    descripcion: "Aprobacion por parte de gerencia para los casos que pueden llegar a representar un riesgo para la academia",
     clase: "PREVENTIVO",
-    pesoClase: 15.0,
+    pesoClase: 45,
     tipo: "MANUAL",
-    pesoTipo: 5.0,
+    pesoTipo: 20,
     frecuencia: "OCASIONAL",
-    pesoFrecuencia: 2.5,
-    formalidad: "FORMAL / DOCUMENTADO",
-    pesoFormalidad: 7.5,
-    ponderacion: 30.0
+    pesoFrecuencia: 30,
+    formalidad: "DODI",
+    pesoFormalidad: 45,
+    ponderacion: 34
   },
   {
     id: "4",
     codigo: "CTR-LAFT-04",
-    descripcion: "Chequeo de información pública en medios de comunicación.",
+    descripcion: "Chequeo de información pública en medios de comunicación (Internet, Prensa, Radio, TV, Redes Sociales, Diario Oficial, Gaceta Distrital y otras) para las novedades en listas.",
     clase: "PREVENTIVO",
-    pesoClase: 15.0,
+    pesoClase: 45,
     tipo: "SEMIAUTOMÁTICO",
-    pesoTipo: 10.0,
+    pesoTipo: 35,
     frecuencia: "PERMANENTE",
-    pesoFrecuencia: 10.0,
-    formalidad: "FORMAL / DOCUMENTADO",
-    pesoFormalidad: 7.5,
-    ponderacion: 42.5
+    pesoFrecuencia: 45,
+    formalidad: "DODI",
+    pesoFormalidad: 45,
+    ponderacion: 43
   },
   {
     id: "5",
     codigo: "CTR-LAFT-05",
-    descripcion: "Validación y causación de recibos de caja contra extractos bancarios.",
+    descripcion: "Validacion y causacion de recibos de caja por parte de facturacion y cartera de los pagos realizados por los diferentes canales de recaudo.",
     clase: "DETECTIVO",
-    pesoClase: 10.0,
+    pesoClase: 40,
     tipo: "SEMIAUTOMÁTICO",
-    pesoTipo: 10.0,
+    pesoTipo: 35,
     frecuencia: "PERMANENTE",
-    pesoFrecuencia: 10.0,
-    formalidad: "FORMAL / DOCUMENTADO",
-    pesoFormalidad: 7.5,
-    ponderacion: 37.5
+    pesoFrecuencia: 45,
+    formalidad: "DODI",
+    pesoFormalidad: 45,
+    ponderacion: 42
+  },
+  {
+    id: "6",
+    codigo: "CTR-LAFT-06",
+    descripcion: "Identificacion y seguimiento de las partidas pendientes por identificar en los Bancos (cartera)",
+    clase: "DETECTIVO",
+    pesoClase: 40,
+    tipo: "MANUAL",
+    pesoTipo: 20,
+    frecuencia: "PERMANENTE",
+    pesoFrecuencia: 45,
+    formalidad: "DODI",
+    pesoFormalidad: 45,
+    ponderacion: 38
+  },
+  {
+    id: "7",
+    codigo: "CTR-LAFT-07",
+    descripcion: "Revision por parte de sagrilaft de los reportes diarios gestionados por cartera de los canales de recaudo.",
+    clase: "DETECTIVO",
+    pesoClase: 40,
+    tipo: "MANUAL",
+    pesoTipo: 20,
+    frecuencia: "PERIODICO",
+    pesoFrecuencia: 20,
+    formalidad: "DODI",
+    pesoFormalidad: 45,
+    ponderacion: 29
+  },
+  {
+    id: "8",
+    codigo: "CTR-LAFT-08",
+    descripcion: "Adquirir un servicio de consulta en listas por medio de un proveedor tecnologico de para el manejo de listas",
+    clase: "PREVENTIVO",
+    pesoClase: 45,
+    tipo: "SEMIAUTOMÁTICO",
+    pesoTipo: 35,
+    frecuencia: "PERMANENTE",
+    pesoFrecuencia: 45,
+    formalidad: "DODI",
+    pesoFormalidad: 45,
+    ponderacion: 43
+  },
+  {
+    id: "9",
+    codigo: "CTR-LAFT-09",
+    descripcion: "Analisis y aprobacion por parte de facturacion y matriculas de los documentos cargados en schoolpack",
+    clase: "PREVENTIVO",
+    pesoClase: 45,
+    tipo: "MANUAL",
+    pesoTipo: 20,
+    frecuencia: "PERMANENTE",
+    pesoFrecuencia: 45,
+    formalidad: "DODI",
+    pesoFormalidad: 45,
+    ponderacion: 39
+  },
+  {
+    id: "10",
+    codigo: "CTR-LAFT-10",
+    descripcion: "Aplicacion de los procedimientos para verificacion y aprobacion de los documentos suministrados por los Clientes por parte de facturacion y matriculas.",
+    clase: "DETECTIVO",
+    pesoClase: 40,
+    tipo: "SEMIAUTOMÁTICO",
+    pesoTipo: 35,
+    frecuencia: "PERMANENTE",
+    pesoFrecuencia: 45,
+    formalidad: "DODI",
+    pesoFormalidad: 45,
+    ponderacion: 42
+  },
+  {
+    id: "11",
+    codigo: "CTR-LAFT-11",
+    descripcion: "Realizar capacitaciones a los colaboradores de la academia en temas como gestion documental,señales de alerta, identificacion de Operaciones sospechosas, cambios importantes en la regulacion y concientizar sobre la prevencion del LA/FT/PADM.",
+    clase: "PREVENTIVO",
+    pesoClase: 45,
+    tipo: "SEMIAUTOMÁTICO",
+    pesoTipo: 35,
+    frecuencia: "PERIODICO",
+    pesoFrecuencia: 20,
+    formalidad: "DODI",
+    pesoFormalidad: 45,
+    ponderacion: 34
+  },
+  {
+    id: "12",
+    codigo: "CTR-LAFT-12",
+    descripcion: "Aplicación del procedimiento para identificación y conocimiento para identificar los clientes naturales y jurídicos, junto con los beneficiarios finales, validando la documentación entregada.",
+    clase: "DETECTIVO",
+    pesoClase: 40,
+    tipo: "MANUAL",
+    pesoTipo: 20,
+    frecuencia: "PERMANENTE",
+    pesoFrecuencia: 45,
+    formalidad: "DODI",
+    pesoFormalidad: 45,
+    ponderacion: 38
+  },
+  {
+    id: "13",
+    codigo: "CTR-LAFT-13",
+    descripcion: "Politica sobre el pago a contrapartes unicamente a través de medios bancarios, como transferencias bancarias a cuentas certificadas a nombre de la contraparte con quien se realiza la compra del producto o prestacion del servicio.",
+    clase: "PREVENTIVO",
+    pesoClase: 45,
+    tipo: "AUTOMÁTICO",
+    pesoTipo: 45,
+    frecuencia: "PERMANENTE",
+    pesoFrecuencia: 45,
+    formalidad: "DODI",
+    pesoFormalidad: 45,
+    ponderacion: 45
+  },
+  {
+    id: "14",
+    codigo: "CTR-LAFT-14",
+    descripcion: "Concepto del oficial de cumplimiento para vincular una contrapartes, posterior a la revision inicial de los analistas del proceso.",
+    clase: "PREVENTIVO",
+    pesoClase: 45,
+    tipo: "MANUAL",
+    pesoTipo: 20,
+    frecuencia: "PERMANENTE",
+    pesoFrecuencia: 45,
+    formalidad: "DODI",
+    pesoFormalidad: 45,
+    ponderacion: 39
+  },
+  {
+    id: "15",
+    codigo: "CTR-LAFT-15",
+    descripcion: "Validacion por parte del proceso de juridica encunato a que los inmuebles en los que se va a realizar la actividad economica no presenten procesos judiciales, cautelares que puedan generar un riesgo para Smart.",
+    clase: "PREVENTIVO",
+    pesoClase: 45,
+    tipo: "MANUAL",
+    pesoTipo: 20,
+    frecuencia: "PERMANENTE",
+    pesoFrecuencia: 45,
+    formalidad: "DODI",
+    pesoFormalidad: 45,
+    ponderacion: 39
+  },
+  {
+    id: "16",
+    codigo: "CTR-LAFT-16",
+    descripcion: "Conocimiento por parte de los empleados del listado de señales de alerta y del mecanismo de reporte",
+    clase: "DETECTIVO",
+    pesoClase: 40,
+    tipo: "MANUAL",
+    pesoTipo: 20,
+    frecuencia: "PERMANENTE",
+    pesoFrecuencia: 45,
+    formalidad: "DODI",
+    pesoFormalidad: 45,
+    ponderacion: 38
+  },
+  {
+    id: "17",
+    codigo: "CTR-LAFT-17",
+    descripcion: "Divulgación del Código de Etica y Conducta y lineamientos para la prevención y control del riesgo LA/FT",
+    clase: "PREVENTIVO",
+    pesoClase: 45,
+    tipo: "MANUAL",
+    pesoTipo: 20,
+    frecuencia: "PERMANENTE",
+    pesoFrecuencia: 45,
+    formalidad: "DODI",
+    pesoFormalidad: 45,
+    ponderacion: 39
+  },
+  {
+    id: "18",
+    codigo: "CTR-LAFT-18",
+    descripcion: "Aplicación del procedimiento de Talento Humano para la vinculación de nuevos colaboradores.",
+    clase: "PREVENTIVO",
+    pesoClase: 45,
+    tipo: "MANUAL",
+    pesoTipo: 20,
+    frecuencia: "PERMANENTE",
+    pesoFrecuencia: 45,
+    formalidad: "DODI",
+    pesoFormalidad: 45,
+    ponderacion: 39
+  },
+  {
+    id: "19",
+    codigo: "CTR-LAFT-19",
+    descripcion: "Revision del cumplimiento de debida diligencia de los los proveedores registrados en el CONTROL DE FACTURACION ELECTRONICA 2024, que maneja contabilidad por parte de sagrilaft",
+    clase: "DETECTIVO",
+    pesoClase: 40,
+    tipo: "SEMIAUTOMÁTICO",
+    pesoTipo: 35,
+    frecuencia: "PERMANENTE",
+    pesoFrecuencia: 45,
+    formalidad: "DODI",
+    pesoFormalidad: 45,
+    ponderacion: 42
+  },
+  {
+    id: "20",
+    codigo: "CTR-LAFT-20",
+    descripcion: "Identificacion de cumplimiento de protocolos de seguridad de las herramientas, aplicaciones, Software y Hardware, que procesan, almacenan y gestionan información y/o operaciones financieras de la academia",
+    clase: "PREVENTIVO",
+    pesoClase: 45,
+    tipo: "MANUAL",
+    pesoTipo: 20,
+    frecuencia: "PERMANENTE",
+    pesoFrecuencia: 45,
+    formalidad: "DODI",
+    pesoFormalidad: 45,
+    ponderacion: 39
+  },
+  {
+    id: "21",
+    codigo: "CTR-LAFT-21",
+    descripcion: "Politicas de seguridad respecto al uso y restriccion de usuarios de equipos, aplicaciones y plataformas por parte de los colaboradores.",
+    clase: "PREVENTIVO",
+    pesoClase: 45,
+    tipo: "MANUAL",
+    pesoTipo: 20,
+    frecuencia: "PERMANENTE",
+    pesoFrecuencia: 45,
+    formalidad: "DODI",
+    pesoFormalidad: 45,
+    ponderacion: 39
+  },
+  {
+    id: "22",
+    codigo: "CTR-LAFT-22",
+    descripcion: "Administracion de usuarios por niveles de seguridad de acuerdo al cargo al Area y la informacio que requiera.",
+    clase: "PREVENTIVO",
+    pesoClase: 45,
+    tipo: "MANUAL",
+    pesoTipo: 20,
+    frecuencia: "PERIODICO",
+    pesoFrecuencia: 20,
+    formalidad: "DODI",
+    pesoFormalidad: 45,
+    ponderacion: 30
+  },
+  {
+    id: "23",
+    codigo: "CTR-LAFT-23",
+    descripcion: "Analisis de los factores de riesgo por parte de Sagrilaft, antes del lanzamiento de un nuevo producto o aperturas de sedes.",
+    clase: "PREVENTIVO",
+    pesoClase: 45,
+    tipo: "MANUAL",
+    pesoTipo: 20,
+    frecuencia: "OCASIONAL",
+    pesoFrecuencia: 30,
+    formalidad: "NODO",
+    pesoFormalidad: 15,
+    ponderacion: 28
+  },
+  {
+    id: "24",
+    codigo: "CTR-LAFT-24",
+    descripcion: "Analisis de Jurisdicciones donde la academia realiza o proyecta sus actividades comerciales.",
+    clase: "PREVENTIVO",
+    pesoClase: 45,
+    tipo: "MANUAL",
+    pesoTipo: 20,
+    frecuencia: "OCASIONAL",
+    pesoFrecuencia: 30,
+    formalidad: "NODO",
+    pesoFormalidad: 15,
+    ponderacion: 28
+  },
+  {
+    id: "25",
+    codigo: "CTR-LAFT-25",
+    descripcion: "Revision y actualizacion de la Matriz legal de Smart",
+    clase: "DETECTIVO",
+    pesoClase: 40,
+    tipo: "MANUAL",
+    pesoTipo: 20,
+    frecuencia: "PERIODICO",
+    pesoFrecuencia: 20,
+    formalidad: "DODI",
+    pesoFormalidad: 45,
+    ponderacion: 29
+  },
+  {
+    id: "26",
+    codigo: "CTR-LAFT-26",
+    descripcion: "Divulgación de las obligaciones normativas Frente al cumplimiento del sistema Sagrilaft",
+    clase: "DETECTIVO",
+    pesoClase: 40,
+    tipo: "MANUAL",
+    pesoTipo: 20,
+    frecuencia: "PERIODICO",
+    pesoFrecuencia: 20,
+    formalidad: "DODI",
+    pesoFormalidad: 45,
+    ponderacion: 29
   }
 ];
 
@@ -105,14 +394,14 @@ export default function Controls() {
     codigo: "",
     descripcion: "",
     clase: "PREVENTIVO",
-    pesoClase: 15.0,
+    pesoClase: 45,
     tipo: "SEMIAUTOMÁTICO",
-    pesoTipo: 10.0,
+    pesoTipo: 35,
     frecuencia: "PERMANENTE",
-    pesoFrecuencia: 10.0,
-    formalidad: "FORMAL / DOCUMENTADO",
-    pesoFormalidad: 7.5,
-    ponderacion: 42.5
+    pesoFrecuencia: 45,
+    formalidad: "DODI",
+    pesoFormalidad: 45,
+    ponderacion: 43
   });
 
   useEffect(() => {
@@ -120,7 +409,7 @@ export default function Controls() {
       const saved = localStorage.getItem(CONTROLES_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
+        if (Array.isArray(parsed) && parsed.length >= 26) {
           setControles(parsed);
           return;
         }
@@ -137,76 +426,22 @@ export default function Controls() {
     localStorage.setItem(CONTROLES_KEY, JSON.stringify(updated));
   };
 
-  const calculatePonderacion = (
-    c = formData.clase,
-    t = formData.tipo,
-    f = formData.frecuencia,
-    form = formData.formalidad
-  ) => {
-    const pc = PESOS_CLASE[c] || 10;
-    const pt = PESOS_TIPO[t] || 10;
-    const pf = PESOS_FRECUENCIA[f] || 10;
-    const pform = PESOS_FORMALIDAD[form] || 7.5;
-    return {
-      pc, pt, pf, pform,
-      total: pc + pt + pf + pform
-    };
-  };
-
-  const handleClaseChange = (clase: CatalogControl["clase"]) => {
-    const calcs = calculatePonderacion(clase, formData.tipo, formData.frecuencia, formData.formalidad);
-    setFormData({
-      ...formData,
-      clase,
-      pesoClase: calcs.pc,
-      ponderacion: calcs.total
-    });
-  };
-
-  const handleTipoChange = (tipo: CatalogControl["tipo"]) => {
-    const calcs = calculatePonderacion(formData.clase, tipo, formData.frecuencia, formData.formalidad);
-    setFormData({
-      ...formData,
-      tipo,
-      pesoTipo: calcs.pt,
-      ponderacion: calcs.total
-    });
-  };
-
-  const handleFrecuenciaChange = (frecuencia: CatalogControl["frecuencia"]) => {
-    const calcs = calculatePonderacion(formData.clase, formData.tipo, frecuencia, formData.formalidad);
-    setFormData({
-      ...formData,
-      frecuencia,
-      pesoFrecuencia: calcs.pf,
-      ponderacion: calcs.total
-    });
-  };
-
-  const handleFormalidadChange = (formalidad: CatalogControl["formalidad"]) => {
-    const calcs = calculatePonderacion(formData.clase, formData.tipo, formData.frecuencia, formalidad);
-    setFormData({
-      ...formData,
-      formalidad,
-      pesoFormalidad: calcs.pform,
-      ponderacion: calcs.total
-    });
-  };
-
   const handleOpenCreate = () => {
     setEditingControl(null);
+    const num = controles.length + 1;
+    const codeStr = num < 10 ? `0${num}` : `${num}`;
     setFormData({
-      codigo: `CTR-LAFT-0${controles.length + 1}`,
+      codigo: `CTR-LAFT-${codeStr}`,
       descripcion: "",
       clase: "PREVENTIVO",
-      pesoClase: 15.0,
+      pesoClase: 45,
       tipo: "SEMIAUTOMÁTICO",
-      pesoTipo: 10.0,
+      pesoTipo: 35,
       frecuencia: "PERMANENTE",
-      pesoFrecuencia: 10.0,
-      formalidad: "FORMAL / DOCUMENTADO",
-      pesoFormalidad: 7.5,
-      ponderacion: 42.5
+      pesoFrecuencia: 45,
+      formalidad: "DODI",
+      pesoFormalidad: 45,
+      ponderacion: 43
     });
     setIsModalOpen(true);
   };
@@ -216,15 +451,15 @@ export default function Controls() {
     setFormData({
       codigo: control.codigo,
       descripcion: control.descripcion,
-      clase: control.clase || "PREVENTIVO",
-      pesoClase: control.pesoClase || 15.0,
-      tipo: control.tipo || "SEMIAUTOMÁTICO",
-      pesoTipo: control.pesoTipo || 10.0,
-      frecuencia: control.frecuencia || "PERMANENTE",
-      pesoFrecuencia: control.pesoFrecuencia || 10.0,
-      formalidad: control.formalidad || "FORMAL / DOCUMENTADO",
-      pesoFormalidad: control.pesoFormalidad || 7.5,
-      ponderacion: control.ponderacion || 42.5
+      clase: control.clase,
+      pesoClase: control.pesoClase,
+      tipo: control.tipo,
+      pesoTipo: control.pesoTipo,
+      frecuencia: control.frecuencia,
+      pesoFrecuencia: control.pesoFrecuencia,
+      formalidad: control.formalidad,
+      pesoFormalidad: control.pesoFormalidad,
+      ponderacion: control.ponderacion
     });
     setIsModalOpen(true);
   };
@@ -261,7 +496,7 @@ export default function Controls() {
 
   return (
     <div className="w-full space-y-6 pb-12">
-      {/* Header */}
+      {/* Encabezado Principal */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Catálogo de Controles</h1>
@@ -286,46 +521,78 @@ export default function Controls() {
         />
       </div>
 
-      {/* Tabla con Estructura de Encabezados Ponderados */}
-      <div className="border border-black rounded-lg bg-card shadow-sm overflow-hidden w-full">
+      {/* Tabla Limpia Estándar */}
+      <div className="border rounded-lg bg-card shadow-sm overflow-hidden w-full">
         <div className="overflow-x-auto w-full">
-          <table className="w-full text-left text-xs border-collapse">
+          <table className="w-full text-left text-xs border-collapse min-w-[1000px]">
             <thead>
-              <tr className="border-b border-black text-xs uppercase font-extrabold">
-                <th className="p-2 border-r border-black bg-stone-300 text-black w-28">Código</th>
-                <th className="p-2 border-r border-black bg-stone-300 text-black min-w-[220px]">Descripción</th>
-                <th className="p-2 border-r border-black text-black text-center" style={{ backgroundColor: "#8c2828" }}>CLASE</th>
-                <th className="p-2 border-r border-black bg-stone-300 text-black text-center w-20">PESO</th>
-                <th className="p-2 border-r border-black text-black text-center" style={{ backgroundColor: "#8c2828" }}>TIPO</th>
-                <th className="p-2 border-r border-black bg-stone-300 text-black text-center w-20">PESO</th>
-                <th className="p-2 border-r border-black text-black text-center" style={{ backgroundColor: "#8c2828" }}>FRECUENCIA</th>
-                <th className="p-2 border-r border-black bg-stone-300 text-black text-center w-20">PESO</th>
-                <th className="p-2 border-r border-black text-black text-center" style={{ backgroundColor: "#8c2828" }}>Formalidad del Control</th>
-                <th className="p-2 border-r border-black bg-stone-300 text-black text-center w-20">PESO</th>
-                <th className="p-2 border-r border-black bg-stone-300 text-black text-center w-28">PONDERACION</th>
-                <th className="p-2 bg-stone-300 text-black text-center w-20">Acciones</th>
+              <tr className="border-b bg-muted/60 text-muted-foreground uppercase font-bold text-[11px] tracking-wider">
+                <th className="p-3.5 w-32">Código</th>
+                <th className="p-3.5 min-w-[300px]">Control / Descripción</th>
+                <th className="p-3.5 text-center">Clase</th>
+                <th className="p-3.5 text-center">Peso</th>
+                <th className="p-3.5 text-center">Tipo</th>
+                <th className="p-3.5 text-center">Peso</th>
+                <th className="p-3.5 text-center">Frecuencia</th>
+                <th className="p-3.5 text-center">Peso</th>
+                <th className="p-3.5 text-center">Formalidad</th>
+                <th className="p-3.5 text-center">Peso</th>
+                <th className="p-3.5 text-center font-extrabold text-foreground bg-muted/30">Ponderación</th>
+                <th className="p-3.5 text-center w-20">Acciones</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-300">
+            <tbody className="divide-y divide-border">
               {filteredControles.map((item) => (
-                <tr key={item.id} className="hover:bg-muted/30 transition-colors border-b border-slate-300 text-xs">
-                  <td className="p-2 font-mono font-bold border-r border-slate-300">{item.codigo}</td>
-                  <td className="p-2 font-medium border-r border-slate-300">{item.descripcion}</td>
-                  <td className="p-2 border-r border-slate-300 text-center font-semibold">{item.clase}</td>
-                  <td className="p-2 border-r border-slate-300 text-center font-bold text-slate-700">{(item.pesoClase || 15).toFixed(1)} %</td>
-                  <td className="p-2 border-r border-slate-300 text-center font-semibold">{item.tipo}</td>
-                  <td className="p-2 border-r border-slate-300 text-center font-bold text-slate-700">{(item.pesoTipo || 10).toFixed(1)} %</td>
-                  <td className="p-2 border-r border-slate-300 text-center font-semibold">{item.frecuencia}</td>
-                  <td className="p-2 border-r border-slate-300 text-center font-bold text-slate-700">{(item.pesoFrecuencia || 10).toFixed(1)} %</td>
-                  <td className="p-2 border-r border-slate-300 text-center font-semibold">{item.formalidad || "FORMAL / DOCUMENTADO"}</td>
-                  <td className="p-2 border-r border-slate-300 text-center font-bold text-slate-700">{(item.pesoFormalidad || 7.5).toFixed(1)} %</td>
-                  <td className="p-2 border-r border-slate-300 text-center font-extrabold text-teal-800 bg-teal-50/50">
-                    {((item.ponderacion || 42.5) / 100).toFixed(3).replace(".", ",")}
+                <tr key={item.id} className="hover:bg-muted/30 transition-colors">
+                  <td className="p-3.5 font-mono font-bold text-xs text-teal-800 dark:text-teal-400 whitespace-nowrap">
+                    {item.codigo}
                   </td>
-                  <td className="p-2 text-center whitespace-nowrap">
-                    <div className="flex items-center justify-center gap-1">
-                      <button onClick={() => handleOpenEdit(item)} className="p-1 hover:text-teal-600 text-sm" title="Editar">✏️</button>
-                      <button onClick={() => handleDelete(item.id)} className="p-1 hover:text-red-600 text-sm" title="Eliminar">🗑️</button>
+                  <td className="p-3.5 text-xs font-medium text-foreground leading-relaxed">
+                    {item.descripcion}
+                  </td>
+                  <td className="p-3.5 text-center font-semibold text-slate-700 dark:text-slate-300">
+                    {item.clase}
+                  </td>
+                  <td className="p-3.5 text-center text-muted-foreground font-medium">
+                    {item.pesoClase}%
+                  </td>
+                  <td className="p-3.5 text-center font-semibold text-slate-700 dark:text-slate-300">
+                    {item.tipo}
+                  </td>
+                  <td className="p-3.5 text-center text-muted-foreground font-medium">
+                    {item.pesoTipo}%
+                  </td>
+                  <td className="p-3.5 text-center font-semibold text-slate-700 dark:text-slate-300">
+                    {item.frecuencia}
+                  </td>
+                  <td className="p-3.5 text-center text-muted-foreground font-medium">
+                    {item.pesoFrecuencia}%
+                  </td>
+                  <td className="p-3.5 text-center font-semibold text-slate-700 dark:text-slate-300">
+                    {item.formalidad}
+                  </td>
+                  <td className="p-3.5 text-center text-muted-foreground font-medium">
+                    {item.pesoFormalidad}%
+                  </td>
+                  <td className="p-3.5 text-center font-bold text-sm text-teal-700 dark:text-teal-400 bg-teal-50/40 dark:bg-teal-950/20">
+                    {item.ponderacion}%
+                  </td>
+                  <td className="p-3.5 text-center whitespace-nowrap">
+                    <div className="flex items-center justify-center gap-1.5">
+                      <button
+                        onClick={() => handleOpenEdit(item)}
+                        className="p-1 hover:text-teal-600 text-base transition-colors"
+                        title="Editar Control"
+                      >
+                        ✏️
+                      </button>
+                      <button
+                        onClick={() => handleDelete(item.id)}
+                        className="p-1 hover:text-red-600 text-base transition-colors"
+                        title="Eliminar Control"
+                      >
+                        🗑️
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -335,17 +602,17 @@ export default function Controls() {
         </div>
       </div>
 
-      {/* Modal Formulario Estructurado */}
+      {/* Modal Limpio Estándar */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="bg-background border rounded-xl shadow-2xl w-full max-w-lg p-6 space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 overflow-y-auto">
+          <div className="bg-background border rounded-xl shadow-2xl w-full max-w-xl p-6 space-y-4 my-8">
             <div className="flex justify-between items-center border-b pb-3">
               <h3 className="font-bold text-lg text-foreground">
                 {editingControl ? `Editar Control: ${editingControl.codigo}` : "Nuevo Control"}
               </h3>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="text-muted-foreground hover:text-foreground font-bold text-xl"
+                className="text-muted-foreground hover:text-foreground font-bold text-xl px-2"
               >
                 ×
               </button>
@@ -364,7 +631,7 @@ export default function Controls() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold mb-1 text-foreground">Descripción *</label>
+                <label className="block text-xs font-semibold mb-1 text-foreground">Descripción del Control *</label>
                 <textarea
                   required
                   rows={3}
@@ -374,70 +641,98 @@ export default function Controls() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold mb-1 text-foreground">Clase</label>
-                  <select
+                  <input
+                    type="text"
                     value={formData.clase}
-                    onChange={(e) => handleClaseChange(e.target.value as any)}
+                    onChange={(e) => setFormData({ ...formData, clase: e.target.value })}
                     className="w-full px-3 py-2 border rounded-md text-sm bg-background"
-                  >
-                    <option value="PREVENTIVO">PREVENTIVO</option>
-                    <option value="DETECTIVO">DETECTIVO</option>
-                    <option value="CORRECTIVO">CORRECTIVO</option>
-                  </select>
+                  />
                 </div>
-
                 <div>
-                  <label className="block text-xs font-semibold mb-1 text-foreground">Ejecución</label>
-                  <select
-                    value={formData.tipo}
-                    onChange={(e) => handleTipoChange(e.target.value as any)}
+                  <label className="block text-xs font-semibold mb-1 text-foreground">Peso Clase (%)</label>
+                  <input
+                    type="number"
+                    value={formData.pesoClase}
+                    onChange={(e) => setFormData({ ...formData, pesoClase: Number(e.target.value) })}
                     className="w-full px-3 py-2 border rounded-md text-sm bg-background"
-                  >
-                    <option value="SEMIAUTOMÁTICO">SEMIAUTOMÁTICO</option>
-                    <option value="AUTOMÁTICO">AUTOMÁTICO</option>
-                    <option value="MANUAL">MANUAL</option>
-                  </select>
+                  />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold mb-1 text-foreground">Frecuencia</label>
-                  <select
-                    value={formData.frecuencia}
-                    onChange={(e) => handleFrecuenciaChange(e.target.value as any)}
-                    className="w-full px-3 py-2 border rounded-md text-sm bg-background"
-                  >
-                    <option value="PERMANENTE">PERMANENTE</option>
-                    <option value="DIARIO">DIARIO</option>
-                    <option value="MENSUAL">MENSUAL</option>
-                    <option value="OCASIONAL">OCASIONAL</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold mb-1 text-foreground">Ponderación (%)</label>
+                  <label className="block text-xs font-semibold mb-1 text-foreground">Tipo / Ejecución</label>
                   <input
                     type="text"
-                    value={(formData.ponderacion / 100).toFixed(3).replace(".", ",")}
-                    readOnly
-                    className="w-full px-3 py-2 border rounded-md text-sm bg-muted/40 font-bold"
+                    value={formData.tipo}
+                    onChange={(e) => setFormData({ ...formData, tipo: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-md text-sm bg-background"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-1 text-foreground">Peso Tipo (%)</label>
+                  <input
+                    type="number"
+                    value={formData.pesoTipo}
+                    onChange={(e) => setFormData({ ...formData, pesoTipo: Number(e.target.value) })}
+                    className="w-full px-3 py-2 border rounded-md text-sm bg-background"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold mb-1 text-foreground">Frecuencia</label>
+                  <input
+                    type="text"
+                    value={formData.frecuencia}
+                    onChange={(e) => setFormData({ ...formData, frecuencia: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-md text-sm bg-background"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-1 text-foreground">Peso Frecuencia (%)</label>
+                  <input
+                    type="number"
+                    value={formData.pesoFrecuencia}
+                    onChange={(e) => setFormData({ ...formData, pesoFrecuencia: Number(e.target.value) })}
+                    className="w-full px-3 py-2 border rounded-md text-sm bg-background"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold mb-1 text-foreground">Formalidad del Control</label>
+                  <input
+                    type="text"
+                    value={formData.formalidad}
+                    onChange={(e) => setFormData({ ...formData, formalidad: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-md text-sm bg-background"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-1 text-foreground">Peso Formalidad (%)</label>
+                  <input
+                    type="number"
+                    value={formData.pesoFormalidad}
+                    onChange={(e) => setFormData({ ...formData, pesoFormalidad: Number(e.target.value) })}
+                    className="w-full px-3 py-2 border rounded-md text-sm bg-background"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold mb-1 text-foreground">Formalidad del Control</label>
-                <select
-                  value={formData.formalidad}
-                  onChange={(e) => handleFormalidadChange(e.target.value as any)}
-                  className="w-full px-3 py-2 border rounded-md text-sm bg-background"
-                >
-                  <option value="FORMAL / DOCUMENTADO">FORMAL / DOCUMENTADO</option>
-                  <option value="NO FORMALIZADO">NO FORMALIZADO</option>
-                </select>
+                <label className="block text-xs font-semibold mb-1 text-foreground">Ponderación Total (%)</label>
+                <input
+                  type="number"
+                  value={formData.ponderacion}
+                  onChange={(e) => setFormData({ ...formData, ponderacion: Number(e.target.value) })}
+                  className="w-full px-3 py-2 border rounded-md text-sm bg-background font-bold text-teal-800"
+                />
               </div>
 
               <div className="flex justify-end gap-3 pt-4 border-t">
