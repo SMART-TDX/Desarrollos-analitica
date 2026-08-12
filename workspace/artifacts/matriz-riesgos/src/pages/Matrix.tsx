@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { CONTROLES_KEY, CatalogControl, DEFAULT_CATALOG_CONTROLES } from "./Controls";
 
 const RIESGOS_KEY = "laft_riesgos_v1";
 const PARAMETROS_KEY = "laft_parametros_v1";
@@ -45,19 +46,31 @@ const DEFAULT_SUBPROCESOS = [
   "COMERCIAL-TELEMERCADEO-VENTAS",
   "COMERCIAL-TELEMERCADEO-VENTAS-CORPORATIVO Y PERSONALIZADO-EXAMENES INTERNACIONALES-INSTITUTO-SMART ONLINE",
   "COMPRAS",
-  "CONTABILIDAD"
+  "CONTABILIDAD",
+  "INSTITUTO"
 ];
 
-const DEFAULT_CONTROLES: ControlItem[] = [
+const DEFAULT_FACTORES = [
+  "ALIADOS ESTRATÉGICOS",
+  "CANALES DE DISTRIBUCIÓN",
+  "Colaboradores",
+  "EMPLEADOS",
+  "ESTUDIANTES",
+  "PRODUCTOS Y SERVICIOS",
+  "PROVEEDORES",
+  "TECNOLÓGICO"
+];
+
+const DEFAULT_CONTROLES_RIESGO: ControlItem[] = [
   {
     codigo: "CTR-LAFT-01",
-    descripcion: "Consulta en las listas para todas las personas naturales y jurídicas a vincular.",
+    descripcion: "Consulta en las listas restrictivas para todas las personas asociadas.",
     clase: "PREVENTIVO",
     ponderacion: 42.5
   },
   {
     codigo: "CTR-LAFT-04",
-    descripcion: "Chequeo de información pública en medios de comunicación o fuentes abiertas.",
+    descripcion: "Chequeo de información pública en medios de comunicación.",
     clase: "PREVENTIVO",
     ponderacion: 42.5
   }
@@ -71,14 +84,14 @@ const DEFAULT_RIESGOS: RiskItem[] = [
     subproceso: "COMERCIAL-TELEMERCADEO-VENTAS",
     descripcion: "Infiltración de recursos de origen ilícito a través de nuevos clientes.",
     banderas: ["CLIENTE", "Laft"],
-    factorRiesgo: "CLIENTE",
+    factorRiesgo: "ESTUDIANTES",
     tipologia: "Cliente sin verificar",
     quePuedeSuceder: "Vinculación de fondos ilícitos",
     porQuePuedeSuceder: "Omitir lista restrictiva",
     probabilidadInherente: 2,
     impactoInherente: 3,
     perfilInherente: "TOLERABLE(6)",
-    controles: DEFAULT_CONTROLES,
+    controles: DEFAULT_CONTROLES_RIESGO,
     efectividad: 60,
     probabilidadResidual: 1,
     impactoResidual: 2,
@@ -129,9 +142,14 @@ export default function Matrix() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRisk, setEditingRisk] = useState<RiskItem | null>(null);
 
+  // Catálogo completo de controles
+  const [catalogControles, setCatalogControles] = useState<CatalogControl[]>([]);
+  const [showSelectControlModal, setShowSelectControlModal] = useState(false);
+
   // Parámetros Dinámicos
   const [listaProcesos, setListaProcesos] = useState<string[]>(DEFAULT_PROCESOS);
   const [listaSubprocesos, setListaSubprocesos] = useState<string[]>(DEFAULT_SUBPROCESOS);
+  const [listaFactores, setListaFactores] = useState<string[]>(DEFAULT_FACTORES);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -146,27 +164,36 @@ export default function Matrix() {
     porQuePuedeSuceder: "",
     probabilidadInherente: 2,
     impactoInherente: 5,
-    controles: DEFAULT_CONTROLES as ControlItem[],
+    controles: DEFAULT_CONTROLES_RIESGO as ControlItem[],
   });
 
   useEffect(() => {
-    // 1. Cargar Parámetros
+    // 1. Cargar Catálogo de Controles
     try {
-      const savedParams = localStorage.getItem(PARAMETROS_KEY);
-      if (savedParams) {
-        const parsed = JSON.parse(savedParams);
-        if (parsed.procesos && Array.isArray(parsed.procesos) && parsed.procesos.length > 0) {
-          setListaProcesos(parsed.procesos);
-        }
-        if (parsed.subprocesos && Array.isArray(parsed.subprocesos) && parsed.subprocesos.length > 0) {
-          setListaSubprocesos(parsed.subprocesos);
-        }
+      const savedCtrls = localStorage.getItem(CONTROLES_KEY);
+      if (savedCtrls) {
+        setCatalogControles(JSON.parse(savedCtrls));
+      } else {
+        setCatalogControles(DEFAULT_CATALOG_CONTROLES);
       }
     } catch (e) {
       console.error(e);
     }
 
-    // 2. Cargar Riesgos
+    // 2. Cargar Parámetros
+    try {
+      const savedParams = localStorage.getItem(PARAMETROS_KEY);
+      if (savedParams) {
+        const parsed = JSON.parse(savedParams);
+        if (parsed.procesos?.length) setListaProcesos(parsed.procesos);
+        if (parsed.subprocesos?.length) setListaSubprocesos(parsed.subprocesos);
+        if (parsed.factoresRiesgo?.length) setListaFactores(parsed.factoresRiesgo);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+
+    // 3. Cargar Riesgos
     try {
       const saved = localStorage.getItem(RIESGOS_KEY);
       if (saved) {
@@ -186,6 +213,32 @@ export default function Matrix() {
   const saveToStorage = (updatedList: RiskItem[]) => {
     setRiesgos(updatedList);
     localStorage.setItem(RIESGOS_KEY, JSON.stringify(updatedList));
+  };
+
+  const handleAddControlFromCatalog = (ctrl: CatalogControl) => {
+    // Verificar si ya está agregado
+    if (formData.controles.some((c) => c.codigo === ctrl.codigo)) {
+      alert("Este control ya se encuentra asociado a este riesgo.");
+      return;
+    }
+
+    const newControlItem: ControlItem = {
+      codigo: ctrl.codigo,
+      descripcion: ctrl.descripcion,
+      clase: ctrl.clase,
+      ponderacion: ctrl.ponderacion
+    };
+
+    setFormData({
+      ...formData,
+      controles: [...formData.controles, newControlItem]
+    });
+    setShowSelectControlModal(false);
+  };
+
+  const handleRemoveControl = (index: number) => {
+    const updatedCtrls = formData.controles.filter((_, i) => i !== index);
+    setFormData({ ...formData, controles: updatedCtrls });
   };
 
   const exportExcel = () => {
@@ -239,13 +292,13 @@ export default function Matrix() {
       subproceso: listaSubprocesos[0] || "COMERCIAL-TELEMERCADEO-VENTAS",
       descripcion: "",
       banderas: ["Laft", "Operativo"],
-      factorRiesgo: "ESTUDIANTES",
+      factorRiesgo: listaFactores[0] || "ESTUDIANTES",
       tipologia: "",
       quePuedeSuceder: "",
       porQuePuedeSuceder: "",
       probabilidadInherente: 2,
       impactoInherente: 5,
-      controles: DEFAULT_CONTROLES,
+      controles: DEFAULT_CONTROLES_RIESGO,
     });
     setIsModalOpen(true);
   };
@@ -258,13 +311,13 @@ export default function Matrix() {
       subproceso: item.subproceso || listaSubprocesos[0],
       descripcion: item.descripcion,
       banderas: item.banderas || ["Laft"],
-      factorRiesgo: item.factorRiesgo || "ESTUDIANTES",
+      factorRiesgo: item.factorRiesgo || listaFactores[0],
       tipologia: item.tipologia || "",
       quePuedeSuceder: item.quePuedeSuceder || "",
       porQuePuedeSuceder: item.porQuePuedeSuceder || "",
       probabilidadInherente: item.probabilidadInherente || 2,
       impactoInherente: item.impactoInherente || 5,
-      controles: item.controles || DEFAULT_CONTROLES,
+      controles: item.controles || DEFAULT_CONTROLES_RIESGO,
     });
     setIsModalOpen(true);
   };
@@ -282,22 +335,6 @@ export default function Matrix() {
     } else {
       setFormData({ ...formData, banderas: [...formData.banderas, bandera] });
     }
-  };
-
-  const handleAddControl = () => {
-    const nextNum = formData.controles.length + 1;
-    const newCtrl: ControlItem = {
-      codigo: `CTR-LAFT-${nextNum < 10 ? '0' + nextNum : nextNum}`,
-      descripcion: "Nuevo control de verificación y seguimiento automático.",
-      clase: "PREVENTIVO",
-      ponderacion: 40.0
-    };
-    setFormData({ ...formData, controles: [...formData.controles, newCtrl] });
-  };
-
-  const handleRemoveControl = (index: number) => {
-    const updatedCtrls = formData.controles.filter((_, i) => i !== index);
-    setFormData({ ...formData, controles: updatedCtrls });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -350,7 +387,7 @@ export default function Matrix() {
         }
       `}</style>
 
-      {/* Header con Botones PDF y Excel */}
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Matriz de Riesgos</h1>
@@ -361,18 +398,12 @@ export default function Matrix() {
             onClick={() => window.print()}
             className="flex items-center gap-1.5 px-3 py-2 border rounded-md text-sm font-medium hover:bg-muted transition-colors bg-card"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
             PDF
           </button>
           <button
             onClick={exportExcel}
             className="flex items-center gap-1.5 px-3 py-2 border rounded-md text-sm font-medium hover:bg-muted transition-colors bg-card"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
             Sobresalir / Excel
           </button>
           <button
@@ -386,15 +417,12 @@ export default function Matrix() {
 
       {/* Buscador */}
       <div className="relative max-w-md">
-        <svg className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-        </svg>
         <input
           type="text"
           placeholder="Buscar por código, proceso o descripción..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full pl-9 pr-4 py-2 border rounded-md text-sm bg-background focus:outline-none focus:ring-2 focus:ring-teal-600"
+          className="w-full pl-4 pr-4 py-2 border rounded-md text-sm bg-background focus:outline-none focus:ring-2 focus:ring-teal-600"
         />
       </div>
 
@@ -426,7 +454,7 @@ export default function Matrix() {
                   <td className="p-3">
                     <div className="flex flex-wrap gap-1">
                       {(item.banderas || []).map((b, i) => (
-                        <span key={i} className="px-1.5 py-0.5 text-[10px] bg-slate-100 dark:bg-slate-800 border rounded font-semibold text-slate-700 dark:text-slate-300">
+                        <span key={i} className="px-1.5 py-0.5 text-[10px] bg-slate-100 border rounded font-semibold text-slate-700">
                           {b}
                         </span>
                       ))}
@@ -451,7 +479,7 @@ export default function Matrix() {
         </div>
       </div>
 
-      {/* Modal / Formulario Completo */}
+      {/* Modal Formulario Riesgo */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 overflow-y-auto">
           <div className="bg-background border rounded-xl shadow-2xl w-full max-w-4xl max-h-[92vh] overflow-y-auto my-6">
@@ -470,7 +498,7 @@ export default function Matrix() {
 
             <form onSubmit={handleSubmit} className="p-6 space-y-6">
               
-              {/* Sección 1: Identificación del Riesgo */}
+              {/* Sección 1: Identificación */}
               <div className="border rounded-lg p-5 bg-card shadow-sm space-y-4">
                 <h3 className="font-bold text-base text-foreground">Identificación del Riesgo</h3>
                 
@@ -535,7 +563,7 @@ export default function Matrix() {
                           type="checkbox"
                           checked={formData.banderas.includes(b)}
                           onChange={() => handleCheckboxBandera(b)}
-                          className="w-4 h-4 rounded text-teal-600 focus:ring-teal-500"
+                          className="w-4 h-4 rounded text-teal-600"
                         />
                         <span>{b}</span>
                       </label>
@@ -550,18 +578,19 @@ export default function Matrix() {
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-semibold mb-1 text-foreground">Factor de Riesgo</label>
+                    <label className="block text-xs font-semibold mb-1 text-foreground">Factor de Riesgo *</label>
                     <select
+                      required
                       value={formData.factorRiesgo}
                       onChange={(e) => setFormData({ ...formData, factorRiesgo: e.target.value })}
                       className="w-full px-3 py-2 border rounded-md text-sm bg-background"
                     >
-                      <option value="ESTUDIANTES">ESTUDIANTES</option>
-                      <option value="CLIENTE">CLIENTE</option>
-                      <option value="PROVEEDOR">PROVEEDOR</option>
-                      <option value="EMPLEADO">EMPLEADO</option>
+                      {listaFactores.map((f, idx) => (
+                        <option key={idx} value={f}>{f}</option>
+                      ))}
                     </select>
                   </div>
+
                   <div>
                     <label className="block text-xs font-semibold mb-1 text-foreground">Tipología</label>
                     <input
@@ -633,16 +662,16 @@ export default function Matrix() {
                 </div>
               </div>
 
-              {/* Sección 4: Controles Asociados */}
+              {/* Sección 4: Controles Asociados conectada al Catálogo */}
               <div className="border rounded-lg p-5 bg-card shadow-sm space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="font-bold text-base text-foreground">Controles Asociados</h3>
                   <button
                     type="button"
-                    onClick={handleAddControl}
+                    onClick={() => setShowSelectControlModal(true)}
                     className="flex items-center gap-1 px-3 py-1.5 border rounded-md text-xs font-semibold hover:bg-muted transition-colors"
                   >
-                    + Agregar control
+                    + Agregar control del Catálogo
                   </button>
                 </div>
 
@@ -702,6 +731,52 @@ export default function Matrix() {
               </div>
 
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Sub-modal: Seleccionar Control desde el Catálogo */}
+      {showSelectControlModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="bg-background border rounded-xl shadow-2xl w-full max-w-2xl max-h-[80vh] overflow-y-auto p-6 space-y-4">
+            <div className="flex justify-between items-center border-b pb-3">
+              <h3 className="font-bold text-base text-foreground">Seleccionar Control del Catálogo</h3>
+              <button
+                onClick={() => setShowSelectControlModal(false)}
+                className="text-muted-foreground hover:text-foreground font-bold text-xl"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="divide-y divide-border border rounded-lg overflow-hidden">
+              {catalogControles.map((catCtrl) => (
+                <div
+                  key={catCtrl.id}
+                  className="p-3 flex items-center justify-between hover:bg-muted/40 transition-colors gap-3"
+                >
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-mono font-bold text-xs">{catCtrl.codigo}</span>
+                      <span className="px-1.5 py-0.2 text-[10px] bg-slate-100 border rounded font-bold text-slate-700">
+                        {catCtrl.clase}
+                      </span>
+                      <span className="text-xs font-semibold text-teal-700">
+                        {catCtrl.ponderacion}%
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">{catCtrl.descripcion}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleAddControlFromCatalog(catCtrl)}
+                    className="px-3 py-1 bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold rounded shrink-0"
+                  >
+                    + Asociar
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
