@@ -7,10 +7,20 @@ export interface CatalogControl {
   codigo: string;
   descripcion: string;
   clase: "PREVENTIVO" | "DETECTIVO" | "CORRECTIVO";
-  ejecucion: "MANUAL" | "AUTOMÁTICO" | "SEMIAUTOMÁTICO";
-  frecuencia: "PERMANENTE" | "OCASIONAL" | "DIARIO" | "MENSUAL";
+  pesoClase: number;
+  tipo: "AUTOMÁTICO" | "SEMIAUTOMÁTICO" | "MANUAL";
+  pesoTipo: number;
+  frecuencia: "PERMANENTE" | "DIARIO" | "MENSUAL" | "OCASIONAL";
+  pesoFrecuencia: number;
+  formalidad: "FORMAL / DOCUMENTADO" | "NO FORMALIZADO";
+  pesoFormalidad: number;
   ponderacion: number;
 }
+
+const PESOS_CLASE = { PREVENTIVO: 15.0, DETECTIVO: 10.0, CORRECTIVO: 5.0 };
+const PESOS_TIPO = { AUTOMÁTICO: 15.0, SEMIAUTOMÁTICO: 10.0, MANUAL: 5.0 };
+const PESOS_FRECUENCIA = { PERMANENTE: 10.0, DIARIO: 8.0, MENSUAL: 5.0, OCASIONAL: 2.5 };
+const PESOS_FORMALIDAD = { "FORMAL / DOCUMENTADO": 7.5, "NO FORMALIZADO": 2.5 };
 
 export const DEFAULT_CATALOG_CONTROLES: CatalogControl[] = [
   {
@@ -18,8 +28,13 @@ export const DEFAULT_CATALOG_CONTROLES: CatalogControl[] = [
     codigo: "CTR-LAFT-01",
     descripcion: "Consulta en las listas restrictivas para todas las personas asociadas.",
     clase: "PREVENTIVO",
-    ejecucion: "SEMIAUTOMÁTICO",
+    pesoClase: 15.0,
+    tipo: "SEMIAUTOMÁTICO",
+    pesoTipo: 10.0,
     frecuencia: "PERMANENTE",
+    pesoFrecuencia: 10.0,
+    formalidad: "FORMAL / DOCUMENTADO",
+    pesoFormalidad: 7.5,
     ponderacion: 42.5
   },
   {
@@ -27,8 +42,13 @@ export const DEFAULT_CATALOG_CONTROLES: CatalogControl[] = [
     codigo: "CTR-LAFT-02",
     descripcion: "Aceptación de cláusula SAGRILAFT sobre prevención del riesgo.",
     clase: "PREVENTIVO",
-    ejecucion: "SEMIAUTOMÁTICO",
+    pesoClase: 15.0,
+    tipo: "SEMIAUTOMÁTICO",
+    pesoTipo: 10.0,
     frecuencia: "PERMANENTE",
+    pesoFrecuencia: 10.0,
+    formalidad: "FORMAL / DOCUMENTADO",
+    pesoFormalidad: 7.5,
     ponderacion: 42.5
   },
   {
@@ -36,17 +56,27 @@ export const DEFAULT_CATALOG_CONTROLES: CatalogControl[] = [
     codigo: "CTR-LAFT-03",
     descripcion: "Aprobación por parte de gerencia para vinculación de clientes especiales.",
     clase: "PREVENTIVO",
-    ejecucion: "MANUAL",
+    pesoClase: 15.0,
+    tipo: "MANUAL",
+    pesoTipo: 5.0,
     frecuencia: "OCASIONAL",
-    ponderacion: 33.5
+    pesoFrecuencia: 2.5,
+    formalidad: "FORMAL / DOCUMENTADO",
+    pesoFormalidad: 7.5,
+    ponderacion: 30.0
   },
   {
     id: "4",
     codigo: "CTR-LAFT-04",
     descripcion: "Chequeo de información pública en medios de comunicación.",
     clase: "PREVENTIVO",
-    ejecucion: "SEMIAUTOMÁTICO",
+    pesoClase: 15.0,
+    tipo: "SEMIAUTOMÁTICO",
+    pesoTipo: 10.0,
     frecuencia: "PERMANENTE",
+    pesoFrecuencia: 10.0,
+    formalidad: "FORMAL / DOCUMENTADO",
+    pesoFormalidad: 7.5,
     ponderacion: 42.5
   },
   {
@@ -54,9 +84,14 @@ export const DEFAULT_CATALOG_CONTROLES: CatalogControl[] = [
     codigo: "CTR-LAFT-05",
     descripcion: "Validación y causación de recibos de caja contra extractos bancarios.",
     clase: "DETECTIVO",
-    ejecucion: "SEMIAUTOMÁTICO",
+    pesoClase: 10.0,
+    tipo: "SEMIAUTOMÁTICO",
+    pesoTipo: 10.0,
     frecuencia: "PERMANENTE",
-    ponderacion: 41.5
+    pesoFrecuencia: 10.0,
+    formalidad: "FORMAL / DOCUMENTADO",
+    pesoFormalidad: 7.5,
+    ponderacion: 37.5
   }
 ];
 
@@ -66,14 +101,18 @@ export default function Controls() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingControl, setEditingControl] = useState<CatalogControl | null>(null);
 
-  // Estado del Formulario
   const [formData, setFormData] = useState<Omit<CatalogControl, "id">>({
     codigo: "",
     descripcion: "",
     clase: "PREVENTIVO",
-    ejecucion: "SEMIAUTOMÁTICO",
+    pesoClase: 15.0,
+    tipo: "SEMIAUTOMÁTICO",
+    pesoTipo: 10.0,
     frecuencia: "PERMANENTE",
-    ponderacion: 40.0
+    pesoFrecuencia: 10.0,
+    formalidad: "FORMAL / DOCUMENTADO",
+    pesoFormalidad: 7.5,
+    ponderacion: 42.5
   });
 
   useEffect(() => {
@@ -87,7 +126,7 @@ export default function Controls() {
         }
       }
     } catch (e) {
-      console.error("Error leyendo controles:", e);
+      console.error(e);
     }
     setControles(DEFAULT_CATALOG_CONTROLES);
     localStorage.setItem(CONTROLES_KEY, JSON.stringify(DEFAULT_CATALOG_CONTROLES));
@@ -98,15 +137,76 @@ export default function Controls() {
     localStorage.setItem(CONTROLES_KEY, JSON.stringify(updated));
   };
 
+  const calculatePonderacion = (
+    c = formData.clase,
+    t = formData.tipo,
+    f = formData.frecuencia,
+    form = formData.formalidad
+  ) => {
+    const pc = PESOS_CLASE[c] || 10;
+    const pt = PESOS_TIPO[t] || 10;
+    const pf = PESOS_FRECUENCIA[f] || 10;
+    const pform = PESOS_FORMALIDAD[form] || 7.5;
+    return {
+      pc, pt, pf, pform,
+      total: pc + pt + pf + pform
+    };
+  };
+
+  const handleClaseChange = (clase: CatalogControl["clase"]) => {
+    const calcs = calculatePonderacion(clase, formData.tipo, formData.frecuencia, formData.formalidad);
+    setFormData({
+      ...formData,
+      clase,
+      pesoClase: calcs.pc,
+      ponderacion: calcs.total
+    });
+  };
+
+  const handleTipoChange = (tipo: CatalogControl["tipo"]) => {
+    const calcs = calculatePonderacion(formData.clase, tipo, formData.frecuencia, formData.formalidad);
+    setFormData({
+      ...formData,
+      tipo,
+      pesoTipo: calcs.pt,
+      ponderacion: calcs.total
+    });
+  };
+
+  const handleFrecuenciaChange = (frecuencia: CatalogControl["frecuencia"]) => {
+    const calcs = calculatePonderacion(formData.clase, formData.tipo, frecuencia, formData.formalidad);
+    setFormData({
+      ...formData,
+      frecuencia,
+      pesoFrecuencia: calcs.pf,
+      ponderacion: calcs.total
+    });
+  };
+
+  const handleFormalidadChange = (formalidad: CatalogControl["formalidad"]) => {
+    const calcs = calculatePonderacion(formData.clase, formData.tipo, formData.frecuencia, formalidad);
+    setFormData({
+      ...formData,
+      formalidad,
+      pesoFormalidad: calcs.pform,
+      ponderacion: calcs.total
+    });
+  };
+
   const handleOpenCreate = () => {
     setEditingControl(null);
     setFormData({
       codigo: `CTR-LAFT-0${controles.length + 1}`,
       descripcion: "",
       clase: "PREVENTIVO",
-      ejecucion: "SEMIAUTOMÁTICO",
+      pesoClase: 15.0,
+      tipo: "SEMIAUTOMÁTICO",
+      pesoTipo: 10.0,
       frecuencia: "PERMANENTE",
-      ponderacion: 40.0
+      pesoFrecuencia: 10.0,
+      formalidad: "FORMAL / DOCUMENTADO",
+      pesoFormalidad: 7.5,
+      ponderacion: 42.5
     });
     setIsModalOpen(true);
   };
@@ -116,10 +216,15 @@ export default function Controls() {
     setFormData({
       codigo: control.codigo,
       descripcion: control.descripcion,
-      clase: control.clase,
-      ejecucion: control.ejecucion,
-      frecuencia: control.frecuencia,
-      ponderacion: control.ponderacion
+      clase: control.clase || "PREVENTIVO",
+      pesoClase: control.pesoClase || 15.0,
+      tipo: control.tipo || "SEMIAUTOMÁTICO",
+      pesoTipo: control.pesoTipo || 10.0,
+      frecuencia: control.frecuencia || "PERMANENTE",
+      pesoFrecuencia: control.pesoFrecuencia || 10.0,
+      formalidad: control.formalidad || "FORMAL / DOCUMENTADO",
+      pesoFormalidad: control.pesoFormalidad || 7.5,
+      ponderacion: control.ponderacion || 42.5
     });
     setIsModalOpen(true);
   };
@@ -156,7 +261,7 @@ export default function Controls() {
 
   return (
     <div className="w-full space-y-6 pb-12">
-      {/* Encabezado */}
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Catálogo de Controles</h1>
@@ -172,68 +277,55 @@ export default function Controls() {
 
       {/* Buscador */}
       <div className="relative max-w-md">
-        <svg className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-        </svg>
         <input
           type="text"
           placeholder="Buscar por código o descripción..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full pl-9 pr-4 py-2 border rounded-md text-sm bg-background focus:outline-none focus:ring-2 focus:ring-teal-600"
+          className="w-full pl-4 pr-4 py-2 border rounded-md text-sm bg-background focus:outline-none focus:ring-2 focus:ring-teal-600"
         />
       </div>
 
-      {/* Tabla del Catálogo */}
-      <div className="border rounded-lg bg-card shadow-sm overflow-hidden w-full">
+      {/* Tabla con Estructura de Encabezados Ponderados */}
+      <div className="border border-black rounded-lg bg-card shadow-sm overflow-hidden w-full">
         <div className="overflow-x-auto w-full">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="border-b bg-muted/50 text-muted-foreground uppercase font-bold tracking-wider">
-                <th className="p-4 w-36">Código</th>
-                <th className="p-4">Descripción</th>
-                <th className="p-4 w-72">Atributos</th>
-                <th className="p-4 w-32 text-right">Ponderación</th>
-                <th className="p-4 w-28 text-center">Acciones</th>
+              <tr className="border-b border-black text-xs uppercase font-extrabold">
+                <th className="p-2 border-r border-black bg-stone-300 text-black w-28">Código</th>
+                <th className="p-2 border-r border-black bg-stone-300 text-black min-w-[220px]">Descripción</th>
+                <th className="p-2 border-r border-black text-black text-center" style={{ backgroundColor: "#8c2828" }}>CLASE</th>
+                <th className="p-2 border-r border-black bg-stone-300 text-black text-center w-20">PESO</th>
+                <th className="p-2 border-r border-black text-black text-center" style={{ backgroundColor: "#8c2828" }}>TIPO</th>
+                <th className="p-2 border-r border-black bg-stone-300 text-black text-center w-20">PESO</th>
+                <th className="p-2 border-r border-black text-black text-center" style={{ backgroundColor: "#8c2828" }}>FRECUENCIA</th>
+                <th className="p-2 border-r border-black bg-stone-300 text-black text-center w-20">PESO</th>
+                <th className="p-2 border-r border-black text-black text-center" style={{ backgroundColor: "#8c2828" }}>Formalidad del Control</th>
+                <th className="p-2 border-r border-black bg-stone-300 text-black text-center w-20">PESO</th>
+                <th className="p-2 border-r border-black bg-stone-300 text-black text-center w-28">PONDERACION</th>
+                <th className="p-2 bg-stone-300 text-black text-center w-20">Acciones</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border">
+            <tbody className="divide-y divide-slate-300">
               {filteredControles.map((item) => (
-                <tr key={item.id} className="hover:bg-muted/30 transition-colors">
-                  <td className="p-4 font-mono font-bold text-xs">{item.codigo}</td>
-                  <td className="p-4 text-xs font-medium text-foreground">{item.descripcion}</td>
-                  <td className="p-4">
-                    <div className="flex flex-wrap gap-1.5">
-                      <span className="px-2 py-0.5 text-[10px] bg-slate-100 border rounded font-bold text-slate-700">
-                        {item.clase}
-                      </span>
-                      <span className="px-2 py-0.5 text-[10px] bg-slate-100 border rounded font-bold text-slate-700">
-                        {item.ejecucion}
-                      </span>
-                      <span className="px-2 py-0.5 text-[10px] bg-slate-100 border rounded font-bold text-slate-700">
-                        {item.frecuencia}
-                      </span>
-                    </div>
+                <tr key={item.id} className="hover:bg-muted/30 transition-colors border-b border-slate-300 text-xs">
+                  <td className="p-2 font-mono font-bold border-r border-slate-300">{item.codigo}</td>
+                  <td className="p-2 font-medium border-r border-slate-300">{item.descripcion}</td>
+                  <td className="p-2 border-r border-slate-300 text-center font-semibold">{item.clase}</td>
+                  <td className="p-2 border-r border-slate-300 text-center font-bold text-slate-700">{(item.pesoClase || 15).toFixed(1)} %</td>
+                  <td className="p-2 border-r border-slate-300 text-center font-semibold">{item.tipo}</td>
+                  <td className="p-2 border-r border-slate-300 text-center font-bold text-slate-700">{(item.pesoTipo || 10).toFixed(1)} %</td>
+                  <td className="p-2 border-r border-slate-300 text-center font-semibold">{item.frecuencia}</td>
+                  <td className="p-2 border-r border-slate-300 text-center font-bold text-slate-700">{(item.pesoFrecuencia || 10).toFixed(1)} %</td>
+                  <td className="p-2 border-r border-slate-300 text-center font-semibold">{item.formalidad || "FORMAL / DOCUMENTADO"}</td>
+                  <td className="p-2 border-r border-slate-300 text-center font-bold text-slate-700">{(item.pesoFormalidad || 7.5).toFixed(1)} %</td>
+                  <td className="p-2 border-r border-slate-300 text-center font-extrabold text-teal-800 bg-teal-50/50">
+                    {((item.ponderacion || 42.5) / 100).toFixed(3).replace(".", ",")}
                   </td>
-                  <td className="p-4 text-right font-bold text-xs text-foreground">
-                    {item.ponderacion.toFixed(3)} %
-                  </td>
-                  <td className="p-4 text-center">
-                    <div className="flex items-center justify-center gap-2">
-                      <button
-                        onClick={() => handleOpenEdit(item)}
-                        className="p-1 text-slate-500 hover:text-teal-600 transition-colors text-base"
-                        title="Editar control"
-                      >
-                        ✏️
-                      </button>
-                      <button
-                        onClick={() => handleDelete(item.id)}
-                        className="p-1 text-slate-500 hover:text-red-600 transition-colors text-base"
-                        title="Eliminar control"
-                      >
-                        🗑️
-                      </button>
+                  <td className="p-2 text-center whitespace-nowrap">
+                    <div className="flex items-center justify-center gap-1">
+                      <button onClick={() => handleOpenEdit(item)} className="p-1 hover:text-teal-600 text-sm" title="Editar">✏️</button>
+                      <button onClick={() => handleDelete(item.id)} className="p-1 hover:text-red-600 text-sm" title="Eliminar">🗑️</button>
                     </div>
                   </td>
                 </tr>
@@ -243,7 +335,7 @@ export default function Controls() {
         </div>
       </div>
 
-      {/* Modal Crear / Editar Control */}
+      {/* Modal Formulario Estructurado */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
           <div className="bg-background border rounded-xl shadow-2xl w-full max-w-lg p-6 space-y-4">
@@ -287,7 +379,7 @@ export default function Controls() {
                   <label className="block text-xs font-semibold mb-1 text-foreground">Clase</label>
                   <select
                     value={formData.clase}
-                    onChange={(e) => setFormData({ ...formData, clase: e.target.value as any })}
+                    onChange={(e) => handleClaseChange(e.target.value as any)}
                     className="w-full px-3 py-2 border rounded-md text-sm bg-background"
                   >
                     <option value="PREVENTIVO">PREVENTIVO</option>
@@ -299,8 +391,8 @@ export default function Controls() {
                 <div>
                   <label className="block text-xs font-semibold mb-1 text-foreground">Ejecución</label>
                   <select
-                    value={formData.ejecucion}
-                    onChange={(e) => setFormData({ ...formData, ejecucion: e.target.value as any })}
+                    value={formData.tipo}
+                    onChange={(e) => handleTipoChange(e.target.value as any)}
                     className="w-full px-3 py-2 border rounded-md text-sm bg-background"
                   >
                     <option value="SEMIAUTOMÁTICO">SEMIAUTOMÁTICO</option>
@@ -315,40 +407,50 @@ export default function Controls() {
                   <label className="block text-xs font-semibold mb-1 text-foreground">Frecuencia</label>
                   <select
                     value={formData.frecuencia}
-                    onChange={(e) => setFormData({ ...formData, frecuencia: e.target.value as any })}
+                    onChange={(e) => handleFrecuenciaChange(e.target.value as any)}
                     className="w-full px-3 py-2 border rounded-md text-sm bg-background"
                   >
                     <option value="PERMANENTE">PERMANENTE</option>
-                    <option value="OCASIONAL">OCASIONAL</option>
                     <option value="DIARIO">DIARIO</option>
                     <option value="MENSUAL">MENSUAL</option>
+                    <option value="OCASIONAL">OCASIONAL</option>
                   </select>
                 </div>
 
                 <div>
                   <label className="block text-xs font-semibold mb-1 text-foreground">Ponderación (%)</label>
                   <input
-                    type="number"
-                    step="0.1"
-                    required
-                    value={formData.ponderacion}
-                    onChange={(e) => setFormData({ ...formData, ponderacion: parseFloat(e.target.value) || 0 })}
-                    className="w-full px-3 py-2 border rounded-md text-sm bg-background"
+                    type="text"
+                    value={(formData.ponderacion / 100).toFixed(3).replace(".", ",")}
+                    readOnly
+                    className="w-full px-3 py-2 border rounded-md text-sm bg-muted/40 font-bold"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold mb-1 text-foreground">Formalidad del Control</label>
+                <select
+                  value={formData.formalidad}
+                  onChange={(e) => handleFormalidadChange(e.target.value as any)}
+                  className="w-full px-3 py-2 border rounded-md text-sm bg-background"
+                >
+                  <option value="FORMAL / DOCUMENTADO">FORMAL / DOCUMENTADO</option>
+                  <option value="NO FORMALIZADO">NO FORMALIZADO</option>
+                </select>
               </div>
 
               <div className="flex justify-end gap-3 pt-4 border-t">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 border rounded-md text-sm font-medium hover:bg-muted"
+                  className="px-5 py-2 border rounded-md text-sm font-medium hover:bg-muted"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white rounded-md text-sm font-bold"
+                  className="px-5 py-2 bg-teal-700 hover:bg-teal-800 text-white rounded-md text-sm font-bold shadow-sm"
                 >
                   Guardar Control
                 </button>
