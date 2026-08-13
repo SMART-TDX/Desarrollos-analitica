@@ -39,6 +39,36 @@ export interface RiesgoRow {
   observaciones?: string;
 }
 
+// Valores por defecto estandarizados
+const DEFAULTS_PROCESOS = [
+  "GESTION ADMINISTRATIVA Y FINANCIERA",
+  "Gestión Académica",
+  "Gestión Comercial",
+  "Gestión Humana",
+  "Gestión Jurídica",
+  "Gestión de Tecnología"
+];
+
+const DEFAULTS_SUBPROCESOS = [
+  "CARTERA",
+  "COMERCIALL-TELEMERCADEO-VENTAS",
+  "COMERCIALL-TELEMERCADEO-VENTAS-CORPORATIVO Y PERSONALIZADO-EXAMENES INTERNACIONALES-INSTITUTO-SMART ONLINE",
+  "COMPRAS",
+  "CONTABILIDAD",
+  "INSTITUTO"
+];
+
+const DEFAULTS_FACTORES = [
+  "ALIADOS ESTRATÉGICOS",
+  "CANALES DE DISTRIBUCIÓN",
+  "Colaboradores",
+  "EMPLEADOS",
+  "ESTUDIANTES",
+  "PRODUCTOS Y SERVICIOS",
+  "PROVEEDORES",
+  "TECNOLÓGICO"
+];
+
 export function getNivelRiesgo(score: number): { label: string; bgBadge: string } {
   if (score <= 4) {
     return { label: "BAJO", bgBadge: "bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold" };
@@ -84,11 +114,11 @@ export const RIESGOS_INICIALES: RiesgoRow[] = [
   {
     id: "1",
     codigo: "RIE-LAFT-01",
-    proceso: "Comercial / Vinculación",
-    subproceso: "Onboarding Clientes",
+    proceso: "Gestión Comercial",
+    subproceso: "COMERCIALL-TELEMERCADEO-VENTAS",
     descripcion: "Vinculación de clientes o contrapartes en listas restrictivas o con antecedentes LAFT",
     banderas: { laft: true, operativo: true, legal: true, reputacional: true, contagio: false },
-    factorRiesgo: "Clientes / Contrapartes",
+    factorRiesgo: "Colaboradores",
     tipologia: "Lavado mediante empresas fachada",
     causa: "Falta de verificación en listas restrictivas o actualización extemporánea",
     consecuencia: "Sanciones administrativas de la Superintendencia y daño reputacional",
@@ -100,11 +130,11 @@ export const RIESGOS_INICIALES: RiesgoRow[] = [
   {
     id: "2",
     codigo: "RIE-LAFT-02",
-    proceso: "Tesorería / Cartera",
-    subproceso: "Recaudos y Pagos",
+    proceso: "GESTION ADMINISTRATIVA Y FINANCIERA",
+    subproceso: "CARTERA",
     descripcion: "Recaudo de efectivo o transferencias desde cuentas de origen no justificado",
     banderas: { laft: true, operativo: true, legal: false, reputacional: true, contagio: false },
-    factorRiesgo: "Productos / Servicios",
+    factorRiesgo: "PRODUCTOS Y SERVICIOS",
     tipologia: "Paso de dinero de origen ilícito",
     causa: "Pagos de terceros no identificados o falta de conciliación bancaria diaria",
     consecuencia: "Ingreso de recursos ilícitos a la contabilidad de la organización",
@@ -116,11 +146,11 @@ export const RIESGOS_INICIALES: RiesgoRow[] = [
   {
     id: "3",
     codigo: "RIE-LAFT-03",
-    proceso: "Talento Humano",
-    subproceso: "Contratación",
+    proceso: "Gestión Humana",
+    subproceso: "INSTITUTO",
     descripcion: "Contratación de empleados vinculados con actividades de lavado de activos o financiación del terrorismo",
     banderas: { laft: true, operativo: false, legal: true, reputacional: true, contagio: false },
-    factorRiesgo: "Clientes / Contrapartes",
+    factorRiesgo: "EMPLEADOS",
     tipologia: "Complicidad interna",
     causa: "Estudios de seguridad o debida diligencia incompletos al momento del ingreso",
     consecuencia: "Uso de la infraestructura organizacional para operaciones sospechosas",
@@ -132,11 +162,11 @@ export const RIESGOS_INICIALES: RiesgoRow[] = [
   {
     id: "4",
     codigo: "RIE-LAFT-04",
-    proceso: "Compras / Contratación",
-    subproceso: "Proveedores",
+    proceso: "GESTION ADMINISTRATIVA Y FINANCIERA",
+    subproceso: "COMPRAS",
     descripcion: "Pagos a proveedores ficticios o empresas fachada para canalizar recursos ilegales",
     banderas: { laft: true, operativo: true, legal: true, reputacional: false, contagio: false },
-    factorRiesgo: "Clientes / Contrapartes",
+    factorRiesgo: "PROVEEDORES",
     tipologia: "Facturación falsa",
     causa: "Falta de validación del beneficiario final y certificación bancaria",
     consecuencia: "Infracciones normativas SAGRILAFT y pérdida de activos",
@@ -157,6 +187,42 @@ export default function Matrix() {
     }
     return CONTROLES_OFICIALES;
   });
+
+  // Estado de Parámetros Dinámicos cargados desde localStorage
+  const [listaProcesos, setListaProcesos] = useState<string[]>(DEFAULTS_PROCESOS);
+  const [listaSubprocesos, setListaSubprocesos] = useState<string[]>(DEFAULTS_SUBPROCESOS);
+  const [listaFactores, setListaFactores] = useState<string[]>(DEFAULTS_FACTORES);
+
+  useEffect(() => {
+    try {
+      // Cargar parámetros personalizados si existen
+      const savedParams = localStorage.getItem("laft_parametros_v1");
+      if (savedParams) {
+        const parsed = JSON.parse(savedParams);
+        if (parsed.procesos && Array.isArray(parsed.procesos) && parsed.procesos.length > 0) {
+          setListaProcesos(parsed.procesos);
+        }
+        if (parsed.subprocesos && Array.isArray(parsed.subprocesos) && parsed.subprocesos.length > 0) {
+          setListaSubprocesos(parsed.subprocesos);
+        }
+        if (parsed.factores && Array.isArray(parsed.factores) && parsed.factores.length > 0) {
+          setListaFactores(parsed.factores);
+        }
+      } else {
+        // Búsqueda por llaves individuales si se guardaron independientemente
+        const pProcesos = localStorage.getItem("laft_param_procesos");
+        if (pProcesos) setListaProcesos(JSON.parse(pProcesos));
+
+        const pSubprocesos = localStorage.getItem("laft_param_subprocesos");
+        if (pSubprocesos) setListaSubprocesos(JSON.parse(pSubprocesos));
+
+        const pFactores = localStorage.getItem("laft_param_factores");
+        if (pFactores) setListaFactores(JSON.parse(pFactores));
+      }
+    } catch (e) {
+      console.error("Error al cargar parámetros dinámicos:", e);
+    }
+  }, []);
 
   const [riesgos, setRiesgos] = useState<RiesgoRow[]>(() => {
     try {
@@ -184,11 +250,11 @@ export default function Matrix() {
   const [formData, setFormData] = useState<RiesgoRow>({
     id: "",
     codigo: "",
-    proceso: "",
-    subproceso: "",
+    proceso: DEFAULTS_PROCESOS[0] || "",
+    subproceso: DEFAULTS_SUBPROCESOS[0] || "",
     descripcion: "",
     banderas: { laft: true, operativo: false, legal: false, reputacional: false, contagio: false },
-    factorRiesgo: "Clientes / Contrapartes",
+    factorRiesgo: DEFAULTS_FACTORES[0] || "",
     tipologia: "",
     causa: "",
     consecuencia: "",
@@ -212,11 +278,11 @@ export default function Matrix() {
     setFormData({
       id: Date.now().toString(),
       codigo: nextCode,
-      proceso: "",
-      subproceso: "",
+      proceso: listaProcesos[0] || "",
+      subproceso: listaSubprocesos[0] || "",
       descripcion: "",
       banderas: { laft: true, operativo: false, legal: false, reputacional: false, contagio: false },
-      factorRiesgo: "Clientes / Contrapartes",
+      factorRiesgo: listaFactores[0] || "",
       tipologia: "",
       causa: "",
       consecuencia: "",
@@ -232,6 +298,9 @@ export default function Matrix() {
   const handleOpenEditForm = (item: RiesgoRow) => {
     setFormData({
       ...item,
+      proceso: item.proceso || listaProcesos[0] || "",
+      subproceso: item.subproceso || listaSubprocesos[0] || "",
+      factorRiesgo: item.factorRiesgo || listaFactores[0] || "",
       descripcion: item.descripcion || item.riesgo || "",
       controlCodigos: obtenerCodigosControlSeguros(item),
       banderas: item.banderas || { laft: true, operativo: false, legal: false, reputacional: false, contagio: false }
@@ -290,9 +359,9 @@ export default function Matrix() {
     return desc.includes(term) || cod.includes(term) || proc.includes(term);
   });
 
-  // EXPORTACIÓN COMPLETA A EXCEL (.CSV)
+  // Exportar Excel
   const handleExportExcel = () => {
-    let csvContent = "\uFEFF"; // UTF-8 BOM
+    let csvContent = "\uFEFF";
     csvContent += "Código;Proceso;Subproceso;Clasificación / Banderas;Factor Riesgo;Tipología;Descripción del Riesgo;Causa Raíz;Consecuencia / Impacto;Prob. Inh.;Imp. Inh.;Riesgo Inherente;Controles Asignados (Ponderación);Mitigación (%);Riesgo Residual\n";
 
     filteredRiesgos.forEach((r) => {
@@ -342,13 +411,13 @@ export default function Matrix() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.setAttribute("download", `Matriz_Riesgos_LAFT_Completa_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.setAttribute("download", `Matriz_Riesgos_LAFT_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
-  // EXPORTACIÓN COMPLETA Y DETALLADA A PDF
+  // Exportar PDF
   const handleExportPDF = () => {
     const printWindow = window.open("", "_blank");
     if (!printWindow) return;
@@ -366,7 +435,6 @@ export default function Matrix() {
       const resLevel = getNivelRiesgo(resScore);
       const resColors = getColorsPDF(resLevel.label);
 
-      // Extraer Banderas Activas
       const activeFlags = [];
       if (item.banderas?.laft) activeFlags.push("LAFT");
       if (item.banderas?.operativo) activeFlags.push("Operativo");
@@ -433,7 +501,7 @@ export default function Matrix() {
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Matriz de riesgos sagrilaf/title>
+          <title>Matriz Completa de Riesgos LAFT / PADM</title>
           <style>
             @page { size: A4 landscape; margin: 8mm; }
             body { font-family: Arial, sans-serif; font-size: 10px; color: #0f172a; margin: 0; padding: 5px; }
@@ -447,14 +515,14 @@ export default function Matrix() {
         <body>
           <div class="header-box">
             <h1>Matriz Integral de Riesgos LAFT / PADM</h1>
-            <p>Reporte Consolidado con Análisis Cualitativo (Proceso, Subproceso, Causa, Consecuencia, Tipología) y Evaluaciones ResiduaIes.</p>
+            <p>Reporte Consolidado con Análisis Cualitativo y Parámetros Estandarizados.</p>
           </div>
           <table>
             <thead>
               <tr>
                 <th style="width: 80px;">Código / Clasif.</th>
-                <th style="width: 100px;">Proceso / Subp.</th>
-                <th style="width: 100px;">Factor / Tipología</th>
+                <th style="width: 110px;">Proceso / Subp.</th>
+                <th style="width: 110px;">Factor / Tipología</th>
                 <th>Descripción, Causa y Consecuencia del Riesgo</th>
                 <th style="width: 85px; text-align: center;">Riesgo Inh.</th>
                 <th style="width: 220px;">Controles Asignados (Ponderación)</th>
@@ -467,9 +535,7 @@ export default function Matrix() {
             </tbody>
           </table>
           <script>
-            window.onload = function() {
-              window.print();
-            };
+            window.onload = function() { window.print(); };
           </script>
         </body>
       </html>
@@ -478,6 +544,11 @@ export default function Matrix() {
     printWindow.document.write(content);
     printWindow.document.close();
   };
+
+  // Asegurar que si el objeto actual tiene un valor no listado se mantenga como opción visible
+  const opcionesProcesos = Array.from(new Set([...listaProcesos, formData.proceso])).filter(Boolean);
+  const opcionesSubprocesos = Array.from(new Set([...listaSubprocesos, formData.subproceso || ""])).filter(Boolean);
+  const opcionesFactores = Array.from(new Set([...listaFactores, formData.factorRiesgo])).filter(Boolean);
 
   // VISTA 1: FORMULARIO NUEVO / EDITAR RIESGO
   if (viewMode === "form") {
@@ -498,7 +569,7 @@ export default function Matrix() {
                 {editingId ? "Editar Riesgo" : "Nuevo Riesgo"}
               </h1>
               <p className="text-xs text-slate-500">
-                Información detallada para la matriz LAFT
+                Información parametrizada para la matriz de riesgos LAFT
               </p>
             </div>
           </div>
@@ -524,31 +595,39 @@ export default function Matrix() {
                 type="text"
                 value={formData.codigo}
                 onChange={(e) => setFormData({ ...formData, codigo: e.target.value })}
-                placeholder="Ej. R-LAFT015"
-                className="w-full p-2.5 border border-slate-300 rounded-md focus:ring-1 focus:ring-teal-600 focus:border-teal-600"
+                placeholder="Ej. RIE-LAFT-05"
+                className="w-full p-2.5 border border-slate-300 rounded-md focus:ring-1 focus:ring-teal-600 focus:border-teal-600 bg-white"
               />
             </div>
 
+            {/* LISTA DESPLEGABLE DINÁMICA DE PROCESOS */}
             <div>
               <label className="block font-medium text-slate-700 mb-1">Proceso *</label>
-              <input
-                type="text"
+              <select
                 value={formData.proceso}
                 onChange={(e) => setFormData({ ...formData, proceso: e.target.value })}
-                placeholder="-- Seleccione o escriba --"
-                className="w-full p-2.5 border border-slate-300 rounded-md focus:ring-1 focus:ring-teal-600 focus:border-teal-600"
-              />
+                className="w-full p-2.5 border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-teal-600 focus:border-teal-600 font-medium"
+              >
+                <option value="">-- Seleccione Proceso --</option>
+                {opcionesProcesos.map((p) => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
             </div>
 
+            {/* LISTA DESPLEGABLE DINÁMICA DE SUBPROCESOS */}
             <div>
               <label className="block font-medium text-slate-700 mb-1">Subproceso</label>
-              <input
-                type="text"
+              <select
                 value={formData.subproceso || ""}
                 onChange={(e) => setFormData({ ...formData, subproceso: e.target.value })}
-                placeholder="-- Seleccione o escriba --"
-                className="w-full p-2.5 border border-slate-300 rounded-md focus:ring-1 focus:ring-teal-600 focus:border-teal-600"
-              />
+                className="w-full p-2.5 border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-teal-600 focus:border-teal-600"
+              >
+                <option value="">-- Seleccione Subproceso --</option>
+                {opcionesSubprocesos.map((sp) => (
+                  <option key={sp} value={sp}>{sp}</option>
+                ))}
+              </select>
             </div>
           </div>
 
@@ -599,17 +678,18 @@ export default function Matrix() {
           </h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+            {/* LISTA DESPLEGABLE DINÁMICA DE FACTOR DE RIESGO */}
             <div>
               <label className="block font-medium text-slate-700 mb-1">Factor de Riesgo</label>
               <select
                 value={formData.factorRiesgo}
                 onChange={(e) => setFormData({ ...formData, factorRiesgo: e.target.value })}
-                className="w-full p-2.5 border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-teal-600"
+                className="w-full p-2.5 border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-teal-600 focus:border-teal-600 font-medium"
               >
-                <option value="Clientes / Contrapartes">Clientes / Contrapartes</option>
-                <option value="Productos / Servicios">Productos / Servicios</option>
-                <option value="Canales de Distribución">Canales de Distribución</option>
-                <option value="Jurisdicciones">Jurisdicciones</option>
+                <option value="">-- Seleccione Factor de Riesgo --</option>
+                {opcionesFactores.map((f) => (
+                  <option key={f} value={f}>{f}</option>
+                ))}
               </select>
             </div>
 
@@ -738,39 +818,33 @@ export default function Matrix() {
   // VISTA 2: TABLA MATRIZ DE RIESGOS
   return (
     <div className="p-6 max-w-[1700px] mx-auto space-y-6 bg-slate-50 min-h-screen text-slate-800">
-      {/* Encabezado Superior */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">
             Matriz de Riesgos LAFT / PADM
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            Evaluación del Riesgo Inherente y cálculo de mitigación acumulada de Controles Múltiples.
+            Evaluación del Riesgo Inherente y cálculo de mitigación acumulada con parámetros parametrizados.
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {/* Botón Excel */}
           <button
             onClick={handleExportExcel}
             className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-emerald-800 bg-emerald-100 hover:bg-emerald-200 rounded-lg transition-colors border border-emerald-300"
-            title="Descargar en formato Excel"
           >
             <FileSpreadsheet className="w-4 h-4 text-emerald-700" />
             Excel
           </button>
 
-          {/* Botón PDF */}
           <button
             onClick={handleExportPDF}
             className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-rose-800 bg-rose-100 hover:bg-rose-200 rounded-lg transition-colors border border-rose-300"
-            title="Descargar reporte detallado en PDF"
           >
             <FileText className="w-4 h-4 text-rose-700" />
             PDF
           </button>
 
-          {/* Botón Restablecer */}
           <button
             onClick={handleReset}
             className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors border border-slate-200"
@@ -779,7 +853,6 @@ export default function Matrix() {
             Restablecer Matriz
           </button>
 
-          {/* Botón Nuevo Riesgo */}
           <button
             onClick={handleOpenNewForm}
             className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg shadow-sm transition-colors"
@@ -790,7 +863,6 @@ export default function Matrix() {
         </div>
       </div>
 
-      {/* Buscador */}
       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-3">
         <Search className="w-5 h-5 text-slate-400" />
         <input
@@ -802,7 +874,6 @@ export default function Matrix() {
         />
       </div>
 
-      {/* Tabla Matriz de Riesgos */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
