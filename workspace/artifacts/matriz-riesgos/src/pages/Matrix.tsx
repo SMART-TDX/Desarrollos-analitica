@@ -44,7 +44,6 @@ export interface RiesgoRow {
   observaciones?: string;
 }
 
-// Valores por defecto estandarizados
 const DEFAULTS_PROCESOS = [
   "GESTION ADMINISTRATIVA Y FINANCIERA",
   "Gestión Académica",
@@ -85,24 +84,31 @@ const OPCIONES_MONITOREO = [
   "Anual"
 ];
 
+// CALIFICACIÓN SEGÚN EL PERFIL DE RIESGO SOLICITADO
 export function getNivelRiesgo(score: number): { label: string; bgBadge: string } {
-  if (score <= 4) {
-    return { label: "BAJO", bgBadge: "bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold" };
-  } else if (score <= 9) {
-    return { label: "MEDIO", bgBadge: "bg-amber-100 text-amber-900 border border-amber-300 font-bold" };
-  } else if (score <= 15) {
-    return { label: "ALTO", bgBadge: "bg-orange-100 text-orange-900 border border-orange-300 font-extrabold" };
+  if (score <= 3) {
+    return { 
+      label: "ACEPTABLE", 
+      bgBadge: "bg-emerald-400 text-emerald-950 font-bold border border-emerald-500" 
+    };
+  } else if (score <= 12) {
+    return { 
+      label: "TOLERABLE", 
+      bgBadge: "bg-yellow-300 text-yellow-950 font-bold border border-yellow-400" 
+    };
   } else {
-    return { label: "EXTREMO", bgBadge: "bg-rose-100 text-rose-800 border border-rose-300 font-extrabold" };
+    return { 
+      label: "INACEPTABLE", 
+      bgBadge: "bg-rose-500 text-white font-extrabold border border-rose-600" 
+    };
   }
 }
 
 function getColorsPDF(label: string): { bg: string; text: string } {
   switch (label) {
-    case "BAJO": return { bg: "#d1fae5", text: "#065f46" };
-    case "MEDIO": return { bg: "#fef3c7", text: "#92400e" };
-    case "ALTO": return { bg: "#ffedd5", text: "#9a3412" };
-    case "EXTREMO": default: return { bg: "#ffe4e6", text: "#9f1239" };
+    case "ACEPTABLE": return { bg: "#86efac", text: "#064e3b" };  // Verde brillante
+    case "TOLERABLE": return { bg: "#fde047", text: "#713f12" };  // Amarillo brillante
+    case "INACEPTABLE": default: return { bg: "#f87171", text: "#ffffff" }; // Rojo
   }
 }
 
@@ -140,10 +146,10 @@ export const RIESGOS_INICIALES: RiesgoRow[] = [
     porQuePuedeSuceder: "Falta de verificación en listas restrictivas o actualización extemporánea de las herramientas de consulta.",
     causa: "Falta de verificación en listas restrictivas o actualización extemporánea de las herramientas de consulta.",
     consecuencia: "Sanciones administrativas de la Superintendencia de Sociedades y daño reputacional.",
-    probabilidadInherente: 4,
-    impactoInherente: 5,
-    probabilidadResidual: 2,
-    impactoResidual: 2,
+    probabilidadInherente: 3,
+    impactoInherente: 3,
+    probabilidadResidual: 1,
+    impactoResidual: 3,
     tipoMonitoreo: "Mensual",
     responsable: "Oficial de Cumplimiento",
     controlCodigos: ["CTR-LAFT-01", "CTR-LAFT-02"],
@@ -162,10 +168,10 @@ export const RIESGOS_INICIALES: RiesgoRow[] = [
     porQuePuedeSuceder: "Pagos de terceros no identificados o falta de conciliación bancaria diaria.",
     causa: "Pagos de terceros no identificados o falta de conciliación bancaria diaria.",
     consecuencia: "Ingreso de recursos ilícitos a la contabilidad de la organización e investigaciones penales.",
-    probabilidadInherente: 3,
-    impactoInherente: 4,
+    probabilidadInherente: 2,
+    impactoInherente: 3,
     probabilidadResidual: 1,
-    impactoResidual: 2,
+    impactoResidual: 4,
     tipoMonitoreo: "Continuo / En tiempo real",
     responsable: "Líder de Cartera y Tesorería",
     controlCodigos: ["CTR-LAFT-05"],
@@ -184,7 +190,6 @@ export default function Matrix() {
     return CONTROLES_OFICIALES;
   });
 
-  // Parámetros Dinámicos
   const [listaProcesos, setListaProcesos] = useState<string[]>(DEFAULTS_PROCESOS);
   const [listaSubprocesos, setListaSubprocesos] = useState<string[]>(DEFAULTS_SUBPROCESOS);
   const [listaFactores, setListaFactores] = useState<string[]>(DEFAULTS_FACTORES);
@@ -249,8 +254,8 @@ export default function Matrix() {
     consecuencia: "",
     probabilidadInherente: 3,
     impactoInherente: 3,
-    probabilidadResidual: 2,
-    impactoResidual: 2,
+    probabilidadResidual: 1,
+    impactoResidual: 3,
     tipoMonitoreo: "Mensual",
     responsable: "Oficial de Cumplimiento",
     controlCodigos: [],
@@ -282,8 +287,8 @@ export default function Matrix() {
       consecuencia: "",
       probabilidadInherente: 3,
       impactoInherente: 3,
-      probabilidadResidual: 2,
-      impactoResidual: 2,
+      probabilidadResidual: 1,
+      impactoResidual: 3,
       tipoMonitoreo: "Mensual",
       responsable: "Oficial de Cumplimiento",
       controlCodigos: ["CTR-LAFT-01"],
@@ -301,8 +306,8 @@ export default function Matrix() {
       factorRiesgo: item.factorRiesgo || listaFactores[0] || "",
       quePuedeSuceder: item.quePuedeSuceder || item.descripcion || "",
       porQuePuedeSuceder: item.porQuePuedeSuceder || item.causa || "",
-      probabilidadResidual: item.probabilidadResidual || 2,
-      impactoResidual: item.impactoResidual || 2,
+      probabilidadResidual: item.probabilidadResidual || 1,
+      impactoResidual: item.impactoResidual || 3,
       tipoMonitoreo: item.tipoMonitoreo || "Mensual",
       responsable: item.responsable || "Oficial de Cumplimiento",
       controlCodigos: obtenerCodigosControlSeguros(item),
@@ -368,10 +373,9 @@ export default function Matrix() {
     return desc.includes(term) || cod.includes(term) || proc.includes(term);
   });
 
-  // Exportar Excel
   const handleExportExcel = () => {
     let csvContent = "\uFEFF";
-    csvContent += "Código;Proceso;Subproceso;Factor Riesgo;¿Qué puede suceder?;Tipología;¿Por qué puede suceder?;Consecuencias;Prob. Inh.;Imp. Inh.;Riesgo Inherente;Controles;Mitigación (%);Prob. Res.;Imp. Res.;Riesgo Residual;Tipo Monitoreo;Responsable\n";
+    csvContent += "Código;Proceso;Subproceso;Factor Riesgo;¿Qué puede suceder?;Tipología;¿Por qué puede suceder?;Consecuencias;Prob. Inh.;Imp. Inh.;Perfil Inherente;Controles;Mitigación (%);Prob. Res.;Imp. Res.;Perfil Residual;Tipo Monitoreo;Responsable\n";
 
     filteredRiesgos.forEach((r) => {
       const inhScore = (r.probabilidadInherente || 1) * (r.impactoInherente || 1);
@@ -399,12 +403,12 @@ export default function Matrix() {
         `"${(r.consecuencia || '').replace(/"/g, '""')}"`,
         r.probabilidadInherente,
         r.impactoInherente,
-        `"${inhScore} - ${inhLevel}"`,
+        `"${inhLevel}"`,
         `"${listaControles.replace(/"/g, '""')}"`,
         `"${mitigacionTotal}%"`,
         resProb,
         resImp,
-        `"${resScoreManual} - ${resLevel}"`,
+        `"${resLevel}"`,
         `"${r.tipoMonitoreo || ''}"`,
         `"${r.responsable || ''}"`
       ].join(";");
@@ -422,7 +426,6 @@ export default function Matrix() {
     document.body.removeChild(link);
   };
 
-  // Exportar PDF
   const handleExportPDF = () => {
     const printWindow = window.open("", "_blank");
     if (!printWindow) return;
@@ -438,9 +441,6 @@ export default function Matrix() {
       const resLevel = getNivelRiesgo(resScore);
       const resColors = getColorsPDF(resLevel.label);
 
-      const itemCodigos = obtenerCodigosControlSeguros(item);
-      const controlesAsignados = controles.filter((c) => itemCodigos.includes(c.codigo));
-
       return `
         <tr style="page-break-inside: avoid;">
           <td style="padding: 6px; border: 1px solid #cbd5e1; font-weight: bold;">${item.codigo}</td>
@@ -453,14 +453,14 @@ export default function Matrix() {
           </td>
           <td style="padding: 6px; border: 1px solid #cbd5e1; text-align: center;">
             <div style="font-size: 8px;">P:${item.probabilidadInherente} I:${item.impactoInherente}</div>
-            <div style="padding: 3px; border-radius: 4px; font-weight: bold; background-color: ${inhColors.bg}; color: ${inhColors.text};">
-              ${inhScore} - ${inhLevel.label}
+            <div style="padding: 4px; border-radius: 4px; font-weight: bold; background-color: ${inhColors.bg}; color: ${inhColors.text};">
+              ${inhLevel.label}
             </div>
           </td>
           <td style="padding: 6px; border: 1px solid #cbd5e1; text-align: center;">
             <div style="font-size: 8px;">P:${resProb} I:${resImp}</div>
-            <div style="padding: 3px; border-radius: 4px; font-weight: bold; background-color: ${resColors.bg}; color: ${resColors.text};">
-              ${resScore} - ${resLevel.label}
+            <div style="padding: 4px; border-radius: 4px; font-weight: bold; background-color: ${resColors.bg}; color: ${resColors.text};">
+              ${resLevel.label}
             </div>
           </td>
           <td style="padding: 6px; border: 1px solid #cbd5e1;">
@@ -485,7 +485,7 @@ export default function Matrix() {
           </style>
         </head>
         <body>
-          <h1>Reporte General de Riesgos y Análisis Cualitativo</h1>
+          <h1>Reporte General de Perfil de Riesgos</h1>
           <table>
             <thead>
               <tr>
@@ -493,8 +493,8 @@ export default function Matrix() {
                 <th style="width: 110px;">Proceso / Subp.</th>
                 <th style="width: 110px;">Factor / Tipología</th>
                 <th>Análisis Cualitativo del Riesgo</th>
-                <th style="width: 80px; text-align: center;">R. Inherente</th>
-                <th style="width: 80px; text-align: center;">R. Residual</th>
+                <th style="width: 90px; text-align: center;">Perfil Inherente</th>
+                <th style="width: 90px; text-align: center;">Perfil Residual</th>
                 <th style="width: 120px;">Monitoreo / Resp.</th>
               </tr>
             </thead>
@@ -515,7 +515,7 @@ export default function Matrix() {
   const opcionesSubprocesos = Array.from(new Set([...listaSubprocesos, formData.subproceso || ""])).filter(Boolean);
   const opcionesFactores = Array.from(new Set([...listaFactores, formData.factorRiesgo])).filter(Boolean);
 
-  // VISTA 1: FORMULARIO
+  // VISTA FORMULARIO
   if (viewMode === "form") {
     const formControlCodigos = formData.controlCodigos || [];
 
@@ -534,7 +534,7 @@ export default function Matrix() {
                 {editingId ? "Editar Riesgo" : "Nuevo Riesgo"}
               </h1>
               <p className="text-xs text-slate-500">
-                Formulario de identificación y análisis cualitativo estandarizado
+                Formulario de identificación y perfilamiento de riesgo
               </p>
             </div>
           </div>
@@ -548,7 +548,6 @@ export default function Matrix() {
           </button>
         </div>
 
-        {/* IDENTIFICACIÓN GENERAL */}
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-5">
           <h2 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-2">
             Identificación del Riesgo
@@ -594,43 +593,14 @@ export default function Matrix() {
               </select>
             </div>
           </div>
-
-          <div className="pt-2">
-            <label className="block font-semibold text-slate-500 mb-2 text-xs">
-              Clasificación (Banderas)
-            </label>
-            <div className="flex flex-wrap gap-6 text-xs text-slate-700">
-              {(["laft", "operativo", "legal", "reputacional", "contagio"] as const).map((flag) => (
-                <label key={flag} className="flex items-center gap-2 cursor-pointer capitalize">
-                  <input
-                    type="checkbox"
-                    checked={formData.banderas?.[flag] || false}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        banderas: {
-                          ...(formData.banderas || { laft: false, operativo: false, legal: false, reputacional: false, contagio: false }),
-                          [flag]: e.target.checked
-                        }
-                      })
-                    }
-                    className="w-4 h-4 rounded text-teal-600 focus:ring-teal-500 border-slate-300"
-                  />
-                  <span>{flag}</span>
-                </label>
-              ))}
-            </div>
-          </div>
         </div>
 
-        {/* ANÁLISIS CUALITATIVO REESTRUCTURADO */}
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-5">
           <h2 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-2">
             Análisis Cualitativo
           </h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-            {/* 1. FACTOR DE RIESGO */}
             <div>
               <label className="block font-medium text-slate-700 mb-1">Factor de Riesgo *</label>
               <select
@@ -645,7 +615,6 @@ export default function Matrix() {
               </select>
             </div>
 
-            {/* 3. TIPOLOGÍA */}
             <div>
               <label className="block font-medium text-slate-700 mb-1">Tipología</label>
               <input
@@ -658,7 +627,6 @@ export default function Matrix() {
             </div>
           </div>
 
-          {/* 2. ¿QUÉ PUEDE SUCEDER? */}
           <div>
             <label className="block font-medium text-slate-700 mb-1 text-xs">
               ¿Qué puede suceder? *
@@ -673,7 +641,6 @@ export default function Matrix() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-            {/* 4. ¿POR QUÉ PUEDE SUCEDER? */}
             <div>
               <label className="block font-medium text-slate-700 mb-1">¿Por qué puede suceder? (Causa Raíz)</label>
               <textarea
@@ -685,7 +652,6 @@ export default function Matrix() {
               />
             </div>
 
-            {/* 5. CONSECUENCIAS */}
             <div>
               <label className="block font-medium text-slate-700 mb-1">Consecuencias / Impacto</label>
               <textarea
@@ -698,16 +664,15 @@ export default function Matrix() {
             </div>
           </div>
 
-          {/* 6. PROBABILIDAD E IMPACTO INHERENTE */}
           <div className="pt-2 border-t border-slate-100">
-            <h3 className="text-xs font-bold text-slate-800 mb-3">Evaluación del Riesgo Inherente</h3>
+            <h3 className="text-xs font-bold text-slate-800 mb-3">Evaluación y Perfil Inherente</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
               <div>
                 <label className="block font-medium text-slate-700 mb-1">Probabilidad Inherente (1 a 5)</label>
                 <select
                   value={formData.probabilidadInherente}
                   onChange={(e) => setFormData({ ...formData, probabilidadInherente: Number(e.target.value) })}
-                  className="w-full p-2.5 border border-amber-300 rounded-md font-bold bg-amber-50/60 focus:ring-1 focus:ring-amber-500"
+                  className="w-full p-2.5 border border-yellow-300 rounded-md font-bold bg-yellow-50/60 focus:ring-1 focus:ring-yellow-500"
                 >
                   <option value={1}>1 - Raro</option>
                   <option value={2}>2 - Improbable</option>
@@ -722,7 +687,7 @@ export default function Matrix() {
                 <select
                   value={formData.impactoInherente}
                   onChange={(e) => setFormData({ ...formData, impactoInherente: Number(e.target.value) })}
-                  className="w-full p-2.5 border border-amber-300 rounded-md font-bold bg-amber-50/60 focus:ring-1 focus:ring-amber-500"
+                  className="w-full p-2.5 border border-yellow-300 rounded-md font-bold bg-yellow-50/60 focus:ring-1 focus:ring-yellow-500"
                 >
                   <option value={1}>1 - Insignificante</option>
                   <option value={2}>2 - Menor</option>
@@ -734,14 +699,13 @@ export default function Matrix() {
             </div>
           </div>
 
-          {/* 7. PROBABILIDAD E IMPACTO RESIDUAL */}
           <div className="pt-2 border-t border-slate-100">
-            <h3 className="text-xs font-bold text-slate-800 mb-3">Evaluación del Riesgo Residual</h3>
+            <h3 className="text-xs font-bold text-slate-800 mb-3">Evaluación y Perfil Residual</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
               <div>
                 <label className="block font-medium text-slate-700 mb-1">Probabilidad Residual (1 a 5)</label>
                 <select
-                  value={formData.probabilidadResidual || 2}
+                  value={formData.probabilidadResidual || 1}
                   onChange={(e) => setFormData({ ...formData, probabilidadResidual: Number(e.target.value) })}
                   className="w-full p-2.5 border border-emerald-300 rounded-md font-bold bg-emerald-50/60 focus:ring-1 focus:ring-emerald-500"
                 >
@@ -756,7 +720,7 @@ export default function Matrix() {
               <div>
                 <label className="block font-medium text-slate-700 mb-1">Impacto Residual (1 a 5)</label>
                 <select
-                  value={formData.impactoResidual || 2}
+                  value={formData.impactoResidual || 3}
                   onChange={(e) => setFormData({ ...formData, impactoResidual: Number(e.target.value) })}
                   className="w-full p-2.5 border border-emerald-300 rounded-md font-bold bg-emerald-50/60 focus:ring-1 focus:ring-emerald-500"
                 >
@@ -770,7 +734,6 @@ export default function Matrix() {
             </div>
           </div>
 
-          {/* 8 y 9. TIPO DE MONITOREO Y RESPONSABLE */}
           <div className="pt-2 border-t border-slate-100">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
               <div>
@@ -800,7 +763,6 @@ export default function Matrix() {
           </div>
         </div>
 
-        {/* ASIGNACIÓN DE CONTROLES */}
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
           <div className="flex justify-between items-center border-b border-slate-100 pb-2">
             <div>
@@ -856,7 +818,7 @@ export default function Matrix() {
     );
   }
 
-  // VISTA 2: TABLA PRINCIPAL
+  // VISTA TABLA PRINCIPAL
   return (
     <div className="p-6 max-w-[1700px] mx-auto space-y-6 bg-slate-50 min-h-screen text-slate-800">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
@@ -865,7 +827,7 @@ export default function Matrix() {
             Matriz de Riesgos LAFT / PADM
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            Gestión cualitativa y cuantitativa de riesgos con controles asignados.
+            Gestión cualitativa y perfilamiento del riesgo (Aceptable, Tolerable, Inaceptable).
           </p>
         </div>
 
@@ -924,9 +886,9 @@ export default function Matrix() {
                 <th className="p-3.5 w-32">Proceso</th>
                 <th className="p-3.5 w-36">Factor / Tipología</th>
                 <th className="p-3.5 min-w-[280px]">¿Qué puede suceder?</th>
-                <th className="p-3.5 w-24 text-center">R. Inherente</th>
+                <th className="p-3.5 w-28 text-center">Perfil Inherente</th>
                 <th className="p-3.5 min-w-[220px]">Controles</th>
-                <th className="p-3.5 w-24 text-center">R. Residual</th>
+                <th className="p-3.5 w-28 text-center">Perfil Residual</th>
                 <th className="p-3.5 w-32">Monitoreo / Resp.</th>
                 <th className="p-3.5 w-20 text-center">Acciones</th>
               </tr>
@@ -974,10 +936,13 @@ export default function Matrix() {
                       )}
                     </td>
 
+                    {/* COLUMNA PERFIL INHERENTE */}
                     <td className="p-2 align-top text-center">
-                      <div className="text-[10px] text-slate-500 font-mono mb-1">P:{item.probabilidadInherente} | I:{item.impactoInherente}</div>
-                      <div className={`px-2 py-1 rounded-md text-[11px] tracking-wide ${inhLevel.bgBadge}`}>
-                        {inhScore} - {inhLevel.label}
+                      <div className="text-[10px] text-slate-500 font-mono mb-1">
+                        P:{item.probabilidadInherente} | I:{item.impactoInherente}
+                      </div>
+                      <div className={`px-2 py-1 rounded-md text-[11px] uppercase tracking-wider ${inhLevel.bgBadge}`}>
+                        {inhLevel.label}
                       </div>
                     </td>
 
@@ -1000,10 +965,13 @@ export default function Matrix() {
                       </div>
                     </td>
 
+                    {/* COLUMNA PERFIL RESIDUAL */}
                     <td className="p-2 align-top text-center">
-                      <div className="text-[10px] text-slate-500 font-mono mb-1">P:{resProb} | I:{resImp}</div>
-                      <div className={`px-2 py-1 rounded-md text-[11px] tracking-wide ${resLevel.bgBadge}`}>
-                        {resScore} - {resLevel.label}
+                      <div className="text-[10px] text-slate-500 font-mono mb-1">
+                        P:{resProb} | I:{resImp}
+                      </div>
+                      <div className={`px-2 py-1 rounded-md text-[11px] uppercase tracking-wider ${resLevel.bgBadge}`}>
+                        {resLevel.label}
                       </div>
                     </td>
 
