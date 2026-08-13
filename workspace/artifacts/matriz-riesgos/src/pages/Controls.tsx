@@ -1,146 +1,146 @@
 import React, { useState, useEffect } from "react";
-import {
-  Plus,
-  Search,
-  Edit3,
-  Trash2,
-  RotateCcw,
-  ShieldCheck,
-  X,
-  Save
-} from "lucide-react";
-import { STORAGE_KEY, DEFAULT_PARAMETROS } from "./Parameters";
+import { Plus, Trash2, Edit3, Save, RotateCcw, ShieldCheck, Settings } from "lucide-react";
 
-// Interface del Control
+// 1. ESTRUCTURA DE PARÁMETROS DE PONDERACIÓN
+export interface ParametrosControl {
+  pesos: {
+    clase: number;       // Peso PARAMETROS!$E$6 (ej. 0.35)
+    tipo: number;        // Peso PARAMETROS!$G$6 (ej. 0.30)
+    frecuencia: number;  // Peso PARAMETROS!$I$6 (ej. 0.20)
+    formalidad: number;  // Peso PARAMETROS!$K$6 (ej. 0.15)
+  };
+  valores: {
+    clase: Record<string, number>;
+    tipo: Record<string, number>;
+    frecuencia: Record<string, number>;
+    formalidad: Record<string, number>;
+  };
+}
+
+export const PARAMETROS_DEFAULT: ParametrosControl = {
+  pesos: {
+    clase: 0.35,
+    tipo: 0.30,
+    frecuencia: 0.20,
+    formalidad: 0.15,
+  },
+  valores: {
+    clase: {
+      "Preventivo": 100,
+      "Detectivo": 70,
+      "Correctivo": 40,
+    },
+    tipo: {
+      "Automático": 100,
+      "Semiautomático": 70,
+      "Manual": 40,
+    },
+    frecuencia: {
+      "Continuo / En tiempo real": 100,
+      "Diario": 90,
+      "Semanal": 80,
+      "Mensual": 70,
+      "Bimestral": 60,
+      "Trimestral": 50,
+      "Semestral": 40,
+      "Anual": 30,
+      "Ocasional": 20,
+    },
+    formalidad: {
+      "Documentado y Formalizado": 100,
+      "Documentado no Formalizado": 60,
+      "No Documentado": 20,
+    },
+  },
+};
+
 export interface ControlRow {
   id: string;
   codigo: string;
   control: string;
-  descripcion?: string;
   clase: string;
   tipo: string;
   frecuencia: string;
   formalidad: string;
-  evidencia?: string;
   responsable?: string;
+  evidencia?: string;
 }
 
-// Función para obtener los parámetros guardados o por defecto
-export function getParametros() {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) return JSON.parse(saved);
-  } catch (e) {
-    console.error("Error al leer parámetros:", e);
-  }
-  return DEFAULT_PARAMETROS;
-}
-
-// Cálculo dinámico según los pesos configurados en la interfaz de Parámetros
+// 2. FÓRMULA DE PONDERACIÓN FIEL A EXCEL
+// =@SI.ERROR((($D2*PARAMETROS!$E$6))+(($F2*PARAMETROS!$G$6))+(($H2*PARAMETROS!$I$6))+(($J2*PARAMETROS!$K$6));NOD())
 export function calcularPonderacion(
   clase: string,
   tipo: string,
   frecuencia: string,
-  formalidad: string
+  formalidad: string,
+  parametrosCustom?: ParametrosControl
 ): number {
-  const parametros = getParametros();
+  const params = parametrosCustom || obtenerParametrosGuardados();
 
-  const getValor = (categoria: string, nombre: string) => {
-    const item = parametros.find(
-      (p: any) =>
-        p.categoria === categoria &&
-        p.nombre?.toLowerCase().trim() === nombre?.toLowerCase().trim()
-    );
-    return item ? item.valor : 0;
-  };
+  const vClase = params.valores.clase[clase] ?? 0;
+  const vTipo = params.valores.tipo[tipo] ?? 0;
+  const vFrecuencia = params.valores.frecuencia[frecuencia] ?? 0;
+  const vFormalidad = params.valores.formalidad[formalidad] ?? 0;
 
-  const pClase = getValor("CLASE", clase);
-  const pTipo = getValor("TIPO", tipo);
-  const pFrecuencia = getValor("FRECUENCIA", frecuencia);
-  const pFormalidad = getValor("FORMALIDAD", formalidad);
+  const pClase = params.pesos.clase;
+  const pTipo = params.pesos.tipo;
+  const pFrecuencia = params.pesos.frecuencia;
+  const pFormalidad = params.pesos.formalidad;
 
-  // Suma ponderada en porcentaje
-  const total = (pClase + pTipo + pFrecuencia + pFormalidad) * 100;
-  return Math.round(total);
+  // Fórmula ponderada exacta
+  const ponderacion = (vClase * pClase) + (vTipo * pTipo) + (vFrecuencia * pFrecuencia) + (vFormalidad * pFormalidad);
+
+  return Math.round(ponderacion);
 }
 
-// Catálogo inicial oficial por defecto
+export function obtenerParametrosGuardados(): ParametrosControl {
+  try {
+    const saved = localStorage.getItem("laft_parametros_controles_v1");
+    if (saved) return JSON.parse(saved);
+  } catch (e) {
+    console.error("Error cargando parámetros de controles:", e);
+  }
+  return PARAMETROS_DEFAULT;
+}
+
 export const CONTROLES_OFICIALES: ControlRow[] = [
   {
     id: "1",
     codigo: "CTR-LAFT-01",
-    control: "Consulta previa y periódica en listas restrictivas y de sanciones",
-    descripcion: "Verificación automatizada en listas OFAC, ONU, PEPs y de sanciones nacionales.",
+    control: "Consulta previa en listas restrictivas y vinculante antes del enrolamiento",
     clase: "Preventivo",
     tipo: "Automático",
-    frecuencia: "Permanente",
-    formalidad: "DODI (Doc/Div)",
-    evidencia: "Logs de consulta y certificado de verificación en sistema",
-    responsable: "Oficial de Cumplimiento / Analista LAFT"
+    frecuencia: "Continuo / En tiempo real",
+    formalidad: "Documentado y Formalizado",
+    responsable: "Analista Sagrilaft",
+    evidencia: "Logs de consulta en sistema"
   },
   {
     id: "2",
     codigo: "CTR-LAFT-02",
-    control: "Debida diligencia intensificada para clientes PEPs e intensivos en efectivo",
-    descripcion: "Aprobación de la alta gerencia y soporte documentado del origen de fondos.",
-    clase: "Preventivo",
+    control: "Verificación periódica de contrapartes existentes en listas de sanción",
+    clase: "Detectivo",
     tipo: "Semiautomático",
-    frecuencia: "Ocasional",
-    formalidad: "DODI (Doc/Div)",
-    evidencia: "Formulario de vinculación PEP y concepto de riesgos",
-    responsable: "Oficial de Cumplimiento"
+    frecuencia: "Mensual",
+    formalidad: "Documentado y Formalizado",
+    responsable: "Oficial de Cumplimiento",
+    evidencia: "Reportes mensuales de coincidencias"
   },
   {
     id: "3",
-    codigo: "CTR-LAFT-05",
-    control: "Monitoreo transaccional de recaudos y facturación frente a perfiles operativos",
-    descripcion: "Alertas tempranas ante incrementos significativos o depósitos inusuales.",
+    codigo: "CTR-LAFT-03",
+    control: "Monitoreo y conciliación de transacciones inusuales de cartera",
     clase: "Detectivo",
-    tipo: "Automático",
-    frecuencia: "Permanente",
-    formalidad: "DODI (Doc/Div)",
-    evidencia: "Reporte de alertas operativas e informe mensual de análisis",
-    responsable: "Analista Financiero / Cartera"
-  },
-  {
-    id: "4",
-    codigo: "CTR-LAFT-09",
-    control: "Restricción de operaciones en efectivo y pagos a terceros no titularizados",
-    descripcion: "Bancarización del 100% de operaciones comerciales y desembolsos a proveedores.",
-    clase: "Preventivo",
     tipo: "Manual",
-    frecuencia: "Permanente",
-    formalidad: "DODI (Doc/Div)",
-    evidencia: "Comprobantes de egreso y certificaciones bancarias de cuenta titular",
-    responsable: "Tesorero / Jefe de Compras"
-  },
-  {
-    id: "5",
-    codigo: "CTR-LAFT-13",
-    control: "Verificación de beneficiarios finales en contratación de proveedores",
-    descripcion: "Identificación de personas naturales con >5% de participación accionaria.",
-    clase: "Preventivo",
-    tipo: "Semiautomático",
-    frecuencia: "Ocasional",
-    formalidad: "DODI (Doc/Div)",
-    evidencia: "Certificado de existencia / Composición accionaria firmada",
-    responsable: "Gestión Jurídica / Compras"
-  },
-  {
-    id: "6",
-    codigo: "CTR-LAFT-18",
-    control: "Estudios de seguridad y antecedentes al personal de procesos críticos",
-    descripcion: "Evaluación de antecedentes judiciales, listas restrictivas y verificación laboral.",
-    clase: "Preventivo",
-    tipo: "Manual",
-    frecuencia: "Ocasional",
-    formalidad: "DODI (Doc/Div)",
-    evidencia: "Informe de estudio de seguridad e historia laboral de contratación",
-    responsable: "Gestión Humana"
+    frecuencia: "Diario",
+    formalidad: "Documentado no Formalizado",
+    responsable: "Líder de Cartera",
+    evidencia: "Planilla de inconsistencias"
   }
 ];
 
 export default function Controls() {
+  const [parametros, setParametros] = useState<ParametrosControl>(obtenerParametrosGuardados);
   const [controles, setControles] = useState<ControlRow[]>(() => {
     try {
       const saved = localStorage.getItem("laft_catalogo_controles_v3");
@@ -151,455 +151,287 @@ export default function Controls() {
     return CONTROLES_OFICIALES;
   });
 
-  const [searchTerm, setSearchTerm] = useState("");
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingControl, setEditingControl] = useState<ControlRow | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [showParams, setShowParams] = useState(false);
 
   const [formData, setFormData] = useState<ControlRow>({
     id: "",
     codigo: "",
     control: "",
-    descripcion: "",
     clase: "Preventivo",
     tipo: "Automático",
-    frecuencia: "Permanente",
-    formalidad: "DODI (Doc/Div)",
-    evidencia: "",
-    responsable: ""
+    frecuencia: "Mensual",
+    formalidad: "Documentado y Formalizado",
+    responsable: "",
+    evidencia: ""
   });
 
-  // Escuchar eventos de actualización de parámetros en tiempo real desde Parameters.tsx
   useEffect(() => {
-    const handleUpdate = () => {
-      // Forzar actualización/re-render de controles para aplicar nuevos pesos
-      setControles((prev) => [...prev]); 
-    };
-
-    window.addEventListener("laft_parametros_updated", handleUpdate);
-    return () => window.removeEventListener("laft_parametros_updated", handleUpdate);
-  }, []);
-
-  // Persistir cambios de los controles en localStorage
-  useEffect(() => {
-    try {
-      localStorage.setItem("laft_catalogo_controles_v3", JSON.stringify(controles));
-    } catch (e) {
-      console.error("Error al guardar controles:", e);
-    }
+    localStorage.setItem("laft_catalogo_controles_v3", JSON.stringify(controles));
   }, [controles]);
 
-  const handleOpenModal = (controlToEdit?: ControlRow) => {
-    if (controlToEdit) {
-      setEditingControl(controlToEdit);
-      setFormData(controlToEdit);
-    } else {
-      setEditingControl(null);
-      const nextNum = controles.length + 1;
-      const nextCode = `CTR-LAFT-${nextNum < 10 ? "0" + nextNum : nextNum}`;
-      setFormData({
-        id: Date.now().toString(),
-        codigo: nextCode,
-        control: "",
-        descripcion: "",
-        clase: "Preventivo",
-        tipo: "Automático",
-        frecuencia: "Permanente",
-        formalidad: "DODI (Doc/Div)",
-        evidencia: "",
-        responsable: ""
-      });
-    }
-    setIsModalOpen(true);
-  };
-
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
-    setEditingControl(null);
-  };
+  useEffect(() => {
+    localStorage.setItem("laft_parametros_controles_v1", JSON.stringify(parametros));
+  }, [parametros]);
 
   const handleSaveControl = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.codigo || !formData.control) {
-      alert("Por favor ingrese el código y el nombre del control.");
+      alert("Por favor ingrese código y descripción del control.");
       return;
     }
 
-    if (editingControl) {
-      setControles((prev) =>
-        prev.map((c) => (c.id === editingControl.id ? formData : c))
-      );
+    if (editingId) {
+      setControles(prev => prev.map(c => c.id === editingId ? formData : c));
+      setEditingId(null);
     } else {
-      setControles((prev) => [...prev, formData]);
+      setControles(prev => [...prev, { ...formData, id: Date.now().toString() }]);
     }
 
-    handleCloseModal();
+    setFormData({
+      id: "",
+      codigo: `CTR-LAFT-0${controles.length + 2}`,
+      control: "",
+      clase: "Preventivo",
+      tipo: "Automático",
+      frecuencia: "Mensual",
+      formalidad: "Documentado y Formalizado",
+      responsable: "",
+      evidencia: ""
+    });
   };
 
-  const handleDeleteControl = (id: string) => {
-    if (confirm("¿Está seguro de eliminar este control del catálogo?")) {
-      setControles((prev) => prev.filter((c) => c.id !== id));
+  const handleEdit = (item: ControlRow) => {
+    setEditingId(item.id);
+    setFormData(item);
+  };
+
+  const handleDelete = (id: string) => {
+    if (confirm("¿Desea eliminar este control?")) {
+      setControles(prev => prev.filter(c => c.id !== id));
     }
   };
-
-  const handleReset = () => {
-    if (confirm("¿Desea restablecer el catálogo de controles oficial?")) {
-      setControles(CONTROLES_OFICIALES);
-      localStorage.removeItem("laft_catalogo_controles_v3");
-    }
-  };
-
-  const filteredControles = controles.filter((c) => {
-    const term = searchTerm.toLowerCase();
-    return (
-      c.codigo.toLowerCase().includes(term) ||
-      c.control.toLowerCase().includes(term) ||
-      (c.responsable || "").toLowerCase().includes(term)
-    );
-  });
 
   return (
-    <div className="p-6 max-w-[1700px] mx-auto space-y-6 bg-slate-50 min-h-screen text-slate-800">
-      {/* Encabezado */}
+    <div className="p-6 max-w-[1500px] mx-auto space-y-6 bg-slate-50 min-h-screen text-slate-800">
+      {/* HEADER */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <ShieldCheck className="w-6 h-6 text-indigo-600" />
-            Catálogo de Controles LAFT
-          </h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Gestión y ponderación de efectividad de controles asociados al sistema SAGRILAFT / PADM.
-          </p>
-        </div>
-
         <div className="flex items-center gap-3">
-          <button
-            onClick={handleReset}
-            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors border border-slate-200"
-          >
-            <RotateCcw className="w-4 h-4" />
-            Restablecer Catálogo
-          </button>
-
-          <button
-            onClick={() => handleOpenModal()}
-            className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            Nuevo Control
-          </button>
+          <div className="p-3 bg-indigo-50 text-indigo-700 rounded-lg">
+            <ShieldCheck className="w-6 h-6" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">Catálogo de Controles LAFT</h1>
+            <p className="text-xs text-slate-500">Ponderación parametrizada según fórmula de matriz de riesgo</p>
+          </div>
         </div>
+
+        <button
+          onClick={() => setShowParams(!showParams)}
+          className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg border border-slate-300 transition-colors"
+        >
+          <Settings className="w-4 h-4 text-slate-600" />
+          {showParams ? "Ocultar Parámetros" : "Configurar Pesos de Parámetros"}
+        </button>
       </div>
 
-      {/* Buscador */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-3">
-        <Search className="w-5 h-5 text-slate-400" />
-        <input
-          type="text"
-          placeholder="Buscar control por código, nombre o responsable..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full bg-transparent text-xs text-slate-800 focus:outline-none placeholder:text-slate-400"
-        />
-      </div>
-
-      {/* Tabla de Controles */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs">
-            <thead>
-              <tr className="bg-slate-100 text-slate-800 font-bold text-xs border-b-2 border-slate-300">
-                <th className="p-3.5 w-28">Código</th>
-                <th className="p-3.5 min-w-[250px]">Nombre del Control</th>
-                <th className="p-3.5 w-28">Clase</th>
-                <th className="p-3.5 w-28">Tipo</th>
-                <th className="p-3.5 w-28">Frecuencia</th>
-                <th className="p-3.5 w-32">Formalidad</th>
-                <th className="p-3.5 w-28 text-center bg-indigo-50/50 text-indigo-950">
-                  Ponderación
-                </th>
-                <th className="p-3.5 w-40">Responsable</th>
-                <th className="p-3.5 w-24 text-center">Acciones</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200">
-              {filteredControles.map((item, idx) => {
-                const ponderacion = calcularPonderacion(
-                  item.clase,
-                  item.tipo,
-                  item.frecuencia,
-                  item.formalidad
-                );
-
-                return (
-                  <tr
-                    key={item.id}
-                    className={
-                      idx % 2 === 0
-                        ? "bg-white hover:bg-slate-50/80"
-                        : "bg-slate-50/40 hover:bg-slate-100/60"
-                    }
-                  >
-                    <td className="p-3 font-bold text-slate-900 align-middle">
-                      {item.codigo}
-                    </td>
-                    <td className="p-3 align-middle text-slate-800">
-                      <div className="font-semibold">{item.control}</div>
-                      {item.descripcion && (
-                        <div className="text-[11px] text-slate-500 mt-0.5 line-clamp-1">
-                          {item.descripcion}
-                        </div>
-                      )}
-                    </td>
-                    <td className="p-3 align-middle text-slate-700">
-                      <span className="px-2 py-1 bg-slate-100 border border-slate-200 rounded text-[11px]">
-                        {item.clase}
-                      </span>
-                    </td>
-                    <td className="p-3 align-middle text-slate-700">
-                      <span className="px-2 py-1 bg-slate-100 border border-slate-200 rounded text-[11px]">
-                        {item.tipo}
-                      </span>
-                    </td>
-                    <td className="p-3 align-middle text-slate-700">
-                      <span className="px-2 py-1 bg-slate-100 border border-slate-200 rounded text-[11px]">
-                        {item.frecuencia}
-                      </span>
-                    </td>
-                    <td className="p-3 align-middle text-slate-700">
-                      <span className="px-2 py-1 bg-slate-100 border border-slate-200 rounded text-[11px]">
-                        {item.formalidad}
-                      </span>
-                    </td>
-                    <td className="p-3 align-middle text-center font-extrabold text-indigo-700 bg-indigo-50/50 text-sm">
-                      {ponderacion}%
-                    </td>
-                    <td className="p-3 align-middle text-slate-600 font-medium">
-                      {item.responsable || "N/A"}
-                    </td>
-                    <td className="p-3 align-middle text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        <button
-                          onClick={() => handleOpenModal(item)}
-                          className="text-slate-500 hover:text-indigo-600 transition-colors p-1"
-                          title="Editar control"
-                        >
-                          <Edit3 className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteControl(item.id)}
-                          className="text-slate-400 hover:text-rose-600 transition-colors p-1"
-                          title="Eliminar control"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Modal Crear / Editar Control */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-xl max-w-2xl w-full p-6 space-y-5 animate-in fade-in zoom-in duration-150">
-            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
-              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 text-indigo-600" />
-                {editingControl ? "Editar Control" : "Nuevo Control"}
-              </h2>
-              <button
-                onClick={handleCloseModal}
-                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg"
-              >
-                <X className="w-5 h-5" />
-              </button>
+      {/* PANEL CONFIGURACIÓN DE PARÁMETROS (SI SE ACTIVA) */}
+      {showParams && (
+        <div className="bg-white p-6 rounded-xl border border-indigo-200 shadow-sm space-y-4">
+          <h2 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-2">
+            Pesos de los Atributos (Ponderación = Clase × P1 + Tipo × P2 + Frecuencia × P3 + Formalidad × P4)
+          </h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+            <div>
+              <label className="block font-medium text-slate-700 mb-1">Peso Clase (D2 * E6)</label>
+              <input
+                type="number"
+                step="0.05"
+                value={parametros.pesos.clase}
+                onChange={e => setParametros({
+                  ...parametros,
+                  pesos: { ...parametros.pesos, clase: parseFloat(e.target.value) || 0 }
+                })}
+                className="w-full p-2 border border-slate-300 rounded font-bold"
+              />
             </div>
-
-            <form onSubmit={handleSaveControl} className="space-y-4 text-xs">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div>
-                  <label className="block font-medium text-slate-700 mb-1">
-                    Código *
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.codigo}
-                    onChange={(e) =>
-                      setFormData({ ...formData, codigo: e.target.value })
-                    }
-                    className="w-full p-2 border border-slate-300 rounded-md focus:ring-1 focus:ring-indigo-600 font-bold"
-                    required
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block font-medium text-slate-700 mb-1">
-                    Nombre del Control *
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.control}
-                    onChange={(e) =>
-                      setFormData({ ...formData, control: e.target.value })
-                    }
-                    placeholder="Ej. Consulta en listas restrictivas"
-                    className="w-full p-2 border border-slate-300 rounded-md focus:ring-1 focus:ring-indigo-600"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-medium text-slate-700 mb-1">
-                  Descripción
-                </label>
-                <textarea
-                  rows={2}
-                  value={formData.descripcion || ""}
-                  onChange={(e) =>
-                    setFormData({ ...formData, descripcion: e.target.value })
-                  }
-                  placeholder="Detalle operativo del control..."
-                  className="w-full p-2 border border-slate-300 rounded-md"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-slate-50 p-3 rounded-lg border border-slate-200">
-                <div>
-                  <label className="block font-medium text-slate-700 mb-1">
-                    Clase
-                  </label>
-                  <select
-                    value={formData.clase}
-                    onChange={(e) =>
-                      setFormData({ ...formData, clase: e.target.value })
-                    }
-                    className="w-full p-2 border border-slate-300 rounded-md bg-white"
-                  >
-                    <option value="Preventivo">Preventivo</option>
-                    <option value="Detectivo">Detectivo</option>
-                    <option value="Correctivo">Correctivo</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-medium text-slate-700 mb-1">
-                    Tipo
-                  </label>
-                  <select
-                    value={formData.tipo}
-                    onChange={(e) =>
-                      setFormData({ ...formData, tipo: e.target.value })
-                    }
-                    className="w-full p-2 border border-slate-300 rounded-md bg-white"
-                  >
-                    <option value="Automático">Automático</option>
-                    <option value="Semiautomático">Semiautomático</option>
-                    <option value="Manual">Manual</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-medium text-slate-700 mb-1">
-                    Frecuencia
-                  </label>
-                  <select
-                    value={formData.frecuencia}
-                    onChange={(e) =>
-                      setFormData({ ...formData, frecuencia: e.target.value })
-                    }
-                    className="w-full p-2 border border-slate-300 rounded-md bg-white"
-                  >
-                    <option value="Permanente">Permanente</option>
-                    <option value="Ocasional">Ocasional</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block font-medium text-slate-700 mb-1">
-                    Formalidad
-                  </label>
-                  <select
-                    value={formData.formalidad}
-                    onChange={(e) =>
-                      setFormData({ ...formData, formalidad: e.target.value })
-                    }
-                    className="w-full p-2 border border-slate-300 rounded-md bg-white"
-                  >
-                    <option value="DODI (Doc/Div)">DODI (Doc/Div)</option>
-                    <option value="NODO (No Doc)">NODO (No Doc)</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-medium text-slate-700 mb-1">
-                    Responsable
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.responsable || ""}
-                    onChange={(e) =>
-                      setFormData({ ...formData, responsable: e.target.value })
-                    }
-                    placeholder="Ej. Oficial de Cumplimiento"
-                    className="w-full p-2 border border-slate-300 rounded-md"
-                  />
-                </div>
-                <div>
-                  <label className="block font-medium text-slate-700 mb-1">
-                    Evidencia
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.evidencia || ""}
-                    onChange={(e) =>
-                      setFormData({ ...formData, evidencia: e.target.value })
-                    }
-                    placeholder="Ej. Logs de auditoría"
-                    className="w-full p-2 border border-slate-300 rounded-md"
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-between items-center pt-3 border-t border-slate-100">
-                <span className="text-slate-600 font-medium">
-                  Ponderación Calculada:{" "}
-                  <strong className="text-indigo-700 text-sm">
-                    {calcularPonderacion(
-                      formData.clase,
-                      formData.tipo,
-                      formData.frecuencia,
-                      formData.formalidad
-                    )}
-                    %
-                  </strong>
-                </span>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={handleCloseModal}
-                    className="px-4 py-2 font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="submit"
-                    className="flex items-center gap-1.5 px-4 py-2 font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors"
-                  >
-                    <Save className="w-4 h-4" />
-                    Guardar
-                  </button>
-                </div>
-              </div>
-            </form>
+            <div>
+              <label className="block font-medium text-slate-700 mb-1">Peso Tipo (F2 * G6)</label>
+              <input
+                type="number"
+                step="0.05"
+                value={parametros.pesos.tipo}
+                onChange={e => setParametros({
+                  ...parametros,
+                  pesos: { ...parametros.pesos, tipo: parseFloat(e.target.value) || 0 }
+                })}
+                className="w-full p-2 border border-slate-300 rounded font-bold"
+              />
+            </div>
+            <div>
+              <label className="block font-medium text-slate-700 mb-1">Peso Frecuencia (H2 * I6)</label>
+              <input
+                type="number"
+                step="0.05"
+                value={parametros.pesos.frecuencia}
+                onChange={e => setParametros({
+                  ...parametros,
+                  pesos: { ...parametros.pesos, frecuencia: parseFloat(e.target.value) || 0 }
+                })}
+                className="w-full p-2 border border-slate-300 rounded font-bold"
+              />
+            </div>
+            <div>
+              <label className="block font-medium text-slate-700 mb-1">Peso Formalidad (J2 * K6)</label>
+              <input
+                type="number"
+                step="0.05"
+                value={parametros.pesos.formalidad}
+                onChange={e => setParametros({
+                  ...parametros,
+                  pesos: { ...parametros.pesos, formalidad: parseFloat(e.target.value) || 0 }
+                })}
+                className="w-full p-2 border border-slate-300 rounded font-bold"
+              />
+            </div>
           </div>
         </div>
       )}
+
+      {/* FORMULARIO AGREGAR / EDITAR CONTROL */}
+      <form onSubmit={handleSaveControl} className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+        <h2 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-2">
+          {editingId ? "Editar Control" : "Registrar Nuevo Control"}
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
+          <div>
+            <label className="block font-medium text-slate-700 mb-1">Código *</label>
+            <input
+              type="text"
+              value={formData.codigo}
+              onChange={e => setFormData({ ...formData, codigo: e.target.value })}
+              className="w-full p-2 border border-slate-300 rounded"
+              placeholder="Ej. CTR-LAFT-04"
+            />
+          </div>
+          <div className="md:col-span-3">
+            <label className="block font-medium text-slate-700 mb-1">Nombre / Descripción del Control *</label>
+            <input
+              type="text"
+              value={formData.control}
+              onChange={e => setFormData({ ...formData, control: e.target.value })}
+              className="w-full p-2 border border-slate-300 rounded"
+              placeholder="Describa el control aplicable..."
+            />
+          </div>
+          <div>
+            <label className="block font-medium text-slate-700 mb-1">Clase</label>
+            <select
+              value={formData.clase}
+              onChange={e => setFormData({ ...formData, clase: e.target.value })}
+              className="w-full p-2 border border-slate-300 rounded"
+            >
+              {Object.keys(parametros.valores.clase).map(k => (
+                <option key={k} value={k}>{k}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block font-medium text-slate-700 mb-1">Tipo</label>
+            <select
+              value={formData.tipo}
+              onChange={e => setFormData({ ...formData, tipo: e.target.value })}
+              className="w-full p-2 border border-slate-300 rounded"
+            >
+              {Object.keys(parametros.valores.tipo).map(k => (
+                <option key={k} value={k}>{k}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block font-medium text-slate-700 mb-1">Frecuencia</label>
+            <select
+              value={formData.frecuencia}
+              onChange={e => setFormData({ ...formData, frecuencia: e.target.value })}
+              className="w-full p-2 border border-slate-300 rounded"
+            >
+              {Object.keys(parametros.valores.frecuencia).map(k => (
+                <option key={k} value={k}>{k}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block font-medium text-slate-700 mb-1">Formalidad</label>
+            <select
+              value={formData.formalidad}
+              onChange={e => setFormData({ ...formData, formalidad: e.target.value })}
+              className="w-full p-2 border border-slate-300 rounded"
+            >
+              {Object.keys(parametros.valores.formalidad).map(k => (
+                <option key={k} value={k}>{k}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 pt-2">
+          <button
+            type="submit"
+            className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg text-xs"
+          >
+            <Save className="w-4 h-4" />
+            {editingId ? "Actualizar Control" : "Guardar Control"}
+          </button>
+        </div>
+      </form>
+
+      {/* TABLA DE CONTROLES */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <table className="w-full text-left border-collapse text-xs">
+          <thead>
+            <tr className="bg-slate-100 text-slate-800 font-bold border-b border-slate-200">
+              <th className="p-3">Código</th>
+              <th className="p-3">Control</th>
+              <th className="p-3">Clase</th>
+              <th className="p-3">Tipo</th>
+              <th className="p-3">Frecuencia</th>
+              <th className="p-3">Formalidad</th>
+              <th className="p-3 text-center bg-indigo-50 text-indigo-900 border-x border-indigo-200">
+                Ponderación (%)
+              </th>
+              <th className="p-3 text-center">Acciones</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-200">
+            {controles.map(c => {
+              const ponderacion = calcularPonderacion(c.clase, c.tipo, c.frecuencia, c.formalidad, parametros);
+              return (
+                <tr key={c.id} className="hover:bg-slate-50">
+                  <td className="p-3 font-bold text-slate-900">{c.codigo}</td>
+                  <td className="p-3 font-medium text-slate-800">{c.control}</td>
+                  <td className="p-3 text-slate-600">{c.clase}</td>
+                  <td className="p-3 text-slate-600">{c.tipo}</td>
+                  <td className="p-3 text-slate-600">{c.frecuencia}</td>
+                  <td className="p-3 text-slate-600">{c.formalidad}</td>
+                  <td className="p-3 text-center font-extrabold text-indigo-700 bg-indigo-50/50 border-x border-indigo-100 font-mono text-sm">
+                    {ponderacion}%
+                  </td>
+                  <td className="p-3 text-center">
+                    <div className="flex justify-center gap-1">
+                      <button onClick={() => handleEdit(c)} className="p-1 text-slate-500 hover:text-indigo-600">
+                        <Edit3 className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => handleDelete(c.id)} className="p-1 text-slate-400 hover:text-rose-600">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
