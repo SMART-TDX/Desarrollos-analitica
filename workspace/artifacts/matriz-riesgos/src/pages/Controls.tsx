@@ -42,7 +42,7 @@ export const PESO_FRECUENCIA: Record<string, number> = {
 
 export const PESO_FORMALIDAD: Record<string, number> = {
   DODI: 45, // Documentado y Divulgado
-  NODO: 15, // No Documentado / Informal
+  NODO: 15, // No Documentado
 };
 
 // 2. Función de cálculo automático de Ponderación
@@ -57,13 +57,12 @@ export function calcularPonderacion(
   const pFrec = PESO_FRECUENCIA[frecuencia] || 0;
   const pForm = PESO_FORMALIDAD[formalidad] || 0;
 
-  // Promedio de los 4 pesos
   const suma = pClase + pTipo + pFrec + pForm;
   return Math.round(suma / 4);
 }
 
 // 3. Catálogo Oficial de 26 Controles de la Imagen
-export const CONTROLES_INICIALES: ControlRow[] = [
+export const CONTROLES_OFICIALES: ControlRow[] = [
   {
     id: "1",
     codigo: "CTR-LAFT-01",
@@ -157,7 +156,7 @@ export const CONTROLES_INICIALES: ControlRow[] = [
   {
     id: "11",
     codigo: "CTR-LAFT-11",
-    control: "Realizar capacitaciones a los colaboradores de la academia en temas como gestion documental, Señales de alerta, identificacion de Operaciones sospechosas, cambios importantes en la regulacion y concientizar sobre la prevención del LA/FT/PADM.",
+    control: "Realizar capacitaciones a los colaboradores de la academia en temas como gestion documental,Señales de alerta, identificacion de Operaciones sospechosas, cambios importantes en la regulacion y concientizar sobre la prevención del LA/FT/PADM.",
     clase: "PREVENTIVO",
     tipo: "SEMIAUTOMÁTICO",
     frecuencia: "PERIÓDICO",
@@ -300,6 +299,9 @@ export const CONTROLES_INICIALES: ControlRow[] = [
   }
 ];
 
+// Alias para evitar errores de importación en otros componentes
+export const CONTROLES_INICIALES = CONTROLES_OFICIALES;
+
 export default function Controls() {
   const [controles, setControles] = useState<ControlRow[]>(() => {
     const saved = localStorage.getItem("laft_catalogo_controles_v3");
@@ -310,7 +312,7 @@ export default function Controls() {
         console.error("Error al cargar controles:", e);
       }
     }
-    return CONTROLES_INICIALES;
+    return CONTROLES_OFICIALES;
   });
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -319,7 +321,6 @@ export default function Controls() {
     localStorage.setItem("laft_catalogo_controles_v3", JSON.stringify(controles));
   }, [controles]);
 
-  // Actualización parametrizada cuando el usuario cambia cualquier opción
   const handleSelectChange = (
     id: string,
     field: "clase" | "tipo" | "frecuencia" | "formalidad",
@@ -331,7 +332,7 @@ export default function Controls() {
           return {
             ...c,
             [field]: value,
-          };
+          } as ControlRow;
         }
         return c;
       })
@@ -367,7 +368,7 @@ export default function Controls() {
 
   const handleReset = () => {
     if (confirm("¿Desea restablecer los 26 controles iniciales de la matriz original?")) {
-      setControles(CONTROLES_INICIALES);
+      setControles(CONTROLES_OFICIALES);
     }
   };
 
@@ -378,7 +379,6 @@ export default function Controls() {
       c.clase.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Estadísticas rápidas
   const totalControles = controles.length;
   const promedioPonderacion =
     totalControles > 0
@@ -426,7 +426,7 @@ export default function Controls() {
         </div>
       </div>
 
-      {/* Tarjetas Informativas & Leyenda de Parámetros */}
+      {/* Tarjetas Informativas & Leyenda */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
           <div className="p-3 bg-indigo-50 text-indigo-600 rounded-lg">
@@ -489,7 +489,7 @@ export default function Controls() {
         />
       </div>
 
-      {/* Tabla Principal parametrizada */}
+      {/* Tabla Principal */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
@@ -498,23 +498,18 @@ export default function Controls() {
                 <th className="p-3 w-28 border-b border-slate-700">Código</th>
                 <th className="p-3 min-w-[320px] border-b border-slate-700">Control</th>
                 
-                {/* CLASE & PESO */}
                 <th className="p-3 border-b border-slate-700 text-center bg-red-900/40 w-36">CLASE</th>
                 <th className="p-3 border-b border-slate-700 text-center bg-slate-700 w-16">PESO</th>
                 
-                {/* TIPO & PESO */}
                 <th className="p-3 border-b border-slate-700 text-center bg-red-900/40 w-40">TIPO</th>
                 <th className="p-3 border-b border-slate-700 text-center bg-slate-700 w-16">PESO</th>
                 
-                {/* FRECUENCIA & PESO */}
                 <th className="p-3 border-b border-slate-700 text-center bg-red-900/40 w-36">FRECUENCIA</th>
                 <th className="p-3 border-b border-slate-700 text-center bg-slate-700 w-16">PESO</th>
                 
-                {/* FORMALIDAD & PESO */}
                 <th className="p-3 border-b border-slate-700 text-center bg-red-900/40 w-36">Formalidad del Control</th>
                 <th className="p-3 border-b border-slate-700 text-center bg-slate-700 w-16">PESO</th>
                 
-                {/* PONDERACION */}
                 <th className="p-3 border-b border-slate-700 text-center bg-slate-900 w-28">PONDERACION</th>
                 <th className="p-3 border-b border-slate-700 text-center w-12">Acción</th>
               </tr>
@@ -537,12 +532,10 @@ export default function Controls() {
                     key={item.id}
                     className={idx % 2 === 0 ? "bg-amber-50/30 hover:bg-amber-100/40" : "bg-white hover:bg-slate-50"}
                   >
-                    {/* Código */}
                     <td className="p-2 font-bold text-slate-800 align-middle">
                       {item.codigo}
                     </td>
 
-                    {/* Descripción Control */}
                     <td className="p-2 align-middle">
                       <textarea
                         rows={2}
@@ -552,7 +545,6 @@ export default function Controls() {
                       />
                     </td>
 
-                    {/* CLASE */}
                     <td className="p-2 align-middle text-center">
                       <select
                         value={item.clase}
@@ -568,7 +560,6 @@ export default function Controls() {
                       {pesoClase}%
                     </td>
 
-                    {/* TIPO */}
                     <td className="p-2 align-middle text-center">
                       <select
                         value={item.tipo}
@@ -584,7 +575,6 @@ export default function Controls() {
                       {pesoTipo}%
                     </td>
 
-                    {/* FRECUENCIA */}
                     <td className="p-2 align-middle text-center">
                       <select
                         value={item.frecuencia}
@@ -600,7 +590,6 @@ export default function Controls() {
                       {pesoFrec}%
                     </td>
 
-                    {/* FORMALIDAD */}
                     <td className="p-2 align-middle text-center">
                       <select
                         value={item.formalidad}
@@ -615,7 +604,6 @@ export default function Controls() {
                       {pesoForm}%
                     </td>
 
-                    {/* PONDERACIÓN AUTOMÁTICA */}
                     <td className="p-2 align-middle text-center font-bold bg-slate-200/80 text-slate-900 text-sm">
                       <span className={`inline-block px-2 py-1 rounded ${
                         ponderacion >= 40 
@@ -628,7 +616,6 @@ export default function Controls() {
                       </span>
                     </td>
 
-                    {/* Eliminar */}
                     <td className="p-2 align-middle text-center">
                       <button
                         onClick={() => handleDeleteControl(item.id)}
