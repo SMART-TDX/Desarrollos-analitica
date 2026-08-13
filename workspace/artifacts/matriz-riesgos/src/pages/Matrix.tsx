@@ -8,7 +8,9 @@ import {
   Save, 
   Edit3, 
   ShieldCheck,
-  Check
+  Check,
+  FileSpreadsheet,
+  FileText
 } from "lucide-react";
 import { CONTROLES_OFICIALES, ControlRow, calcularPonderacion } from "./Controls";
 
@@ -18,7 +20,7 @@ export interface RiesgoRow {
   proceso: string;
   subproceso?: string;
   descripcion: string;
-  riesgo?: string; // Compatibilidad con versiones anteriores
+  riesgo?: string;
   banderas?: {
     laft: boolean;
     operativo: boolean;
@@ -32,8 +34,8 @@ export interface RiesgoRow {
   consecuencia?: string;
   probabilidadInherente: number;
   impactoInherente: number;
-  controlCodigos?: string[]; // SOPORTE PARA MÚLTIPLES CONTROLES
-  controlCodigo?: string;    // Compatibilidad con versión previa
+  controlCodigos?: string[];
+  controlCodigo?: string;
   observaciones?: string;
 }
 
@@ -49,7 +51,6 @@ export function getNivelRiesgo(score: number): { label: string; bgBadge: string 
   }
 }
 
-// Cálculo de Mitigación Combinada para Múltiples Controles
 export function calcularMitigacionMultiple(ponderaciones: number[]): number {
   if (!ponderaciones || ponderaciones.length === 0) return 0;
   let factorResidual = 1;
@@ -60,7 +61,6 @@ export function calcularMitigacionMultiple(ponderaciones: number[]): number {
   return Math.min(mitigacion, 95);
 }
 
-// Normalizador seguro para obtener lista de códigos de control de cualquier versión
 function obtenerCodigosControlSeguros(item: RiesgoRow): string[] {
   if (Array.isArray(item.controlCodigos) && item.controlCodigos.length > 0) {
     return item.controlCodigos;
@@ -71,7 +71,6 @@ function obtenerCodigosControlSeguros(item: RiesgoRow): string[] {
   return [];
 }
 
-// Datos Iniciales de Muestra
 export const RIESGOS_INICIALES: RiesgoRow[] = [
   {
     id: "1",
@@ -140,7 +139,7 @@ export const RIESGOS_INICIALES: RiesgoRow[] = [
 ];
 
 export default function Matrix() {
-  const [controles, setControles] = useState<ControlRow[]>(() => {
+  const [controles] = useState<ControlRow[]>(() => {
     try {
       const saved = localStorage.getItem("laft_catalogo_controles_v3");
       if (saved) return JSON.parse(saved);
@@ -156,7 +155,6 @@ export default function Matrix() {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          // Normalizar elementos para asegurar que tengan el campo descripcion y controlCodigos
           return parsed.map((r: any) => ({
             ...r,
             descripcion: r.descripcion || r.riesgo || "",
@@ -174,7 +172,6 @@ export default function Matrix() {
   const [viewMode, setViewMode] = useState<"table" | "form">("table");
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  // Form State
   const [formData, setFormData] = useState<RiesgoRow>({
     id: "",
     codigo: "",
@@ -284,13 +281,140 @@ export default function Matrix() {
     return desc.includes(term) || cod.includes(term) || proc.includes(term);
   });
 
+  // EXPORTACIÓN A EXCEL (.CSV)
+  const handleExportExcel = () => {
+    let csvContent = "\uFEFF"; // UTF-8 BOM
+    csvContent += "Código;Proceso;Subproceso;Factor Riesgo;Descripción del Riesgo;Prob. Inh.;Imp. Inh.;Riesgo Inherente;Controles Asignados;Mitigación (%);Riesgo Residual\n";
+
+    filteredRiesgos.forEach((r) => {
+      const inhScore = (r.probabilidadInherente || 1) * (r.impactoInherente || 1);
+      const inhLevel = getNivelRiesgo(inhScore).label;
+      const itemCodigos = obtenerCodigosControlSeguros(r);
+      const controlesAsignados = controles.filter((c) => itemCodigos.includes(c.codigo));
+      const ponderaciones = controlesAsignados.map((c) => calcularPonderacion(c.clase, c.tipo, c.frecuencia, c.formalidad));
+      const mitigacionTotal = calcularMitigacionMultiple(ponderaciones);
+      const resScore = Math.max(1, Math.round(inhScore * (1 - mitigacionTotal / 100)));
+      const resLevel = getNivelRiesgo(resScore).label;
+
+      const listaControles = controlesAsignados.map(c => `[${c.codigo}] ${c.control}`).join(" | ");
+
+      const row = [
+        `"${r.codigo}"`,
+        `"${r.proceso}"`,
+        `"${r.subproceso || ''}"`,
+        `"${r.factorRiesgo}"`,
+        `"${(r.descripcion || r.riesgo || '').replace(/"/g, '""')}"`,
+        r.probabilidadInherente,
+        r.impactoInherente,
+        `"${inhScore} - ${inhLevel}"`,
+        `"${listaControles.replace(/"/g, '""')}"`,
+        `"${mitigacionTotal}%"`,
+        `"${resScore} - ${resLevel}"`
+      ].join(";");
+
+      csvContent += row + "\n";
+    });
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `Matriz_Riesgos_LAFT_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // EXPORTACIÓN A PDF
+  const handleExportPDF = () => {
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+
+    const rowsHTML = filteredRiesgos.map((item) => {
+      const inhScore = (item.probabilidadInherente || 1) * (item.impactoInherente || 1);
+      const inhLevel = getNivelRiesgo(inhScore);
+      const itemCodigos = obtenerCodigosControlSeguros(item);
+      const controlesAsignados = controles.filter((c) => itemCodigos.includes(c.codigo));
+      const ponderaciones = controlesAsignados.map((c) => calcularPonderacion(c.clase, c.tipo, c.frecuencia, c.formalidad));
+      const mitigacionTotal = calcularMitigacionMultiple(ponderaciones);
+      const resScore = Math.max(1, Math.round(inhScore * (1 - mitigacionTotal / 100)));
+      const resLevel = getNivelRiesgo(resScore);
+
+      const controlesHTML = controlesAsignados.length > 0
+        ? controlesAsignados.map(c => `<div style="margin-bottom: 4px; font-size: 10px;"><b>${c.codigo}:</b> ${c.control}</div>`).join("")
+        : "<i>Sin controles asignados</i>";
+
+      return `
+        <tr>
+          <td style="padding: 8px; border: 1px solid #cbd5e1; font-weight: bold;">${item.codigo}</td>
+          <td style="padding: 8px; border: 1px solid #cbd5e1;">${item.proceso}</td>
+          <td style="padding: 8px; border: 1px solid #cbd5e1;">${item.factorRiesgo}</td>
+          <td style="padding: 8px; border: 1px solid #cbd5e1;">${item.descripcion || item.riesgo}</td>
+          <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: center;">${item.probabilidadInherente}</td>
+          <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: center;">${item.impactoInherente}</td>
+          <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: center; font-weight: bold;">${inhScore} - ${inhLevel.label}</td>
+          <td style="padding: 8px; border: 1px solid #cbd5e1;">${controlesHTML}</td>
+          <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: center; font-weight: bold;">${mitigacionTotal}%</td>
+          <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: center; font-weight: bold;">${resScore} - ${resLevel.label}</td>
+        </tr>
+      `;
+    }).join("");
+
+    const content = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Matriz de Riesgos LAFT / PADM</title>
+          <style>
+            @page { size: A4 landscape; margin: 10mm; }
+            body { font-family: Arial, sans-serif; font-size: 11px; color: #1e293b; margin: 0; padding: 10px; }
+            h1 { font-size: 18px; margin-bottom: 4px; color: #0f172a; }
+            p { font-size: 11px; color: #64748b; margin-top: 0; margin-bottom: 16px; }
+            table { width: 100%; border-collapse: collapse; font-size: 10px; }
+            th { background-color: #f1f5f9; color: #0f172a; border: 1px solid #cbd5e1; padding: 8px; text-align: left; font-weight: bold; }
+          </style>
+        </head>
+        <body>
+          <h1>Matriz de Riesgos LAFT / PADM</h1>
+          <p>Reporte Oficial de Evaluación de Riesgos Inherentes, Controles Asignados y Riesgos Residuales.</p>
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 80px;">Código</th>
+                <th style="width: 100px;">Proceso</th>
+                <th style="width: 100px;">Factor Riesgo</th>
+                <th>Descripción del Riesgo</th>
+                <th style="width: 40px; text-align: center;">Prob.</th>
+                <th style="width: 40px; text-align: center;">Imp.</th>
+                <th style="width: 80px; text-align: center;">Riesgo Inh.</th>
+                <th style="width: 220px;">Controles Asignados</th>
+                <th style="width: 60px; text-align: center;">Mitigación</th>
+                <th style="width: 80px; text-align: center;">Riesgo Res.</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHTML}
+            </tbody>
+          </table>
+          <script>
+            window.onload = function() {
+              window.print();
+            };
+          </script>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(content);
+    printWindow.document.close();
+  };
+
   // VISTA 1: FORMULARIO NUEVO / EDITAR RIESGO
   if (viewMode === "form") {
     const formControlCodigos = formData.controlCodigos || [];
 
     return (
       <div className="p-6 max-w-[1400px] mx-auto space-y-6 bg-slate-50 min-h-screen text-slate-800">
-        {/* Encabezado Formulario */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
           <div className="flex items-center gap-3">
             <button
@@ -318,7 +442,6 @@ export default function Matrix() {
           </button>
         </div>
 
-        {/* Sección Identificación del Riesgo */}
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-5">
           <h2 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-2">
             Identificación del Riesgo
@@ -372,7 +495,6 @@ export default function Matrix() {
             />
           </div>
 
-          {/* Clasificación (Banderas) */}
           <div className="pt-2">
             <label className="block font-semibold text-slate-500 mb-2 text-xs">
               Clasificación (Banderas)
@@ -401,7 +523,6 @@ export default function Matrix() {
           </div>
         </div>
 
-        {/* Análisis Cualitativo */}
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-5">
           <h2 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-2">
             Análisis Cualitativo
@@ -489,7 +610,6 @@ export default function Matrix() {
           </div>
         </div>
 
-        {/* Sección Asignación de Controles */}
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
           <div className="flex justify-between items-center border-b border-slate-100 pb-2">
             <div>
@@ -559,17 +679,40 @@ export default function Matrix() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Botón Excel */}
+          <button
+            onClick={handleExportExcel}
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-emerald-800 bg-emerald-100 hover:bg-emerald-200 rounded-lg transition-colors border border-emerald-300"
+            title="Descargar en formato Excel"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-emerald-700" />
+            Excel
+          </button>
+
+          {/* Botón PDF */}
+          <button
+            onClick={handleExportPDF}
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-rose-800 bg-rose-100 hover:bg-rose-200 rounded-lg transition-colors border border-rose-300"
+            title="Descargar reporte en PDF"
+          >
+            <FileText className="w-4 h-4 text-rose-700" />
+            PDF
+          </button>
+
+          {/* Botón Restablecer */}
           <button
             onClick={handleReset}
-            className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors border border-slate-200"
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors border border-slate-200"
           >
             <RotateCcw className="w-4 h-4" />
             Restablecer Matriz
           </button>
+
+          {/* Botón Nuevo Riesgo (ROJO) */}
           <button
             onClick={handleOpenNewForm}
-            className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm transition-colors"
+            className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg shadow-sm transition-colors"
           >
             <Plus className="w-4 h-4" />
             Nuevo Riesgo
@@ -594,7 +737,8 @@ export default function Matrix() {
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
-              <tr className="bg-[#1a2332] text-white font-semibold text-xs border-b border-slate-700">
+              {/* Encabezado sin color de fondo (transparente/neutro) */}
+              <tr className="bg-slate-100 text-slate-800 font-bold text-xs border-b-2 border-slate-300">
                 <th className="p-3.5 w-28">Código</th>
                 <th className="p-3.5 w-36">Proceso</th>
                 <th className="p-3.5 w-40">Factor Riesgo</th>

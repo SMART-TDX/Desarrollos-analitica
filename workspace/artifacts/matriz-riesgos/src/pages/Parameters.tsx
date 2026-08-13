@@ -15,10 +15,10 @@ const LISTA_LABELS: Record<string, string> = {
   FACTOR_RIESGO: "Factores de Riesgo",
 };
 
-const STORAGE_KEY = "laft_parametros_v1";
+export const STORAGE_KEY = "laft_parametros_v1";
 
-// Datos iniciales de Replit
-const DEFAULT_PARAMETROS = [
+// Datos iniciales actualizados según la tarjeta SAGRILAFT
+export const DEFAULT_PARAMETROS = [
   // PROCESOS
   { id: 1, categoria: "PROCESO", nombre: "GESTION ADMINISTRATIVA Y FINANCIERA", valor: 0, descripcion: "" },
   { id: 2, categoria: "PROCESO", nombre: "Gestión Académica", valor: 0, descripcion: "" },
@@ -45,12 +45,24 @@ const DEFAULT_PARAMETROS = [
   { id: 19, categoria: "FACTOR_RIESGO", nombre: "PROVEEDORES", valor: 0, descripcion: "" },
   { id: 20, categoria: "FACTOR_RIESGO", nombre: "TECNOLÓGICO", valor: 0, descripcion: "" },
 
-  // PESOS DE CONTROLES
-  { id: 21, categoria: "CLASE", nombre: "Preventivo", valor: 0.4, descripcion: "Control preventivo" },
-  { id: 22, categoria: "CLASE", nombre: "Detectivo", valor: 0.3, descripcion: "Control detectivo" },
-  { id: 23, categoria: "CLASE", nombre: "Correctivo", valor: 0.3, descripcion: "Control correctivo" },
-  { id: 24, categoria: "TIPO", nombre: "Automático", valor: 0.5, descripcion: "Ejecutado por sistema" },
-  { id: 25, categoria: "TIPO", nombre: "Manual", valor: 0.5, descripcion: "Ejecutado por persona" },
+  // PESOS DE CONTROLES (SAGRILAFT)
+  // 1. CLASE
+  { id: 21, categoria: "CLASE", nombre: "Preventivo", valor: 0.45, descripcion: "Control preventivo" },
+  { id: 22, categoria: "CLASE", nombre: "Detectivo", valor: 0.40, descripcion: "Control detectivo" },
+  { id: 23, categoria: "CLASE", nombre: "Correctivo", valor: 0.15, descripcion: "Control correctivo" },
+
+  // 2. TIPO
+  { id: 24, categoria: "TIPO", nombre: "Automático", valor: 0.45, descripcion: "Ejecutado por sistema" },
+  { id: 25, categoria: "TIPO", nombre: "Semiautomático", valor: 0.35, descripcion: "Ejecución mixta sistema/humana" },
+  { id: 26, categoria: "TIPO", nombre: "Manual", valor: 0.20, descripcion: "Ejecutado por persona" },
+
+  // 3. FRECUENCIA
+  { id: 27, categoria: "FRECUENCIA", nombre: "Permanente", valor: 0.45, descripcion: "Ejecución continua" },
+  { id: 28, categoria: "FRECUENCIA", nombre: "Ocasional", valor: 0.30, descripcion: "Ejecución ante eventos" },
+
+  // 4. FORMALIDAD
+  { id: 29, categoria: "FORMALIDAD", nombre: "DODI (Doc/Div)", valor: 0.45, descripcion: "Documentado y Divulgado" },
+  { id: 30, categoria: "FORMALIDAD", nombre: "NODO (No Doc)", valor: 0.15, descripcion: "No Documentado" },
 ];
 
 function AddListaItem({
@@ -128,12 +140,37 @@ function ListaCard({
   );
 }
 
-function PesoRow({ p }: { p: any }) {
+// Fila con campo Input para editar el peso directamente
+function PesoRow({ p, onWeightChange }: { p: any; onWeightChange: (id: number, newValor: number) => void }) {
+  const [val, setVal] = useState(Math.round((p.valor || 0) * 100));
+
+  useEffect(() => {
+    setVal(Math.round((p.valor || 0) * 100));
+  }, [p.valor]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const num = parseFloat(e.target.value) || 0;
+    setVal(num);
+    onWeightChange(p.id, num / 100);
+  };
+
   return (
     <TableRow key={p.id}>
       <TableCell className="font-medium">{p.nombre}</TableCell>
-      <TableCell className="text-right font-mono">{(p.valor * 100).toFixed(0)}%</TableCell>
-      {p.descripcion && <TableCell className="text-xs text-muted-foreground">{p.descripcion}</TableCell>}
+      <TableCell className="text-right">
+        <div className="flex items-center justify-end gap-1">
+          <Input
+            type="number"
+            min="0"
+            max="100"
+            value={val}
+            onChange={handleChange}
+            className="w-20 text-right h-8 text-xs font-mono font-bold"
+          />
+          <span className="text-xs text-muted-foreground">%</span>
+        </div>
+      </TableCell>
+      <TableCell className="text-xs text-muted-foreground">{p.descripcion}</TableCell>
     </TableRow>
   );
 }
@@ -146,10 +183,19 @@ export default function Parameters() {
 
   const [activeTab, setActiveTab] = useState<"listas" | "pesos">("listas");
 
-  // Guardar en localStorage cada vez que cambien los parámetros
+  // Guardar en localStorage y notificar a otros componentes
   const saveParametros = (newParametros: any[]) => {
     setParametros(newParametros);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(newParametros));
+    // Disparar evento para que otras pestañas/componentes se enteren del cambio
+    window.dispatchEvent(new Event("laft_parametros_updated"));
+  };
+
+  const handleWeightChange = (id: number, newValorDecimal: number) => {
+    const updated = parametros.map((item) =>
+      item.id === id ? { ...item, valor: newValorDecimal } : item
+    );
+    saveParametros(updated);
   };
 
   const handleAdd = (categoria: string, nombre: string) => {
@@ -225,10 +271,10 @@ export default function Parameters() {
         ) : (
           <div>
             <p className="text-sm text-muted-foreground mb-4">
-              Pesos usados para calcular la efectividad promedio de los controles asociados a cada riesgo.
+              Ajuste los pesos (%) utilizados para calcular la efectividad promedio de cada control.
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-              {PESO_CATEGORIES.filter((c) => grouped[c]).map((cat) => (
+              {PESO_CATEGORIES.map((cat) => (
                 <Card key={cat}>
                   <CardHeader className="py-4">
                     <CardTitle className="text-base uppercase tracking-wider text-muted-foreground">{cat}</CardTitle>
@@ -244,7 +290,7 @@ export default function Parameters() {
                       </TableHeader>
                       <TableBody>
                         {(grouped[cat] ?? []).map((p) => (
-                          <PesoRow key={p.id} p={p} />
+                          <PesoRow key={p.id} p={p} onWeightChange={handleWeightChange} />
                         ))}
                       </TableBody>
                     </Table>
