@@ -18,7 +18,8 @@ export interface RiesgoRow {
   proceso: string;
   subproceso?: string;
   descripcion: string;
-  banderas: {
+  riesgo?: string; // Compatibilidad con versiones anteriores
+  banderas?: {
     laft: boolean;
     operativo: boolean;
     legal: boolean;
@@ -31,7 +32,8 @@ export interface RiesgoRow {
   consecuencia?: string;
   probabilidadInherente: number;
   impactoInherente: number;
-  controlCodigos: string[]; // SOPORTE PARA MÚLTIPLES CONTROLES
+  controlCodigos?: string[]; // SOPORTE PARA MÚLTIPLES CONTROLES
+  controlCodigo?: string;    // Compatibilidad con versión previa
   observaciones?: string;
 }
 
@@ -50,13 +52,23 @@ export function getNivelRiesgo(score: number): { label: string; bgBadge: string 
 // Cálculo de Mitigación Combinada para Múltiples Controles
 export function calcularMitigacionMultiple(ponderaciones: number[]): number {
   if (!ponderaciones || ponderaciones.length === 0) return 0;
-  // Mitigación Probabilística Acumulada: 1 - (1 - P1)(1 - P2)...
   let factorResidual = 1;
   ponderaciones.forEach((p) => {
-    factorResidual *= (1 - p / 100);
+    factorResidual *= (1 - (p || 0) / 100);
   });
   const mitigacion = Math.round((1 - factorResidual) * 100);
-  return Math.min(mitigacion, 95); // Límite máximo de mitigación 95%
+  return Math.min(mitigacion, 95);
+}
+
+// Normalizador seguro para obtener lista de códigos de control de cualquier versión
+function obtenerCodigosControlSeguros(item: RiesgoRow): string[] {
+  if (Array.isArray(item.controlCodigos) && item.controlCodigos.length > 0) {
+    return item.controlCodigos;
+  }
+  if (item.controlCodigo) {
+    return [item.controlCodigo];
+  }
+  return [];
 }
 
 // Datos Iniciales de Muestra
@@ -129,17 +141,31 @@ export const RIESGOS_INICIALES: RiesgoRow[] = [
 
 export default function Matrix() {
   const [controles, setControles] = useState<ControlRow[]>(() => {
-    const saved = localStorage.getItem("laft_catalogo_controles_v3");
-    if (saved) {
-      try { return JSON.parse(saved); } catch (e) {}
+    try {
+      const saved = localStorage.getItem("laft_catalogo_controles_v3");
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.error("Error al cargar catálogo:", e);
     }
     return CONTROLES_OFICIALES;
   });
 
   const [riesgos, setRiesgos] = useState<RiesgoRow[]>(() => {
-    const saved = localStorage.getItem("laft_matriz_riesgos_v3");
-    if (saved) {
-      try { return JSON.parse(saved); } catch (e) {}
+    try {
+      const saved = localStorage.getItem("laft_matriz_riesgos_v3");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // Normalizar elementos para asegurar que tengan el campo descripcion y controlCodigos
+          return parsed.map((r: any) => ({
+            ...r,
+            descripcion: r.descripcion || r.riesgo || "",
+            controlCodigos: obtenerCodigosControlSeguros(r)
+          }));
+        }
+      }
+    } catch (e) {
+      console.error("Error al cargar riesgos:", e);
     }
     return RIESGOS_INICIALES;
   });
@@ -148,7 +174,7 @@ export default function Matrix() {
   const [viewMode, setViewMode] = useState<"table" | "form">("table");
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  // Form State para la pantalla de Creación/Edición (igual a image_5c189e.png)
+  // Form State
   const [formData, setFormData] = useState<RiesgoRow>({
     id: "",
     codigo: "",
@@ -167,19 +193,12 @@ export default function Matrix() {
   });
 
   useEffect(() => {
-    localStorage.setItem("laft_matriz_riesgos_v3", JSON.stringify(riesgos));
+    try {
+      localStorage.setItem("laft_matriz_riesgos_v3", JSON.stringify(riesgos));
+    } catch (e) {
+      console.error("Error al guardar en localStorage:", e);
+    }
   }, [riesgos]);
-
-  useEffect(() => {
-    const handleStorage = () => {
-      const saved = localStorage.getItem("laft_catalogo_controles_v3");
-      if (saved) {
-        try { setControles(JSON.parse(saved)); } catch (e) {}
-      }
-    };
-    window.addEventListener("storage", handleStorage);
-    return () => window.removeEventListener("storage", handleStorage);
-  }, []);
 
   const handleOpenNewForm = () => {
     const nextNum = riesgos.length + 1;
@@ -205,7 +224,12 @@ export default function Matrix() {
   };
 
   const handleOpenEditForm = (item: RiesgoRow) => {
-    setFormData(item);
+    setFormData({
+      ...item,
+      descripcion: item.descripcion || item.riesgo || "",
+      controlCodigos: obtenerCodigosControlSeguros(item),
+      banderas: item.banderas || { laft: true, operativo: false, legal: false, reputacional: false, contagio: false }
+    });
     setEditingId(item.id);
     setViewMode("form");
   };
@@ -228,45 +252,45 @@ export default function Matrix() {
 
   const handleDeleteRiesgo = (id: string) => {
     if (confirm("¿Está seguro de eliminar este riesgo de la matriz?")) {
-      setRiesgos(riesgos.filter((r) => r.id !== id));
+      setRiesgos((prev) => prev.filter((r) => r.id !== id));
     }
   };
 
   const handleReset = () => {
     if (confirm("¿Desea restablecer los riesgos iniciales de la matriz?")) {
       setRiesgos(RIESGOS_INICIALES);
+      localStorage.removeItem("laft_matriz_riesgos_v3");
     }
   };
 
   const toggleControlInForm = (codigo: string) => {
     setFormData((prev) => {
-      const exists = prev.controlCodigos.includes(codigo);
-      if (exists) {
-        return {
-          ...prev,
-          controlCodigos: prev.controlCodigos.filter((c) => c !== codigo)
-        };
-      } else {
-        return {
-          ...prev,
-          controlCodigos: [...prev.controlCodigos, codigo]
-        };
-      }
+      const currentCodigos = prev.controlCodigos || [];
+      const exists = currentCodigos.includes(codigo);
+      return {
+        ...prev,
+        controlCodigos: exists
+          ? currentCodigos.filter((c) => c !== codigo)
+          : [...currentCodigos, codigo]
+      };
     });
   };
 
-  const filteredRiesgos = riesgos.filter(
-    (r) =>
-      r.codigo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.descripcion.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.proceso.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredRiesgos = riesgos.filter((r) => {
+    const desc = (r.descripcion || r.riesgo || "").toLowerCase();
+    const cod = (r.codigo || "").toLowerCase();
+    const proc = (r.proceso || "").toLowerCase();
+    const term = searchTerm.toLowerCase();
+    return desc.includes(term) || cod.includes(term) || proc.includes(term);
+  });
 
-  // VISTA 1: FORMULARIO NUEVO / EDITAR RIESGO (Diseño image_5c189e.png)
+  // VISTA 1: FORMULARIO NUEVO / EDITAR RIESGO
   if (viewMode === "form") {
+    const formControlCodigos = formData.controlCodigos || [];
+
     return (
       <div className="p-6 max-w-[1400px] mx-auto space-y-6 bg-slate-50 min-h-screen text-slate-800">
-        {/* Cabecera Formulario */}
+        {/* Encabezado Formulario */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
           <div className="flex items-center gap-3">
             <button
@@ -358,11 +382,14 @@ export default function Matrix() {
                 <label key={flag} className="flex items-center gap-2 cursor-pointer capitalize">
                   <input
                     type="checkbox"
-                    checked={formData.banderas[flag]}
+                    checked={formData.banderas?.[flag] || false}
                     onChange={(e) =>
                       setFormData({
                         ...formData,
-                        banderas: { ...formData.banderas, [flag]: e.target.checked }
+                        banderas: {
+                          ...(formData.banderas || { laft: false, operativo: false, legal: false, reputacional: false, contagio: false }),
+                          [flag]: e.target.checked
+                        }
                       })
                     }
                     className="w-4 h-4 rounded text-teal-600 focus:ring-teal-500 border-slate-300"
@@ -374,7 +401,7 @@ export default function Matrix() {
           </div>
         </div>
 
-        {/* Sección Análisis Cualitativo y Evaluación */}
+        {/* Análisis Cualitativo */}
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-5">
           <h2 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-2">
             Análisis Cualitativo
@@ -462,25 +489,25 @@ export default function Matrix() {
           </div>
         </div>
 
-        {/* Sección Asignación de MÚLTIPLES CONTROLES */}
+        {/* Sección Asignación de Controles */}
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
           <div className="flex justify-between items-center border-b border-slate-100 pb-2">
             <div>
               <h2 className="text-sm font-bold text-slate-900">
-                Asignación de Controles (Permite Múltiples Controles por Riesgo)
+                Asignación de Controles (Soporta Múltiples Controles)
               </h2>
               <p className="text-xs text-slate-500">
-                Seleccione uno o más controles del Catálogo oficial para mitigar este riesgo.
+                Seleccione uno o varios controles del Catálogo oficial para este riesgo.
               </p>
             </div>
             <span className="text-xs font-bold text-teal-800 bg-teal-100 px-3 py-1 rounded-full">
-              {formData.controlCodigos.length} Controles Asignados
+              {formControlCodigos.length} Controles Asignados
             </span>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-80 overflow-y-auto p-2 border border-slate-200 rounded-lg bg-slate-50/50 text-xs">
             {controles.map((ctrl) => {
-              const isSelected = formData.controlCodigos.includes(ctrl.codigo);
+              const isSelected = formControlCodigos.includes(ctrl.codigo);
               const pCtrl = calcularPonderacion(ctrl.clase, ctrl.tipo, ctrl.frecuencia, ctrl.formalidad);
 
               return (
@@ -518,7 +545,7 @@ export default function Matrix() {
     );
   }
 
-  // VISTA 2: TABLA MATRIZ DE RIESGOS (Encabezado Azul Oscuro Unificado)
+  // VISTA 2: TABLA MATRIZ DE RIESGOS
   return (
     <div className="p-6 max-w-[1700px] mx-auto space-y-6 bg-slate-50 min-h-screen text-slate-800">
       {/* Encabezado Superior */}
@@ -555,48 +582,43 @@ export default function Matrix() {
         <Search className="w-5 h-5 text-slate-400" />
         <input
           type="text"
-          placeholder="Buscar riesgo por código, proceso, descripción o control asignado..."
+          placeholder="Buscar riesgo por código, proceso o descripción..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="w-full bg-transparent text-xs text-slate-800 focus:outline-none placeholder:text-slate-400"
         />
       </div>
 
-      {/* Tabla Matriz de Riesgos - ENCABEZADO 100% UNIFICADO EN AZUL OSCURO (#1a2332) */}
+      {/* Tabla Matriz de Riesgos */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
-              {/* Sin franja roja/marrón: Todo el encabezado es bg-[#1a2332] */}
               <tr className="bg-[#1a2332] text-white font-semibold text-xs border-b border-slate-700">
                 <th className="p-3.5 w-28">Código</th>
                 <th className="p-3.5 w-36">Proceso</th>
                 <th className="p-3.5 w-40">Factor Riesgo</th>
                 <th className="p-3.5 min-w-[280px]">Descripción del Riesgo</th>
                 
-                {/* EVALUACIÓN INHERENTE */}
                 <th className="p-3.5 w-20 text-center">Prob. Inh.</th>
                 <th className="p-3.5 w-20 text-center">Imp. Inh.</th>
                 <th className="p-3.5 w-32 text-center">Riesgo Inherente</th>
                 
-                {/* CONTROLES ASIGNADOS (SOPORTE MÚLTIPLE) */}
                 <th className="p-3.5 min-w-[320px]">Controles Asignados (Catálogo)</th>
                 <th className="p-3.5 w-32 text-center">Mitigación Acumulada (%)</th>
                 
-                {/* RIESGO RESIDUAL */}
                 <th className="p-3.5 w-32 text-center">Riesgo Residual</th>
                 <th className="p-3.5 w-24 text-center">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
               {filteredRiesgos.map((item, idx) => {
-                // Cálculo Inherente
-                const inhScore = item.probabilidadInherente * item.impactoInherente;
+                const inhScore = (item.probabilidadInherente || 1) * (item.impactoInherente || 1);
                 const inhLevel = getNivelRiesgo(inhScore);
 
-                // Cálculo de Controles Múltiples Asignados
+                const itemCodigos = obtenerCodigosControlSeguros(item);
                 const controlesAsignados = controles.filter((c) =>
-                  item.controlCodigos.includes(c.codigo)
+                  itemCodigos.includes(c.codigo)
                 );
 
                 const ponderaciones = controlesAsignados.map((c) =>
@@ -604,8 +626,6 @@ export default function Matrix() {
                 );
 
                 const mitigacionTotal = calcularMitigacionMultiple(ponderaciones);
-
-                // Cálculo Riesgo Residual
                 const resScore = Math.max(1, Math.round(inhScore * (1 - mitigacionTotal / 100)));
                 const resLevel = getNivelRiesgo(resScore);
 
@@ -614,44 +634,36 @@ export default function Matrix() {
                     key={item.id}
                     className={idx % 2 === 0 ? "bg-white hover:bg-slate-50/80" : "bg-slate-50/40 hover:bg-slate-100/60"}
                   >
-                    {/* Código */}
                     <td className="p-3 font-bold text-slate-900 align-middle">
                       {item.codigo}
                     </td>
 
-                    {/* Proceso */}
                     <td className="p-3 align-middle text-slate-700 font-medium">
                       {item.proceso}
                     </td>
 
-                    {/* Factor de Riesgo */}
                     <td className="p-3 align-middle text-slate-700">
                       {item.factorRiesgo}
                     </td>
 
-                    {/* Riesgo Descripción */}
                     <td className="p-3 align-middle text-slate-800 leading-relaxed">
-                      {item.descripcion}
+                      {item.descripcion || item.riesgo}
                     </td>
 
-                    {/* Probabilidad Inherente */}
                     <td className="p-2 align-middle text-center font-bold bg-amber-50/50 text-amber-900">
                       {item.probabilidadInherente}
                     </td>
 
-                    {/* Impacto Inherente */}
                     <td className="p-2 align-middle text-center font-bold bg-amber-50/50 text-amber-900">
                       {item.impactoInherente}
                     </td>
 
-                    {/* Nivel Inherente (Badge) */}
                     <td className="p-2 align-middle text-center">
                       <div className={`px-2.5 py-1.5 rounded-lg text-xs tracking-wide shadow-xs ${inhLevel.bgBadge}`}>
                         {inhScore} - {inhLevel.label}
                       </div>
                     </td>
 
-                    {/* Múltiples Controles Asignados */}
                     <td className="p-2 align-middle">
                       <div className="flex flex-wrap gap-1.5">
                         {controlesAsignados.length > 0 ? (
@@ -671,19 +683,16 @@ export default function Matrix() {
                       </div>
                     </td>
 
-                    {/* Ponderación Acumulada (%) */}
                     <td className="p-2 align-middle text-center font-extrabold text-indigo-700 bg-indigo-50/40 text-sm">
                       {mitigacionTotal}%
                     </td>
 
-                    {/* Riesgo Residual (Badge) */}
                     <td className="p-2 align-middle text-center">
                       <div className={`px-2.5 py-1.5 rounded-lg text-xs tracking-wide shadow-xs ${resLevel.bgBadge}`}>
                         {resScore} - {resLevel.label}
                       </div>
                     </td>
 
-                    {/* Acciones */}
                     <td className="p-2 align-middle text-center">
                       <div className="flex items-center justify-center gap-1">
                         <button
