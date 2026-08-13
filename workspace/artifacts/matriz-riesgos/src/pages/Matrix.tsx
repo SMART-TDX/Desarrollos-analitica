@@ -1,14 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { 
-  Shield, 
   Plus, 
   RotateCcw, 
   Search, 
-  AlertTriangle, 
-  TrendingDown, 
-  CheckCircle2,
-  Trash2,
-  Layers
+  Trash2
 } from "lucide-react";
 import { CONTROLES_OFICIALES, ControlRow, calcularPonderacion } from "./Controls";
 
@@ -28,13 +23,13 @@ export interface RiesgoRow {
 
 export function getNivelRiesgo(score: number): { label: string; bgBadge: string } {
   if (score <= 4) {
-    return { label: "BAJO", bgBadge: "bg-emerald-100 text-emerald-800 font-bold" };
+    return { label: "BAJO", bgBadge: "bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold" };
   } else if (score <= 9) {
-    return { label: "MEDIO", bgBadge: "bg-amber-100 text-amber-800 font-bold" };
+    return { label: "MEDIO", bgBadge: "bg-amber-100 text-amber-900 border border-amber-300 font-bold" };
   } else if (score <= 15) {
-    return { label: "ALTO", bgBadge: "bg-orange-100 text-orange-800 font-bold" };
+    return { label: "ALTO", bgBadge: "bg-amber-100 text-amber-900 border border-amber-300 font-extrabold" };
   } else {
-    return { label: "EXTREMO", bgBadge: "bg-rose-100 text-rose-800 font-bold" };
+    return { label: "EXTREMO", bgBadge: "bg-rose-100 text-rose-800 border border-rose-300 font-extrabold" };
   }
 }
 
@@ -60,7 +55,7 @@ export const RIESGOS_INICIALES: RiesgoRow[] = [
     factorRiesgo: "Productos / Servicios",
     riesgo: "Recaudo de efectivo o transferencias desde cuentas de origen no justificado",
     causa: "Pagos de terceros no identificados o falta de conciliación bancaria diaria",
-    consecuencia: "Ingreso de recursos ilícitos a la contabilidad de la academia",
+    consecuencia: "Ingreso de recursos ilícitos a la contabilidad de la organización",
     probabilidadInherente: 3,
     impactoInherente: 4,
     controlCodigo: "CTR-LAFT-05",
@@ -82,7 +77,7 @@ export const RIESGOS_INICIALES: RiesgoRow[] = [
   {
     id: "4",
     codigo: "RIE-LAFT-04",
-    proceso: "Compras y Contratación",
+    proceso: "Compras / Contratación",
     factorRiesgo: "Clientes / Contrapartes",
     riesgo: "Pagos a proveedores ficticios o empresas fachada para canalizar recursos ilegales",
     causa: "Falta de validación del beneficiario final y certificación bancaria",
@@ -189,17 +184,13 @@ export default function Matrix() {
 
   return (
     <div className="p-6 max-w-[1700px] mx-auto space-y-6 bg-slate-50 min-h-screen text-slate-800">
-      {/* Encabezado */}
+      {/* Encabezado Superior */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
         <div>
-          <div className="flex items-center gap-2 text-indigo-600 font-semibold text-sm">
-            <Shield className="w-5 h-5" />
-            <span>SISTEMA DE GESTIÓN SAGRILAFT</span>
-          </div>
-          <h1 className="text-2xl font-bold text-slate-900 mt-1">
+          <h1 className="text-2xl font-bold text-slate-900">
             Matriz de Riesgos LAFT / PADM
           </h1>
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-slate-500 mt-1">
             Evaluación del Riesgo Inherente y cálculo automático del Riesgo Residual en función de la Ponderación de los Controles.
           </p>
         </div>
@@ -207,14 +198,14 @@ export default function Matrix() {
         <div className="flex items-center gap-3">
           <button
             onClick={handleReset}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+            className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors border border-slate-200"
           >
             <RotateCcw className="w-4 h-4" />
             Restablecer Matriz
           </button>
           <button
             onClick={handleAddRiesgo}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm transition-colors"
+            className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm transition-colors"
           >
             <Plus className="w-4 h-4" />
             Nuevo Riesgo
@@ -230,33 +221,33 @@ export default function Matrix() {
           placeholder="Buscar riesgo por código, proceso, descripción o control asignado..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full bg-transparent text-sm text-slate-800 focus:outline-none placeholder:text-slate-400"
+          className="w-full bg-transparent text-xs text-slate-800 focus:outline-none placeholder:text-slate-400"
         />
       </div>
 
-      {/* Tabla Matriz de Riesgos */}
+      {/* Tabla Matriz de Riesgos - Diseño Exacto al Original */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
-              <tr className="bg-slate-800 text-white font-semibold">
-                <th className="p-3 w-24 border-b border-slate-700">Código</th>
-                <th className="p-3 w-36 border-b border-slate-700">Proceso</th>
-                <th className="p-3 w-40 border-b border-slate-700">Factor Riesgo</th>
-                <th className="p-3 min-w-[250px] border-b border-slate-700">Descripción del Riesgo</th>
+              <tr className="text-white font-semibold text-xs border-b border-slate-700">
+                <th className="p-3.5 w-28 bg-[#1a2332]">Código</th>
+                <th className="p-3.5 w-36 bg-[#1a2332]">Proceso</th>
+                <th className="p-3.5 w-40 bg-[#1a2332]">Factor Riesgo</th>
+                <th className="p-3.5 min-w-[280px] bg-[#1a2332]">Descripción del Riesgo</th>
                 
                 {/* RIESGO INHERENTE */}
-                <th className="p-3 border-b border-slate-700 text-center bg-amber-900/50 w-20">Prob. Inh.</th>
-                <th className="p-3 border-b border-slate-700 text-center bg-amber-900/50 w-20">Imp. Inh.</th>
-                <th className="p-3 border-b border-slate-700 text-center bg-amber-950/80 w-28">Riesgo Inherente</th>
+                <th className="p-3.5 w-20 text-center bg-[#3f1919]">Prob. Inh.</th>
+                <th className="p-3.5 w-20 text-center bg-[#3f1919]">Imp. Inh.</th>
+                <th className="p-3.5 w-32 text-center bg-[#3f1919]">Riesgo Inherente</th>
                 
-                {/* CONTROL ASIGNADO (Traído de Controls.tsx) */}
-                <th className="p-3 border-b border-slate-700 min-w-[280px] bg-indigo-950/60">Control Asignado (del Catálogo)</th>
-                <th className="p-3 border-b border-slate-700 text-center bg-indigo-900/80 w-24">Ponderación Control (%)</th>
+                {/* CONTROL ASIGNADO Y PONDERACIÓN */}
+                <th className="p-3.5 min-w-[320px] bg-[#1a2332]">Control Asignado (del Catálogo)</th>
+                <th className="p-3.5 w-32 text-center bg-[#1f283d]">Ponderación Control (%)</th>
                 
                 {/* RIESGO RESIDUAL */}
-                <th className="p-3 border-b border-slate-700 text-center bg-emerald-950/80 w-28">Riesgo Residual</th>
-                <th className="p-3 border-b border-slate-700 text-center w-12">Acción</th>
+                <th className="p-3.5 w-32 text-center bg-[#132c2a]">Riesgo Residual</th>
+                <th className="p-3.5 w-16 text-center bg-[#1a2332]">Acción</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200">
@@ -285,10 +276,10 @@ export default function Matrix() {
                 return (
                   <tr
                     key={item.id}
-                    className={idx % 2 === 0 ? "bg-slate-50/50 hover:bg-slate-100/60" : "bg-white hover:bg-slate-50"}
+                    className={idx % 2 === 0 ? "bg-white hover:bg-slate-50/80" : "bg-slate-50/40 hover:bg-slate-100/60"}
                   >
                     {/* Código */}
-                    <td className="p-2 font-bold text-slate-900 align-middle">
+                    <td className="p-3 font-bold text-slate-900 align-middle">
                       {item.codigo}
                     </td>
 
@@ -298,7 +289,7 @@ export default function Matrix() {
                         type="text"
                         value={item.proceso}
                         onChange={(e) => handleRiesgoChange(item.id, "proceso", e.target.value)}
-                        className="w-full text-xs p-1 border border-slate-200 rounded focus:border-indigo-500 bg-transparent focus:bg-white"
+                        className="w-full text-xs p-1.5 border border-slate-200 rounded-md focus:border-indigo-500 bg-white"
                       />
                     </td>
 
@@ -307,7 +298,7 @@ export default function Matrix() {
                       <select
                         value={item.factorRiesgo}
                         onChange={(e) => handleRiesgoChange(item.id, "factorRiesgo", e.target.value)}
-                        className="w-full text-xs p-1 border border-slate-200 rounded focus:border-indigo-500 bg-white"
+                        className="w-full text-xs p-1.5 border border-slate-200 rounded-md focus:border-indigo-500 bg-white"
                       >
                         <option value="Clientes / Contrapartes">Clientes / Contrapartes</option>
                         <option value="Productos / Servicios">Productos / Servicios</option>
@@ -322,7 +313,7 @@ export default function Matrix() {
                         rows={2}
                         value={item.riesgo}
                         onChange={(e) => handleRiesgoChange(item.id, "riesgo", e.target.value)}
-                        className="w-full text-xs p-1 border border-slate-200 rounded focus:border-indigo-500 bg-transparent focus:bg-white resize-y"
+                        className="w-full text-xs p-1.5 border border-slate-200 rounded-md focus:border-indigo-500 bg-white resize-y"
                       />
                     </td>
 
@@ -331,13 +322,13 @@ export default function Matrix() {
                       <select
                         value={item.probabilidadInherente}
                         onChange={(e) => handleRiesgoChange(item.id, "probabilidadInherente", Number(e.target.value))}
-                        className="w-full text-xs p-1 border border-amber-300 rounded text-center font-semibold bg-amber-50"
+                        className="w-full text-xs p-1.5 border border-amber-400 rounded-md text-center font-bold bg-amber-50/60 text-slate-800"
                       >
-                        <option value={1}>1 - Rara vez</option>
-                        <option value={2}>2 - Improbable</option>
-                        <option value={3}>3 - Posible</option>
-                        <option value={4}>4 - Probable</option>
-                        <option value={5}>5 - Casi seguro</option>
+                        <option value={1}>1</option>
+                        <option value={2}>2</option>
+                        <option value={3}>3</option>
+                        <option value={4}>4</option>
+                        <option value={5}>5</option>
                       </select>
                     </td>
 
@@ -346,29 +337,29 @@ export default function Matrix() {
                       <select
                         value={item.impactoInherente}
                         onChange={(e) => handleRiesgoChange(item.id, "impactoInherente", Number(e.target.value))}
-                        className="w-full text-xs p-1 border border-amber-300 rounded text-center font-semibold bg-amber-50"
+                        className="w-full text-xs p-1.5 border border-amber-400 rounded-md text-center font-bold bg-amber-50/60 text-slate-800"
                       >
-                        <option value={1}>1 - Insignificante</option>
-                        <option value={2}>2 - Menor</option>
-                        <option value={3}>3 - Moderado</option>
-                        <option value={4}>4 - Mayor</option>
-                        <option value={5}>5 - Catastrófico</option>
+                        <option value={1}>1</option>
+                        <option value={2}>2</option>
+                        <option value={3}>3</option>
+                        <option value={4}>4</option>
+                        <option value={5}>5</option>
                       </select>
                     </td>
 
-                    {/* Nivel Inherente (Calculado) */}
+                    {/* Nivel Inherente (Badge) */}
                     <td className="p-2 align-middle text-center">
-                      <div className={`px-2 py-1 rounded text-xs ${inhLevel.bgBadge}`}>
+                      <div className={`px-2.5 py-1.5 rounded-lg text-xs tracking-wide shadow-xs ${inhLevel.bgBadge}`}>
                         {inhScore} - {inhLevel.label}
                       </div>
                     </td>
 
-                    {/* Selector de Control traído de Controls.tsx */}
+                    {/* Selector de Control */}
                     <td className="p-2 align-middle">
                       <select
                         value={item.controlCodigo}
                         onChange={(e) => handleRiesgoChange(item.id, "controlCodigo", e.target.value)}
-                        className="w-full text-xs p-1.5 border border-indigo-300 rounded font-medium bg-indigo-50/50 focus:ring-2 focus:ring-indigo-500 text-indigo-950"
+                        className="w-full text-xs p-2 border border-indigo-400 rounded-md font-medium bg-white focus:ring-2 focus:ring-indigo-500 text-slate-900 shadow-xs"
                       >
                         {controles.map((ctrl) => (
                           <option key={ctrl.id} value={ctrl.codigo}>
@@ -378,19 +369,19 @@ export default function Matrix() {
                       </select>
                     </td>
 
-                    {/* Ponderación del Control (Traída automáticamente) */}
-                    <td className="p-2 align-middle text-center font-bold bg-indigo-100/60 text-indigo-900 text-sm">
+                    {/* Ponderación del Control (%) */}
+                    <td className="p-2 align-middle text-center font-extrabold text-indigo-700 bg-indigo-50/40 text-sm">
                       {ponderacionControl}%
                     </td>
 
-                    {/* Riesgo Residual (Calculado) */}
+                    {/* Riesgo Residual (Badge) */}
                     <td className="p-2 align-middle text-center">
-                      <div className={`px-2 py-1 rounded text-xs ${resLevel.bgBadge}`}>
+                      <div className={`px-2.5 py-1.5 rounded-lg text-xs tracking-wide shadow-xs ${resLevel.bgBadge}`}>
                         {resScore} - {resLevel.label}
                       </div>
                     </td>
 
-                    {/* Eliminar */}
+                    {/* Acciones */}
                     <td className="p-2 align-middle text-center">
                       <button
                         onClick={() => handleDeleteRiesgo(item.id)}
