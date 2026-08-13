@@ -83,7 +83,7 @@ const DEFAULT_RIESGOS: RiskItem[] = [
     proceso: "Gestión Comercial",
     subproceso: "COMERCIAL-TELEMERCADEO-VENTAS",
     descripcion: "Infiltración de recursos de origen ilícito a través de nuevos clientes.",
-    banderas: ["CLIENTE", "Laft"],
+    banderas: ["Laft", "Operativo"],
     factorRiesgo: "ESTUDIANTES",
     tipologia: "Cliente sin verificar",
     quePuedeSuceder: "Vinculación de fondos ilícitos",
@@ -92,10 +92,10 @@ const DEFAULT_RIESGOS: RiskItem[] = [
     impactoInherente: 3,
     perfilInherente: "TOLERABLE(6)",
     controles: DEFAULT_CONTROLES_RIESGO,
-    efectividad: 60,
+    efectividad: 85,
     probabilidadResidual: 1,
     impactoResidual: 2,
-    perfilResidual: "ACEPTABLE"
+    perfilResidual: "ACEPTABLE(2)"
   }
 ];
 
@@ -117,7 +117,7 @@ const IMP_OPTIONS = [
 
 const BANDERAS_LIST = ["Laft", "Operativo", "Legal", "Reputacional", "Contagio"];
 
-function getPerfilInherente(prob: number, imp: number) {
+function getPerfilRiesgo(prob: number, imp: number) {
   const score = prob * imp;
   let label = "ACEPTABLE";
   let bg = "bg-emerald-100 text-emerald-800 border-emerald-300";
@@ -133,7 +133,28 @@ function getPerfilInherente(prob: number, imp: number) {
     bg = "bg-yellow-100 text-yellow-900 border-yellow-300";
   }
 
-  return { label: `${label}(${score})`, bg };
+  return { score, label: `${label}(${score})`, bg };
+}
+
+function calcularRiesgoResidual(probInh: number, impInh: number, controles: ControlItem[]) {
+  const efectividadTotal = Math.min(
+    100,
+    controles.reduce((acc, c) => acc + (Number(c.ponderacion) || 0), 0)
+  );
+
+  const factorMitigacion = efectividadTotal / 100;
+  const probRes = Math.max(1, Math.round(probInh * (1 - factorMitigacion * 0.5)));
+  const impRes = Math.max(1, Math.round(impInh * (1 - factorMitigacion * 0.4)));
+
+  const perfilRes = getPerfilRiesgo(probRes, impRes);
+
+  return {
+    efectividad: Math.round(efectividadTotal * 10) / 10,
+    probabilidadResidual: probRes,
+    impactoResidual: impRes,
+    perfilResidual: perfilRes.label,
+    perfilResBg: perfilRes.bg
+  };
 }
 
 export default function Matrix() {
@@ -142,16 +163,13 @@ export default function Matrix() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRisk, setEditingRisk] = useState<RiskItem | null>(null);
 
-  // Catálogo completo de controles
   const [catalogControles, setCatalogControles] = useState<CatalogControl[]>([]);
   const [showSelectControlModal, setShowSelectControlModal] = useState(false);
 
-  // Parámetros Dinámicos
   const [listaProcesos, setListaProcesos] = useState<string[]>(DEFAULT_PROCESOS);
   const [listaSubprocesos, setListaSubprocesos] = useState<string[]>(DEFAULT_SUBPROCESOS);
   const [listaFactores, setListaFactores] = useState<string[]>(DEFAULT_FACTORES);
 
-  // Form State
   const [formData, setFormData] = useState({
     codigo: "",
     proceso: "Gestión Comercial",
@@ -168,7 +186,6 @@ export default function Matrix() {
   });
 
   useEffect(() => {
-    // 1. Cargar Catálogo de Controles
     try {
       const savedCtrls = localStorage.getItem(CONTROLES_KEY);
       if (savedCtrls) {
@@ -177,10 +194,9 @@ export default function Matrix() {
         setCatalogControles(DEFAULT_CATALOG_CONTROLES);
       }
     } catch (e) {
-      console.error(e);
+      console.error("Error al cargar controles:", e);
     }
 
-    // 2. Cargar Parámetros
     try {
       const savedParams = localStorage.getItem(PARAMETROS_KEY);
       if (savedParams) {
@@ -190,10 +206,9 @@ export default function Matrix() {
         if (parsed.factoresRiesgo?.length) setListaFactores(parsed.factoresRiesgo);
       }
     } catch (e) {
-      console.error(e);
+      console.error("Error al cargar parámetros:", e);
     }
 
-    // 3. Cargar Riesgos
     try {
       const saved = localStorage.getItem(RIESGOS_KEY);
       if (saved) {
@@ -204,8 +219,9 @@ export default function Matrix() {
         }
       }
     } catch (e) {
-      console.error(e);
+      console.error("Error al cargar riesgos:", e);
     }
+
     setRiesgos(DEFAULT_RIESGOS);
     localStorage.setItem(RIESGOS_KEY, JSON.stringify(DEFAULT_RIESGOS));
   }, [isModalOpen]);
@@ -216,7 +232,6 @@ export default function Matrix() {
   };
 
   const handleAddControlFromCatalog = (ctrl: CatalogControl) => {
-    // Verificar si ya está agregado
     if (formData.controles.some((c) => c.codigo === ctrl.codigo)) {
       alert("Este control ya se encuentra asociado a este riesgo.");
       return;
@@ -258,22 +273,26 @@ export default function Matrix() {
       "I.R.",
       "Perfil Res."
     ];
+
+    const escapeCsv = (val: any) => `"${String(val ?? "").replace(/"/g, '""')}"`;
+
     const rows = riesgos.map((r) => [
-      r.codigo,
-      `"${r.proceso}"`,
-      `"${r.subproceso || ''}"`,
-      `"${r.descripcion}"`,
-      `"${(r.banderas || []).join(", ")}"`,
-      `"${r.factorRiesgo || ''}"`,
-      `"${r.tipologia || ''}"`,
+      escapeCsv(r.codigo),
+      escapeCsv(r.proceso),
+      escapeCsv(r.subproceso || ''),
+      escapeCsv(r.descripcion),
+      escapeCsv((r.banderas || []).join(", ")),
+      escapeCsv(r.factorRiesgo || ''),
+      escapeCsv(r.tipologia || ''),
       r.probabilidadInherente,
       r.impactoInherente,
-      r.perfilInherente,
-      `${r.efectividad}%`,
+      escapeCsv(r.perfilInherente),
+      escapeCsv(`${r.efectividad}%`),
       r.probabilidadResidual || 1,
-      r.impactoResidual || 2,
-      r.perfilResidual || 'ACEPTABLE',
+      r.impactoResidual || 1,
+      escapeCsv(r.perfilResidual || 'ACEPTABLE')
     ]);
+
     const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
@@ -339,11 +358,22 @@ export default function Matrix() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const perfilInh = getPerfilInherente(formData.probabilidadInherente, formData.impactoInherente).label;
+    const perfilInh = getPerfilRiesgo(formData.probabilidadInherente, formData.impactoInherente).label;
+    const residual = calcularRiesgoResidual(formData.probabilidadInherente, formData.impactoInherente, formData.controles);
 
     if (editingRisk) {
       const updated = riesgos.map((r) =>
-        r.id === editingRisk.id ? { ...r, ...formData, perfilInherente: perfilInh } : r
+        r.id === editingRisk.id
+          ? {
+              ...r,
+              ...formData,
+              perfilInherente: perfilInh,
+              efectividad: residual.efectividad,
+              probabilidadResidual: residual.probabilidadResidual,
+              impactoResidual: residual.impactoResidual,
+              perfilResidual: residual.perfilResidual
+            }
+          : r
       );
       saveToStorage(updated);
     } else {
@@ -351,10 +381,10 @@ export default function Matrix() {
         id: Date.now().toString(),
         ...formData,
         perfilInherente: perfilInh,
-        efectividad: 50,
-        probabilidadResidual: 1,
-        impactoResidual: 2,
-        perfilResidual: "ACEPTABLE"
+        efectividad: residual.efectividad,
+        probabilidadResidual: residual.probabilidadResidual,
+        impactoResidual: residual.impactoResidual,
+        perfilResidual: residual.perfilResidual
       };
       saveToStorage([...riesgos, newRisk]);
     }
@@ -368,7 +398,8 @@ export default function Matrix() {
       r.descripcion?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const perfilInhCalc = getPerfilInherente(formData.probabilidadInherente, formData.impactoInherente);
+  const perfilInhCalc = getPerfilRiesgo(formData.probabilidadInherente, formData.impactoInherente);
+  const residualCalc = calcularRiesgoResidual(formData.probabilidadInherente, formData.impactoInherente, formData.controles);
 
   return (
     <div className="w-full space-y-6 pb-12">
@@ -398,13 +429,13 @@ export default function Matrix() {
             onClick={() => window.print()}
             className="flex items-center gap-1.5 px-3 py-2 border rounded-md text-sm font-medium hover:bg-muted transition-colors bg-card"
           >
-            PDF
+            🖨️ Imprimir / PDF
           </button>
           <button
             onClick={exportExcel}
             className="flex items-center gap-1.5 px-3 py-2 border rounded-md text-sm font-medium hover:bg-muted transition-colors bg-card"
           >
-            Sobresalir / Excel
+            📊 Exportar Excel (CSV)
           </button>
           <button
             onClick={handleOpenCreate}
@@ -439,6 +470,7 @@ export default function Matrix() {
                 <th className="p-3 text-center w-12">P.I.</th>
                 <th className="p-3 text-center w-12">I.I.</th>
                 <th className="p-3 text-center w-32">Perfil Inh.</th>
+                <th className="p-3 text-center w-20">Efectividad</th>
                 <th className="p-3 text-center w-12">P.R.</th>
                 <th className="p-3 text-center w-12">I.R.</th>
                 <th className="p-3 text-center w-32">Perfil Res.</th>
@@ -463,8 +495,9 @@ export default function Matrix() {
                   <td className="p-3 text-center font-bold text-xs">{item.probabilidadInherente}</td>
                   <td className="p-3 text-center font-bold text-xs">{item.impactoInherente}</td>
                   <td className="p-3 text-center font-bold text-xs text-amber-800">{item.perfilInherente}</td>
+                  <td className="p-3 text-center font-bold text-xs text-teal-700">{item.efectividad}%</td>
                   <td className="p-3 text-center font-bold text-xs">{item.probabilidadResidual || 1}</td>
-                  <td className="p-3 text-center font-bold text-xs">{item.impactoResidual || 2}</td>
+                  <td className="p-3 text-center font-bold text-xs">{item.impactoResidual || 1}</td>
                   <td className="p-3 text-center font-bold text-xs text-emerald-800">{item.perfilResidual || "ACEPTABLE"}</td>
                   <td className="p-3 text-center whitespace-nowrap bg-muted/20">
                     <div className="flex items-center justify-center gap-2">
@@ -624,9 +657,9 @@ export default function Matrix() {
                 </div>
               </div>
 
-              {/* Sección 3: Evaluación Inherente */}
+              {/* Sección 3: Evaluación Inherente y Residual Evaluada */}
               <div className="border rounded-lg p-5 bg-card shadow-sm space-y-4">
-                <h3 className="font-bold text-base text-foreground">Evaluación Inherente</h3>
+                <h3 className="font-bold text-base text-foreground">Evaluación de Riesgo</h3>
                 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                   <div>
@@ -658,6 +691,24 @@ export default function Matrix() {
                     <div className={`px-4 py-2 rounded-md font-bold text-sm border text-center ${perfilInhCalc.bg}`}>
                       {perfilInhCalc.label}
                     </div>
+                  </div>
+                </div>
+
+                {/* Resumen Calculado de Riesgo Residual */}
+                <div className="mt-4 pt-4 border-t grid grid-cols-1 sm:grid-cols-3 gap-3 bg-muted/20 p-3 rounded-lg">
+                  <div>
+                    <span className="text-[11px] font-semibold text-muted-foreground block">Efectividad Controles</span>
+                    <span className="text-sm font-bold text-teal-700">{residualCalc.efectividad}%</span>
+                  </div>
+                  <div>
+                    <span className="text-[11px] font-semibold text-muted-foreground block">P.R. / I.R. Est.</span>
+                    <span className="text-sm font-bold text-foreground">{residualCalc.probabilidadResidual} / {residualCalc.impactoResidual}</span>
+                  </div>
+                  <div>
+                    <span className="text-[11px] font-semibold text-muted-foreground block">Perfil Residual Est.</span>
+                    <span className={`inline-block px-2 py-0.5 rounded text-xs font-bold ${residualCalc.perfilResBg}`}>
+                      {residualCalc.perfilResidual}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -696,7 +747,7 @@ export default function Matrix() {
                               {ctrl.clase}
                             </span>
                           </td>
-                          <td className="p-3 text-right font-semibold">{ctrl.ponderacion.toFixed(1).replace(".", ",")} %</td>
+                          <td className="p-3 text-right font-semibold">{(Number(ctrl.ponderacion) || 0).toFixed(1).replace(".", ",")} %</td>
                           <td className="p-3 text-center">
                             <button
                               type="button"
@@ -708,6 +759,13 @@ export default function Matrix() {
                           </td>
                         </tr>
                       ))}
+                      {formData.controles.length === 0 && (
+                        <tr>
+                          <td colSpan={5} className="p-4 text-center text-muted-foreground italic">
+                            No hay controles asociados a este riesgo.
+                          </td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
                 </div>
