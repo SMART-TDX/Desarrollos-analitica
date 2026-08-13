@@ -1,360 +1,650 @@
 import React, { useState, useEffect } from "react";
+import { 
+  ShieldCheck, 
+  Plus, 
+  RotateCcw, 
+  Search, 
+  Layers, 
+  Sliders, 
+  CheckCircle2, 
+  FileText,
+  Trash2
+} from "lucide-react";
 
-export const CONTROLES_KEY = "laft_controles_catalog_v1";
-
-export interface CatalogControl {
+export interface ControlRow {
   id: string;
   codigo: string;
-  descripcion: string;
+  control: string;
   clase: "PREVENTIVO" | "DETECTIVO" | "CORRECTIVO";
-  ponderacion: number;
-  frecuencia?: string;
-  responsable?: string;
+  tipo: "AUTOMÁTICO" | "SEMIAUTOMÁTICO" | "MANUAL";
+  frecuencia: "PERMANENTE" | "OCASIONAL" | "PERIÓDICO";
+  formalidad: "DODI" | "NODO";
 }
 
-export const DEFAULT_CATALOG_CONTROLES: CatalogControl[] = [
+// 1. Mapeos oficiales de PESO según SAGRILAFT
+export const PESO_CLASE: Record<string, number> = {
+  PREVENTIVO: 45,
+  DETECTIVO: 40,
+  CORRECTIVO: 30,
+};
+
+export const PESO_TIPO: Record<string, number> = {
+  "AUTOMÁTICO": 45,
+  "SEMIAUTOMÁTICO": 35,
+  "MANUAL": 20,
+};
+
+export const PESO_FRECUENCIA: Record<string, number> = {
+  PERMANENTE: 45,
+  OCASIONAL: 30,
+  "PERIÓDICO": 20,
+};
+
+export const PESO_FORMALIDAD: Record<string, number> = {
+  DODI: 45, // Documentado y Divulgado
+  NODO: 15, // No Documentado / Informal
+};
+
+// 2. Función de cálculo automático de Ponderación
+export function calcularPonderacion(
+  clase: string,
+  tipo: string,
+  frecuencia: string,
+  formalidad: string
+): number {
+  const pClase = PESO_CLASE[clase] || 0;
+  const pTipo = PESO_TIPO[tipo] || 0;
+  const pFrec = PESO_FRECUENCIA[frecuencia] || 0;
+  const pForm = PESO_FORMALIDAD[formalidad] || 0;
+
+  // Promedio de los 4 pesos
+  const suma = pClase + pTipo + pFrec + pForm;
+  return Math.round(suma / 4);
+}
+
+// 3. Catálogo Oficial de 26 Controles de la Imagen
+export const CONTROLES_INICIALES: ControlRow[] = [
   {
-    id: "ctrl-1",
+    id: "1",
     codigo: "CTR-LAFT-01",
-    descripcion: "Consulta en las listas restrictivas para todas las personas asociadas.",
+    control: "Consulta en las listas para todas las personas naturales o juridicas que se vinculen con la compañía y solicitud de Certificación SAGRILAFT",
     clase: "PREVENTIVO",
-    ponderacion: 42.5,
-    frecuencia: "DIARIO",
-    responsable: "Oficial de Cumplimiento"
+    tipo: "SEMIAUTOMÁTICO",
+    frecuencia: "PERMANENTE",
+    formalidad: "DODI"
   },
   {
-    id: "ctrl-2",
+    id: "2",
     codigo: "CTR-LAFT-02",
-    descripcion: "Monitoreo continuo de transacciones inusuales o sospechosas.",
-    clase: "DETECTIVO",
-    ponderacion: 35.0,
-    frecuencia: "CONTINUO",
-    responsable: "Analista LAFT"
-  },
-  {
-    id: "ctrl-3",
-    codigo: "CTR-LAFT-03",
-    descripcion: "Reporte inmediato de Operaciones Sospechosas (ROS) a la autoridad competente.",
-    clase: "CORRECTIVO",
-    ponderacion: 22.5,
-    frecuencia: "EVENTUAL",
-    responsable: "Oficial de Cumplimiento"
-  },
-  {
-    id: "ctrl-4",
-    codigo: "CTR-LAFT-04",
-    descripcion: "Chequeo de información pública en medios de comunicación y noticias adversas.",
+    control: "Aceptacion de clausula SAGRILAFT sobre origen y destino de los recursos, incluida en los contratos Smart",
     clase: "PREVENTIVO",
-    ponderacion: 42.5,
-    frecuencia: "MENSUAL",
-    responsable: "Gestión Humana / Compras"
+    tipo: "SEMIAUTOMÁTICO",
+    frecuencia: "PERMANENTE",
+    formalidad: "DODI"
+  },
+  {
+    id: "3",
+    codigo: "CTR-LAFT-03",
+    control: "Aprobacion por parte de gerencia para los casos que pueden llegar a representen un riesgo para la academia",
+    clase: "PREVENTIVO",
+    tipo: "MANUAL",
+    frecuencia: "OCASIONAL",
+    formalidad: "DODI"
+  },
+  {
+    id: "4",
+    codigo: "CTR-LAFT-04",
+    control: "Chequeo de información pública en medios comunicacion (Internet, Prensa, Radio, TV, Redes Sociales, Diario Oficial, Gaceta Distrital y otras) para las novedades en listas.",
+    clase: "PREVENTIVO",
+    tipo: "SEMIAUTOMÁTICO",
+    frecuencia: "PERMANENTE",
+    formalidad: "DODI"
+  },
+  {
+    id: "5",
+    codigo: "CTR-LAFT-05",
+    control: "Validacion y causacion de recibos de caja por parte de facturacion y cartera de los pagos realizados por los diferentes canales de recaudo.",
+    clase: "DETECTIVO",
+    tipo: "SEMIAUTOMÁTICO",
+    frecuencia: "PERMANENTE",
+    formalidad: "DODI"
+  },
+  {
+    id: "6",
+    codigo: "CTR-LAFT-06",
+    control: "Identificacion y seguimiento de las partidas pendientes por identificar en los Bancos (cartera)",
+    clase: "DETECTIVO",
+    tipo: "MANUAL",
+    frecuencia: "PERMANENTE",
+    formalidad: "DODI"
+  },
+  {
+    id: "7",
+    codigo: "CTR-LAFT-07",
+    control: "Revision por parte de sdagrilaft de los reportes diarios gestionados por cartera de los canales de recaudo.",
+    clase: "DETECTIVO",
+    tipo: "MANUAL",
+    frecuencia: "PERIÓDICO",
+    formalidad: "DODI"
+  },
+  {
+    id: "8",
+    codigo: "CTR-LAFT-08",
+    control: "Adquirir un servicio de consulta en listas por medio de un proveedor tecnologico de para el manejo de Listas",
+    clase: "PREVENTIVO",
+    tipo: "SEMIAUTOMÁTICO",
+    frecuencia: "PERMANENTE",
+    formalidad: "DODI"
+  },
+  {
+    id: "9",
+    codigo: "CTR-LAFT-09",
+    control: "Analisis y aprobacion por parte de facturacion y matriculas de los documentos cargados en schoolpack",
+    clase: "PREVENTIVO",
+    tipo: "MANUAL",
+    frecuencia: "PERMANENTE",
+    formalidad: "DODI"
+  },
+  {
+    id: "10",
+    codigo: "CTR-LAFT-10",
+    control: "Aplicacion de los procedimientos para verificacion y aprobacion de los documentos suministrados por los Clientes por parte de facturacion y matriculas.",
+    clase: "DETECTIVO",
+    tipo: "SEMIAUTOMÁTICO",
+    frecuencia: "PERMANENTE",
+    formalidad: "DODI"
+  },
+  {
+    id: "11",
+    codigo: "CTR-LAFT-11",
+    control: "Realizar capacitaciones a los colaboradores de la academia en temas como gestion documental, Señales de alerta, identificacion de Operaciones sospechosas, cambios importantes en la regulacion y concientizar sobre la prevención del LA/FT/PADM.",
+    clase: "PREVENTIVO",
+    tipo: "SEMIAUTOMÁTICO",
+    frecuencia: "PERIÓDICO",
+    formalidad: "DODI"
+  },
+  {
+    id: "12",
+    codigo: "CTR-LAFT-12",
+    control: "Aplicación del procedimiento para identificación y conocimiento para identificar los clientes naturales y juridicos, junto con los beneficiarios finales, validando la documentación entregada.",
+    clase: "DETECTIVO",
+    tipo: "MANUAL",
+    frecuencia: "PERMANENTE",
+    formalidad: "DODI"
+  },
+  {
+    id: "13",
+    codigo: "CTR-LAFT-13",
+    control: "Politica sobre el pago a contrapartes unicamente a través de medios bancarios, como transferencias bancarias a cuentas certificadas a nombre de la contraparte con quien se realiza la compra del producto o prestacion del servicio.",
+    clase: "PREVENTIVO",
+    tipo: "AUTOMÁTICO",
+    frecuencia: "PERMANENTE",
+    formalidad: "DODI"
+  },
+  {
+    id: "14",
+    codigo: "CTR-LAFT-14",
+    control: "Concepto del oficial de cumplimiento para vincular una contrapartes, posterior a la revision inicial de los analistas del proceso.",
+    clase: "PREVENTIVO",
+    tipo: "MANUAL",
+    frecuencia: "PERMANENTE",
+    formalidad: "DODI"
+  },
+  {
+    id: "15",
+    codigo: "CTR-LAFT-15",
+    control: "Validacion por parte del proceso de juridica encunato a que los inmuebles en los que se va a realizar la actividad economica no presenten procesos judiciales, cautelares que puedan generar un riesgo para Smart.",
+    clase: "PREVENTIVO",
+    tipo: "MANUAL",
+    frecuencia: "PERMANENTE",
+    formalidad: "DODI"
+  },
+  {
+    id: "16",
+    codigo: "CTR-LAFT-16",
+    control: "Conocimiento por parte de los empleados del listado de señales de alerta y del mecanismo de reporte",
+    clase: "DETECTIVO",
+    tipo: "MANUAL",
+    frecuencia: "PERMANENTE",
+    formalidad: "DODI"
+  },
+  {
+    id: "17",
+    codigo: "CTR-LAFT-17",
+    control: "Divulgación del Código de Etica y Conducta y lineamientos para la prevencion y control del riesgo LA/FT",
+    clase: "PREVENTIVO",
+    tipo: "MANUAL",
+    frecuencia: "PERMANENTE",
+    formalidad: "DODI"
+  },
+  {
+    id: "18",
+    codigo: "CTR-LAFT-18",
+    control: "Aplicación del procedimiento de Talento Humano para la vinculacion de nuevos colaboradores.",
+    clase: "PREVENTIVO",
+    tipo: "MANUAL",
+    frecuencia: "PERMANENTE",
+    formalidad: "DODI"
+  },
+  {
+    id: "19",
+    codigo: "CTR-LAFT-19",
+    control: "Revision del cumplimiento de debida diligencia de los los proveedores registrados en el CONTROL DE FACTURACIÓN ELECTRONICA 2024, que maneja contabilidad por parte de sagrilaft",
+    clase: "DETECTIVO",
+    tipo: "SEMIAUTOMÁTICO",
+    frecuencia: "PERMANENTE",
+    formalidad: "DODI"
+  },
+  {
+    id: "20",
+    codigo: "CTR-LAFT-20",
+    control: "Identificación de cumplimiento de protocolos de seguridad de las herramientas, aplicaciones, Software y Hardware, que procesan, almacenan y gestionan información y/o operaciones financieras de la academia",
+    clase: "PREVENTIVO",
+    tipo: "MANUAL",
+    frecuencia: "PERMANENTE",
+    formalidad: "DODI"
+  },
+  {
+    id: "21",
+    codigo: "CTR-LAFT-21",
+    control: "Politicas de seguridad respecto al uso y restriccion de usuarios de equipos, aplicaciones y plataformas por parte de los colaboradores",
+    clase: "PREVENTIVO",
+    tipo: "MANUAL",
+    frecuencia: "PERMANENTE",
+    formalidad: "DODI"
+  },
+  {
+    id: "22",
+    codigo: "CTR-LAFT-22",
+    control: "Administracion de usuarios por niveles de seguridad de acuerdo al cargo al Area y la informacio que requiera.",
+    clase: "PREVENTIVO",
+    tipo: "MANUAL",
+    frecuencia: "PERIÓDICO",
+    formalidad: "DODI"
+  },
+  {
+    id: "23",
+    codigo: "CTR-LAFT-23",
+    control: "Analisis de los factores de riesgo por parte de Sagrilaft, antes del lanzamiento de un nuevo producto o aperturas de sedes.",
+    clase: "PREVENTIVO",
+    tipo: "MANUAL",
+    frecuencia: "OCASIONAL",
+    formalidad: "NODO"
+  },
+  {
+    id: "24",
+    codigo: "CTR-LAFT-24",
+    control: "Analizis de Jurisdicciones donde la academia realiza o proyecta sus actividades comerciales-",
+    clase: "PREVENTIVO",
+    tipo: "MANUAL",
+    frecuencia: "OCASIONAL",
+    formalidad: "NODO"
+  },
+  {
+    id: "25",
+    codigo: "CTR-LAFT-25",
+    control: "Revision y actualizacion de la Matriz legal de Smart",
+    clase: "DETECTIVO",
+    tipo: "MANUAL",
+    frecuencia: "PERIÓDICO",
+    formalidad: "DODI"
+  },
+  {
+    id: "26",
+    codigo: "CTR-LAFT-26",
+    control: "Divulgación de las obligaciones normativas Frente al cumplimiento del sistema Sagrilaft",
+    clase: "DETECTIVO",
+    tipo: "MANUAL",
+    frecuencia: "PERIÓDICO",
+    formalidad: "DODI"
   }
 ];
 
 export default function Controls() {
-  const [controles, setControles] = useState<CatalogControl[]>([]);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingControl, setEditingControl] = useState<CatalogControl | null>(null);
-
-  const [formData, setFormData] = useState<Omit<CatalogControl, "id">>({
-    codigo: "",
-    descripcion: "",
-    clase: "PREVENTIVO",
-    ponderacion: 10,
-    frecuencia: "DIARIO",
-    responsable: ""
+  const [controles, setControles] = useState<ControlRow[]>(() => {
+    const saved = localStorage.getItem("laft_catalogo_controles_v3");
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error("Error al cargar controles:", e);
+      }
+    }
+    return CONTROLES_INICIALES;
   });
 
+  const [searchTerm, setSearchTerm] = useState("");
+
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(CONTROLES_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setControles(parsed);
-          return;
+    localStorage.setItem("laft_catalogo_controles_v3", JSON.stringify(controles));
+  }, [controles]);
+
+  // Actualización parametrizada cuando el usuario cambia cualquier opción
+  const handleSelectChange = (
+    id: string,
+    field: "clase" | "tipo" | "frecuencia" | "formalidad",
+    value: string
+  ) => {
+    setControles((prev) =>
+      prev.map((c) => {
+        if (c.id === id) {
+          return {
+            ...c,
+            [field]: value,
+          };
         }
-      }
-    } catch (e) {
-      console.error("Error al cargar catálogo de controles:", e);
-    }
-    setControles(DEFAULT_CATALOG_CONTROLES);
-    localStorage.setItem(CONTROLES_KEY, JSON.stringify(DEFAULT_CATALOG_CONTROLES));
-  }, []);
-
-  const saveToStorage = (updatedList: CatalogControl[]) => {
-    setControles(updatedList);
-    localStorage.setItem(CONTROLES_KEY, JSON.stringify(updatedList));
+        return c;
+      })
+    );
   };
 
-  const handleOpenCreate = () => {
-    setEditingControl(null);
-    setFormData({
-      codigo: `CTR-LAFT-0${controles.length + 1}`,
-      descripcion: "",
+  const handleControlTextChange = (id: string, text: string) => {
+    setControles((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, control: text } : c))
+    );
+  };
+
+  const handleAddControl = () => {
+    const nextNum = controles.length + 1;
+    const nextCode = `CTR-LAFT-${nextNum < 10 ? "0" + nextNum : nextNum}`;
+    const newControl: ControlRow = {
+      id: Date.now().toString(),
+      codigo: nextCode,
+      control: "Nuevo control SAGRILAFT...",
       clase: "PREVENTIVO",
-      ponderacion: 10,
-      frecuencia: "DIARIO",
-      responsable: ""
-    });
-    setIsModalOpen(true);
+      tipo: "SEMIAUTOMÁTICO",
+      frecuencia: "PERMANENTE",
+      formalidad: "DODI",
+    };
+    setControles([...controles, newControl]);
   };
 
-  const handleOpenEdit = (item: CatalogControl) => {
-    setEditingControl(item);
-    setFormData({
-      codigo: item.codigo,
-      descripcion: item.descripcion,
-      clase: item.clase,
-      ponderacion: item.ponderacion,
-      frecuencia: item.frecuencia || "DIARIO",
-      responsable: item.responsable || ""
-    });
-    setIsModalOpen(true);
-  };
-
-  const handleDelete = (id: string) => {
-    if (window.confirm("¿Está seguro de eliminar este control del catálogo?")) {
-      const updated = controles.filter((c) => c.id !== id);
-      saveToStorage(updated);
+  const handleDeleteControl = (id: string) => {
+    if (confirm("¿Está seguro de eliminar este control?")) {
+      setControles(controles.filter((c) => c.id !== id));
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (editingControl) {
-      const updated = controles.map((c) =>
-        c.id === editingControl.id ? { ...c, ...formData } : c
-      );
-      saveToStorage(updated);
-    } else {
-      const newControl: CatalogControl = {
-        id: Date.now().toString(),
-        ...formData
-      };
-      saveToStorage([...controles, newControl]);
+  const handleReset = () => {
+    if (confirm("¿Desea restablecer los 26 controles iniciales de la matriz original?")) {
+      setControles(CONTROLES_INICIALES);
     }
-    setIsModalOpen(false);
   };
 
   const filteredControles = controles.filter(
     (c) =>
       c.codigo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.descripcion.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      c.control.toLowerCase().includes(searchTerm.toLowerCase()) ||
       c.clase.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // Estadísticas rápidas
+  const totalControles = controles.length;
+  const promedioPonderacion =
+    totalControles > 0
+      ? Math.round(
+          controles.reduce(
+            (acc, c) => acc + calcularPonderacion(c.clase, c.tipo, c.frecuencia, c.formalidad),
+            0
+          ) / totalControles
+        )
+      : 0;
+
   return (
-    <div className="w-full space-y-6 pb-12">
-      {/* Encabezado */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="p-6 max-w-[1600px] mx-auto space-y-6 bg-slate-50 min-h-screen text-slate-800">
+      {/* Encabezado Principal */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Catálogo de Controles</h1>
-          <p className="text-muted-foreground text-sm">
-            Gestión centralizada de los controles aplicables a la matriz de riesgos LAFT.
+          <div className="flex items-center gap-2 text-indigo-600 font-semibold text-sm">
+            <ShieldCheck className="w-5 h-5" />
+            <span>SISTEMA DE GESTIÓN SAGRILAFT</span>
+          </div>
+          <h1 className="text-2xl font-bold text-slate-900 mt-1">
+            Catálogo de Controles LAFT
+          </h1>
+          <p className="text-sm text-slate-500">
+            Matriz parametrizada con cálculo automático de pesos y porcentaje de ponderación por control.
           </p>
         </div>
-        <button
-          onClick={handleOpenCreate}
-          className="flex items-center gap-1.5 px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white rounded-md text-sm font-medium shadow-sm transition-colors"
-        >
-          <span className="text-lg font-bold">+</span> Nuevo Control
-        </button>
+
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleReset}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+            title="Restablecer controles originales"
+          >
+            <RotateCcw className="w-4 h-4" />
+            Restablecer 26 Controles
+          </button>
+          <button
+            onClick={handleAddControl}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Nuevo Control
+          </button>
+        </div>
+      </div>
+
+      {/* Tarjetas Informativas & Leyenda de Parámetros */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
+          <div className="p-3 bg-indigo-50 text-indigo-600 rounded-lg">
+            <FileText className="w-6 h-6" />
+          </div>
+          <div>
+            <div className="text-2xl font-bold text-slate-900">{totalControles}</div>
+            <div className="text-xs font-medium text-slate-500">Total Controles Registrados</div>
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
+          <div className="p-3 bg-emerald-50 text-emerald-600 rounded-lg">
+            <CheckCircle2 className="w-6 h-6" />
+          </div>
+          <div>
+            <div className="text-2xl font-bold text-slate-900">{promedioPonderacion}%</div>
+            <div className="text-xs font-medium text-slate-500">Ponderación Promedio General</div>
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
+          <div className="p-3 bg-amber-50 text-amber-600 rounded-lg">
+            <Sliders className="w-6 h-6" />
+          </div>
+          <div>
+            <div className="text-2xl font-bold text-slate-900">
+              {controles.filter((c) => c.clase === "PREVENTIVO").length} / {controles.filter((c) => c.clase === "DETECTIVO").length}
+            </div>
+            <div className="text-xs font-medium text-slate-500">Preventivos / Detectivos</div>
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <div className="text-xs font-bold text-slate-700 mb-1 flex items-center gap-1">
+            <Layers className="w-3.5 h-3.5 text-indigo-500" /> Parámetros y Pesos SAGRILAFT
+          </div>
+          <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-[11px] text-slate-600">
+            <div>• Preventivo: <span className="font-semibold text-slate-900">45%</span></div>
+            <div>• Detectivo: <span className="font-semibold text-slate-900">40%</span></div>
+            <div>• Automático: <span className="font-semibold text-slate-900">45%</span></div>
+            <div>• Semiautomático: <span className="font-semibold text-slate-900">35%</span></div>
+            <div>• Permanente: <span className="font-semibold text-slate-900">45%</span></div>
+            <div>• Ocasional: <span className="font-semibold text-slate-900">30%</span></div>
+            <div>• DODI (Doc/Div): <span className="font-semibold text-slate-900">45%</span></div>
+            <div>• NODO (No Doc): <span className="font-semibold text-slate-900">15%</span></div>
+          </div>
+        </div>
       </div>
 
       {/* Buscador */}
-      <div className="relative max-w-md">
+      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-3">
+        <Search className="w-5 h-5 text-slate-400" />
         <input
           type="text"
-          placeholder="Buscar por código, descripción o clase..."
+          placeholder="Buscar por código, descripción de control o clase..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full pl-4 pr-4 py-2 border rounded-md text-sm bg-background focus:outline-none focus:ring-2 focus:ring-teal-600"
+          className="w-full bg-transparent text-sm text-slate-800 focus:outline-none placeholder:text-slate-400"
         />
       </div>
 
-      {/* Tabla Catálogo */}
-      <div className="border rounded-lg bg-card shadow-sm overflow-hidden w-full">
-        <div className="overflow-x-auto w-full">
-          <table className="w-full text-left text-xs border-collapse">
+      {/* Tabla Principal parametrizada */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse text-xs">
             <thead>
-              <tr className="border-b bg-muted/60 text-muted-foreground uppercase font-bold tracking-wider">
-                <th className="p-3 w-32">Código</th>
-                <th className="p-3">Descripción</th>
-                <th className="p-3 w-32">Clase</th>
-                <th className="p-3 w-28 text-right">Ponderación (%)</th>
-                <th className="p-3 w-32">Frecuencia</th>
-                <th className="p-3 w-40">Responsable</th>
-                <th className="p-3 text-center w-24 bg-muted/80">Acciones</th>
+              <tr className="bg-slate-800 text-white font-semibold">
+                <th className="p-3 w-28 border-b border-slate-700">Código</th>
+                <th className="p-3 min-w-[320px] border-b border-slate-700">Control</th>
+                
+                {/* CLASE & PESO */}
+                <th className="p-3 border-b border-slate-700 text-center bg-red-900/40 w-36">CLASE</th>
+                <th className="p-3 border-b border-slate-700 text-center bg-slate-700 w-16">PESO</th>
+                
+                {/* TIPO & PESO */}
+                <th className="p-3 border-b border-slate-700 text-center bg-red-900/40 w-40">TIPO</th>
+                <th className="p-3 border-b border-slate-700 text-center bg-slate-700 w-16">PESO</th>
+                
+                {/* FRECUENCIA & PESO */}
+                <th className="p-3 border-b border-slate-700 text-center bg-red-900/40 w-36">FRECUENCIA</th>
+                <th className="p-3 border-b border-slate-700 text-center bg-slate-700 w-16">PESO</th>
+                
+                {/* FORMALIDAD & PESO */}
+                <th className="p-3 border-b border-slate-700 text-center bg-red-900/40 w-36">Formalidad del Control</th>
+                <th className="p-3 border-b border-slate-700 text-center bg-slate-700 w-16">PESO</th>
+                
+                {/* PONDERACION */}
+                <th className="p-3 border-b border-slate-700 text-center bg-slate-900 w-28">PONDERACION</th>
+                <th className="p-3 border-b border-slate-700 text-center w-12">Acción</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border">
-              {filteredControles.map((item) => (
-                <tr key={item.id} className="hover:bg-muted/30 transition-colors">
-                  <td className="p-3 font-mono font-bold whitespace-nowrap">{item.codigo}</td>
-                  <td className="p-3 text-xs">{item.descripcion}</td>
-                  <td className="p-3">
-                    <span
-                      className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
-                        item.clase === "PREVENTIVO"
-                          ? "bg-blue-50 text-blue-700 border-blue-200"
-                          : item.clase === "DETECTIVO"
-                          ? "bg-amber-50 text-amber-700 border-amber-200"
-                          : "bg-purple-50 text-purple-700 border-purple-200"
-                      }`}
-                    >
-                      {item.clase}
-                    </span>
-                  </td>
-                  <td className="p-3 text-right font-bold text-teal-700">
-                    {item.ponderacion}%
-                  </td>
-                  <td className="p-3 text-muted-foreground">{item.frecuencia || "-"}</td>
-                  <td className="p-3 text-muted-foreground">{item.responsable || "-"}</td>
-                  <td className="p-3 text-center whitespace-nowrap bg-muted/20">
-                    <div className="flex items-center justify-center gap-2">
-                      <button
-                        onClick={() => handleOpenEdit(item)}
-                        className="p-1 hover:text-teal-600 text-base"
-                        title="Editar"
+            <tbody className="divide-y divide-slate-200">
+              {filteredControles.map((item, idx) => {
+                const pesoClase = PESO_CLASE[item.clase] || 0;
+                const pesoTipo = PESO_TIPO[item.tipo] || 0;
+                const pesoFrec = PESO_FRECUENCIA[item.frecuencia] || 0;
+                const pesoForm = PESO_FORMALIDAD[item.formalidad] || 0;
+                const ponderacion = calcularPonderacion(
+                  item.clase,
+                  item.tipo,
+                  item.frecuencia,
+                  item.formalidad
+                );
+
+                return (
+                  <tr
+                    key={item.id}
+                    className={idx % 2 === 0 ? "bg-amber-50/30 hover:bg-amber-100/40" : "bg-white hover:bg-slate-50"}
+                  >
+                    {/* Código */}
+                    <td className="p-2 font-bold text-slate-800 align-middle">
+                      {item.codigo}
+                    </td>
+
+                    {/* Descripción Control */}
+                    <td className="p-2 align-middle">
+                      <textarea
+                        rows={2}
+                        value={item.control}
+                        onChange={(e) => handleControlTextChange(item.id, e.target.value)}
+                        className="w-full text-xs p-1.5 border border-transparent hover:border-slate-300 focus:border-indigo-500 rounded bg-transparent focus:bg-white resize-y transition-all text-slate-800"
+                      />
+                    </td>
+
+                    {/* CLASE */}
+                    <td className="p-2 align-middle text-center">
+                      <select
+                        value={item.clase}
+                        onChange={(e) => handleSelectChange(item.id, "clase", e.target.value)}
+                        className="w-full text-xs p-1 border border-slate-300 rounded font-bold text-slate-700 bg-white focus:ring-2 focus:ring-indigo-500"
                       >
-                        ✏️
-                      </button>
-                      <button
-                        onClick={() => handleDelete(item.id)}
-                        className="p-1 hover:text-red-600 text-base"
-                        title="Eliminar"
+                        <option value="PREVENTIVO">PREVENTIVO</option>
+                        <option value="DETECTIVO">DETECTIVO</option>
+                        <option value="CORRECTIVO">CORRECTIVO</option>
+                      </select>
+                    </td>
+                    <td className="p-2 align-middle text-center font-semibold text-slate-700 bg-slate-100/80">
+                      {pesoClase}%
+                    </td>
+
+                    {/* TIPO */}
+                    <td className="p-2 align-middle text-center">
+                      <select
+                        value={item.tipo}
+                        onChange={(e) => handleSelectChange(item.id, "tipo", e.target.value)}
+                        className="w-full text-xs p-1 border border-slate-300 rounded font-bold text-slate-700 bg-white focus:ring-2 focus:ring-indigo-500"
                       >
-                        🗑️
+                        <option value="AUTOMÁTICO">AUTOMÁTICO</option>
+                        <option value="SEMIAUTOMÁTICO">SEMIAUTOMÁTICO</option>
+                        <option value="MANUAL">MANUAL</option>
+                      </select>
+                    </td>
+                    <td className="p-2 align-middle text-center font-semibold text-slate-700 bg-slate-100/80">
+                      {pesoTipo}%
+                    </td>
+
+                    {/* FRECUENCIA */}
+                    <td className="p-2 align-middle text-center">
+                      <select
+                        value={item.frecuencia}
+                        onChange={(e) => handleSelectChange(item.id, "frecuencia", e.target.value)}
+                        className="w-full text-xs p-1 border border-slate-300 rounded font-bold text-slate-700 bg-white focus:ring-2 focus:ring-indigo-500"
+                      >
+                        <option value="PERMANENTE">PERMANENTE</option>
+                        <option value="OCASIONAL">OCASIONAL</option>
+                        <option value="PERIÓDICO">PERIÓDICO</option>
+                      </select>
+                    </td>
+                    <td className="p-2 align-middle text-center font-semibold text-slate-700 bg-slate-100/80">
+                      {pesoFrec}%
+                    </td>
+
+                    {/* FORMALIDAD */}
+                    <td className="p-2 align-middle text-center">
+                      <select
+                        value={item.formalidad}
+                        onChange={(e) => handleSelectChange(item.id, "formalidad", e.target.value)}
+                        className="w-full text-xs p-1 border border-slate-300 rounded font-bold text-slate-700 bg-white focus:ring-2 focus:ring-indigo-500"
+                      >
+                        <option value="DODI">DODI</option>
+                        <option value="NODO">NODO</option>
+                      </select>
+                    </td>
+                    <td className="p-2 align-middle text-center font-semibold text-slate-700 bg-slate-100/80">
+                      {pesoForm}%
+                    </td>
+
+                    {/* PONDERACIÓN AUTOMÁTICA */}
+                    <td className="p-2 align-middle text-center font-bold bg-slate-200/80 text-slate-900 text-sm">
+                      <span className={`inline-block px-2 py-1 rounded ${
+                        ponderacion >= 40 
+                          ? "bg-emerald-100 text-emerald-800" 
+                          : ponderacion >= 30 
+                          ? "bg-amber-100 text-amber-800" 
+                          : "bg-rose-100 text-rose-800"
+                      }`}>
+                        {ponderacion}%
+                      </span>
+                    </td>
+
+                    {/* Eliminar */}
+                    <td className="p-2 align-middle text-center">
+                      <button
+                        onClick={() => handleDeleteControl(item.id)}
+                        className="text-slate-400 hover:text-rose-600 transition-colors p-1"
+                        title="Eliminar control"
+                      >
+                        <Trash2 className="w-4 h-4" />
                       </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
       </div>
-
-      {/* Modal Formulario Control */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="bg-background border rounded-xl shadow-2xl w-full max-w-lg p-6 space-y-4">
-            <div className="flex justify-between items-center border-b pb-3">
-              <h2 className="text-lg font-bold text-foreground">
-                {editingControl ? `Editar Control: ${editingControl.codigo}` : "Nuevo Control"}
-              </h2>
-              <button
-                onClick={() => setIsModalOpen(false)}
-                className="text-muted-foreground hover:text-foreground text-xl font-bold"
-              >
-                ×
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold mb-1">Código *</label>
-                <input
-                  type="text"
-                  required
-                  value={formData.codigo}
-                  onChange={(e) => setFormData({ ...formData, codigo: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-md text-sm bg-background"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold mb-1">Descripción *</label>
-                <textarea
-                  required
-                  rows={3}
-                  value={formData.descripcion}
-                  onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-md text-sm bg-background"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold mb-1">Clase *</label>
-                  <select
-                    value={formData.clase}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        clase: e.target.value as CatalogControl["clase"]
-                      })
-                    }
-                    className="w-full px-3 py-2 border rounded-md text-sm bg-background"
-                  >
-                    <option value="PREVENTIVO">PREVENTIVO</option>
-                    <option value="DETECTIVO">DETECTIVO</option>
-                    <option value="CORRECTIVO">CORRECTIVO</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold mb-1">Ponderación (%) *</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    min="0"
-                    max="100"
-                    required
-                    value={formData.ponderacion}
-                    onChange={(e) =>
-                      setFormData({ ...formData, ponderacion: parseFloat(e.target.value) || 0 })
-                    }
-                    className="w-full px-3 py-2 border rounded-md text-sm bg-background"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold mb-1">Frecuencia</label>
-                  <input
-                    type="text"
-                    value={formData.frecuencia}
-                    onChange={(e) => setFormData({ ...formData, frecuencia: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-md text-sm bg-background"
-                    placeholder="Ej: DIARIO, MENSUAL..."
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold mb-1">Responsable</label>
-                  <input
-                    type="text"
-                    value={formData.responsable}
-                    onChange={(e) => setFormData({ ...formData, responsable: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-md text-sm bg-background"
-                    placeholder="Ej: Oficial de Cumplimiento"
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-3 pt-4 border-t">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 border rounded-md text-sm hover:bg-muted"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-teal-700 hover:bg-teal-800 text-white rounded-md text-sm font-bold"
-                >
-                  Guardar Control
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
