@@ -84,7 +84,7 @@ const OPCIONES_MONITOREO = [
   "Anual"
 ];
 
-// CALIFICACIÓN SEGÚN EL PERFIL DE RIESGO SOLICITADO
+// CALIFICACIÓN DEL PERFIL DE RIESGO
 export function getNivelRiesgo(score: number): { label: string; bgBadge: string } {
   if (score <= 3) {
     return { 
@@ -106,9 +106,9 @@ export function getNivelRiesgo(score: number): { label: string; bgBadge: string 
 
 function getColorsPDF(label: string): { bg: string; text: string } {
   switch (label) {
-    case "ACEPTABLE": return { bg: "#86efac", text: "#064e3b" };  // Verde brillante
-    case "TOLERABLE": return { bg: "#fde047", text: "#713f12" };  // Amarillo brillante
-    case "INACEPTABLE": default: return { bg: "#f87171", text: "#ffffff" }; // Rojo
+    case "ACEPTABLE": return { bg: "#86efac", text: "#064e3b" };
+    case "TOLERABLE": return { bg: "#fde047", text: "#713f12" };
+    case "INACEPTABLE": default: return { bg: "#f87171", text: "#ffffff" };
   }
 }
 
@@ -139,21 +139,21 @@ export const RIESGOS_INICIALES: RiesgoRow[] = [
     proceso: "Gestión Comercial",
     subproceso: "COMERCIALL-TELEMERCADEO-VENTAS",
     descripcion: "Vinculación de clientes o contrapartes en listas restrictivas o con antecedentes LAFT",
-    quePuedeSuceder: "Ingreso o vinculación de un cliente que figure en listas restrictivas de control o antecedentes vinculados a LAFT.",
+    quePuedeSuceder: "El Estudiantes o el responsables del pago, se encuentren realizando o vinculados en grupos que llevan actividades delictivas.",
     banderas: { laft: true, operativo: true, legal: true, reputacional: true, contagio: false },
     factorRiesgo: "ESTUDIANTES",
     tipologia: "Renuencia del cliente a suministrar la información y documentación solicitada por la academia",
-    porQuePuedeSuceder: "Falta de verificación en listas restrictivas o actualización extemporánea de las herramientas de consulta.",
-    causa: "Falta de verificación en listas restrictivas o actualización extemporánea de las herramientas de consulta.",
-    consecuencia: "Sanciones administrativas de la Superintendencia de Sociedades y daño reputacional.",
+    porQuePuedeSuceder: "No se realiza una identificacion de los clientes y los responsables del pago, antes de prestarle servicios",
+    causa: "No se realiza una identificacion de los clientes y los responsables del pago, antes de prestarle servicios",
+    consecuencia: "Sanciones administrativas de la Superintendencia de Sociedades y severo daño reputacional.",
     probabilidadInherente: 3,
     impactoInherente: 3,
     probabilidadResidual: 1,
-    impactoResidual: 3,
+    impactoResidual: 2,
     tipoMonitoreo: "Mensual",
-    responsable: "Oficial de Cumplimiento",
-    controlCodigos: ["CTR-LAFT-01", "CTR-LAFT-02"],
-    observaciones: "Control preventivo crítico de consulta permanente en listas"
+    responsable: "Analista Sagrilaft",
+    controlCodigos: ["CTR-LAFT-01", "CTR-LAFT-02", "CTR-LAFT-03", "CTR-LAFT-04", "CTR-LAFT-11"],
+    observaciones: "Monitoreo continuo de listas restrictivas"
   },
   {
     id: "2",
@@ -162,7 +162,7 @@ export const RIESGOS_INICIALES: RiesgoRow[] = [
     subproceso: "CARTERA",
     descripcion: "Recaudo de efectivo o transferencias desde cuentas de origen no justificado",
     quePuedeSuceder: "Aceptación de pagos por matrícula o servicios con fondos cuyo origen ilícito no es justificado.",
-    banderas: { laft: true, operativo: true, legal: false, reputacional: true, contagio: false },
+    banderas: { laft: true, operativo: true, legal: true, reputacional: true, contagio: false },
     factorRiesgo: "PRODUCTOS Y SERVICIOS",
     tipologia: "Paso de dinero de origen ilícito mediante consignaciones en efectivo de terceros",
     porQuePuedeSuceder: "Pagos de terceros no identificados o falta de conciliación bancaria diaria.",
@@ -171,7 +171,7 @@ export const RIESGOS_INICIALES: RiesgoRow[] = [
     probabilidadInherente: 2,
     impactoInherente: 3,
     probabilidadResidual: 1,
-    impactoResidual: 4,
+    impactoResidual: 3,
     tipoMonitoreo: "Continuo / En tiempo real",
     responsable: "Líder de Cartera y Tesorería",
     controlCodigos: ["CTR-LAFT-05"],
@@ -202,13 +202,6 @@ export default function Matrix() {
         if (parsed.procesos?.length) setListaProcesos(parsed.procesos);
         if (parsed.subprocesos?.length) setListaSubprocesos(parsed.subprocesos);
         if (parsed.factores?.length) setListaFactores(parsed.factores);
-      } else {
-        const pProcesos = localStorage.getItem("laft_param_procesos");
-        if (pProcesos) setListaProcesos(JSON.parse(pProcesos));
-        const pSubprocesos = localStorage.getItem("laft_param_subprocesos");
-        if (pSubprocesos) setListaSubprocesos(JSON.parse(pSubprocesos));
-        const pFactores = localStorage.getItem("laft_param_factores");
-        if (pFactores) setListaFactores(JSON.parse(pFactores));
       }
     } catch (e) {
       console.error("Error al cargar parámetros:", e);
@@ -223,10 +216,11 @@ export default function Matrix() {
         if (Array.isArray(parsed) && parsed.length > 0) {
           return parsed.map((r: any) => ({
             ...r,
-            descripcion: r.descripcion || r.quePuedeSuceder || r.riesgo || "",
+            descripcion: r.descripcion || r.quePuedeSuceder || "",
             quePuedeSuceder: r.quePuedeSuceder || r.descripcion || "",
             porQuePuedeSuceder: r.porQuePuedeSuceder || r.causa || "",
-            controlCodigos: obtenerCodigosControlSeguros(r)
+            controlCodigos: obtenerCodigosControlSeguros(r),
+            banderas: r.banderas || { laft: true, operativo: false, legal: false, reputacional: false, contagio: false }
           }));
         }
       }
@@ -255,9 +249,9 @@ export default function Matrix() {
     probabilidadInherente: 3,
     impactoInherente: 3,
     probabilidadResidual: 1,
-    impactoResidual: 3,
+    impactoResidual: 2,
     tipoMonitoreo: "Mensual",
-    responsable: "Oficial de Cumplimiento",
+    responsable: "Analista Sagrilaft",
     controlCodigos: [],
     observaciones: ""
   });
@@ -280,7 +274,7 @@ export default function Matrix() {
       subproceso: listaSubprocesos[0] || "",
       descripcion: "",
       quePuedeSuceder: "",
-      banderas: { laft: true, operativo: false, legal: false, reputacional: false, contagio: false },
+      banderas: { laft: true, operativo: true, legal: true, reputacional: true, contagio: false },
       factorRiesgo: listaFactores[0] || "",
       tipologia: "",
       porQuePuedeSuceder: "",
@@ -288,9 +282,9 @@ export default function Matrix() {
       probabilidadInherente: 3,
       impactoInherente: 3,
       probabilidadResidual: 1,
-      impactoResidual: 3,
+      impactoResidual: 2,
       tipoMonitoreo: "Mensual",
-      responsable: "Oficial de Cumplimiento",
+      responsable: "Analista Sagrilaft",
       controlCodigos: ["CTR-LAFT-01"],
       observaciones: ""
     });
@@ -307,9 +301,9 @@ export default function Matrix() {
       quePuedeSuceder: item.quePuedeSuceder || item.descripcion || "",
       porQuePuedeSuceder: item.porQuePuedeSuceder || item.causa || "",
       probabilidadResidual: item.probabilidadResidual || 1,
-      impactoResidual: item.impactoResidual || 3,
+      impactoResidual: item.impactoResidual || 2,
       tipoMonitoreo: item.tipoMonitoreo || "Mensual",
-      responsable: item.responsable || "Oficial de Cumplimiento",
+      responsable: item.responsable || "Analista Sagrilaft",
       controlCodigos: obtenerCodigosControlSeguros(item),
       banderas: item.banderas || { laft: true, operativo: false, legal: false, reputacional: false, contagio: false }
     });
@@ -375,7 +369,7 @@ export default function Matrix() {
 
   const handleExportExcel = () => {
     let csvContent = "\uFEFF";
-    csvContent += "Código;Proceso;Subproceso;Factor Riesgo;¿Qué puede suceder?;Tipología;¿Por qué puede suceder?;Consecuencias;Prob. Inh.;Imp. Inh.;Perfil Inherente;Controles;Mitigación (%);Prob. Res.;Imp. Res.;Perfil Residual;Tipo Monitoreo;Responsable\n";
+    csvContent += "Código;Proceso;Subproceso;Factor Riesgo;¿Qué puede suceder?;Tipología;¿Por qué puede suceder?;Consecuencias;Riesgos Asociados;Prob. Inh.;Imp. Inh.;Perfil Inherente;Controles;Mitigación (%);Prob. Res.;Imp. Res.;Perfil Residual;Tipo Monitoreo;Responsable;Observaciones\n";
 
     filteredRiesgos.forEach((r) => {
       const inhScore = (r.probabilidadInherente || 1) * (r.impactoInherente || 1);
@@ -392,6 +386,9 @@ export default function Matrix() {
 
       const listaControles = controlesAsignados.map(c => `[${c.codigo}] ${c.control}`).join(" | ");
 
+      const b = r.banderas || { laft: false, operativo: false, legal: false, reputacional: false, contagio: false };
+      const listaBanderas = Object.keys(b).filter(k => (b as any)[k]).map(k => k.toUpperCase()).join(", ");
+
       const row = [
         `"${r.codigo}"`,
         `"${r.proceso}"`,
@@ -401,6 +398,7 @@ export default function Matrix() {
         `"${(r.tipologia || '').replace(/"/g, '""')}"`,
         `"${(r.porQuePuedeSuceder || r.causa || '').replace(/"/g, '""')}"`,
         `"${(r.consecuencia || '').replace(/"/g, '""')}"`,
+        `"${listaBanderas}"`,
         r.probabilidadInherente,
         r.impactoInherente,
         `"${inhLevel}"`,
@@ -410,7 +408,8 @@ export default function Matrix() {
         resImp,
         `"${resLevel}"`,
         `"${r.tipoMonitoreo || ''}"`,
-        `"${r.responsable || ''}"`
+        `"${r.responsable || ''}"`,
+        `"${(r.observaciones || '').replace(/"/g, '""')}"`
       ].join(";");
 
       csvContent += row + "\n";
@@ -597,7 +596,7 @@ export default function Matrix() {
 
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-5">
           <h2 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-2">
-            Análisis Cualitativo
+            Análisis Cualitativo del Riesgo
           </h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
@@ -664,6 +663,36 @@ export default function Matrix() {
             </div>
           </div>
 
+          {/* RIESGOS ASOCIADOS (BANDERAS) */}
+          <div>
+            <label className="block font-medium text-slate-700 mb-2 text-xs">Riesgos Asociados (Tipos de Riesgo)</label>
+            <div className="flex flex-wrap gap-4 text-xs bg-slate-50 p-3 rounded-lg border border-slate-200">
+              {[
+                { key: "laft", label: "LAFT" },
+                { key: "operativo", label: "OPERATIVO" },
+                { key: "legal", label: "LEGAL" },
+                { key: "reputacional", label: "REPUTACIONAL" },
+                { key: "contagio", label: "CONTAGIO" }
+              ].map(({ key, label }) => (
+                <label key={key} className="flex items-center gap-2 cursor-pointer font-medium">
+                  <input
+                    type="checkbox"
+                    checked={formData.banderas?.[key as keyof typeof formData.banderas] || false}
+                    onChange={(e) => setFormData({
+                      ...formData,
+                      banderas: {
+                        ...(formData.banderas || { laft: false, operativo: false, legal: false, reputacional: false, contagio: false }),
+                        [key]: e.target.checked
+                      }
+                    })}
+                    className="rounded text-teal-600 focus:ring-teal-500 w-4 h-4"
+                  />
+                  <span>{label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
           <div className="pt-2 border-t border-slate-100">
             <h3 className="text-xs font-bold text-slate-800 mb-3">Evaluación y Perfil Inherente</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
@@ -720,7 +749,7 @@ export default function Matrix() {
               <div>
                 <label className="block font-medium text-slate-700 mb-1">Impacto Residual (1 a 5)</label>
                 <select
-                  value={formData.impactoResidual || 3}
+                  value={formData.impactoResidual || 2}
                   onChange={(e) => setFormData({ ...formData, impactoResidual: Number(e.target.value) })}
                   className="w-full p-2.5 border border-emerald-300 rounded-md font-bold bg-emerald-50/60 focus:ring-1 focus:ring-emerald-500"
                 >
@@ -735,7 +764,7 @@ export default function Matrix() {
           </div>
 
           <div className="pt-2 border-t border-slate-100">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
               <div>
                 <label className="block font-medium text-slate-700 mb-1">Tipo de Monitoreo</label>
                 <select
@@ -755,7 +784,18 @@ export default function Matrix() {
                   type="text"
                   value={formData.responsable || ""}
                   onChange={(e) => setFormData({ ...formData, responsable: e.target.value })}
-                  placeholder="Ej. Oficial de Cumplimiento / Líder de Proceso"
+                  placeholder="Ej. Analista Sagrilaft"
+                  className="w-full p-2.5 border border-slate-300 rounded-md focus:ring-1 focus:ring-teal-600"
+                />
+              </div>
+
+              <div>
+                <label className="block font-medium text-slate-700 mb-1">Observaciones</label>
+                <input
+                  type="text"
+                  value={formData.observaciones || ""}
+                  onChange={(e) => setFormData({ ...formData, observaciones: e.target.value })}
+                  placeholder="Observaciones adicionales..."
                   className="w-full p-2.5 border border-slate-300 rounded-md focus:ring-1 focus:ring-teal-600"
                 />
               </div>
@@ -883,13 +923,13 @@ export default function Matrix() {
             <thead>
               <tr className="bg-slate-100 text-slate-800 font-bold text-xs border-b-2 border-slate-300">
                 <th className="p-3.5 w-24">Código</th>
-                <th className="p-3.5 w-32">Proceso</th>
-                <th className="p-3.5 w-36">Factor / Tipología</th>
-                <th className="p-3.5 min-w-[280px]">¿Qué puede suceder?</th>
+                <th className="p-3.5 w-36">Proceso</th>
+                <th className="p-3.5 w-40">Factor / Tipología</th>
+                <th className="p-3.5 min-w-[320px]">Detalle del Riesgo (¿Qué puede suceder? / Causas / Impacto)</th>
                 <th className="p-3.5 w-28 text-center">Perfil Inherente</th>
-                <th className="p-3.5 min-w-[220px]">Controles</th>
+                <th className="p-3.5 min-w-[220px]">Controles Mitigantes</th>
                 <th className="p-3.5 w-28 text-center">Perfil Residual</th>
-                <th className="p-3.5 w-32">Monitoreo / Resp.</th>
+                <th className="p-3.5 w-36">Monitoreo / Resp.</th>
                 <th className="p-3.5 w-20 text-center">Acciones</th>
               </tr>
             </thead>
@@ -899,12 +939,16 @@ export default function Matrix() {
                 const inhLevel = getNivelRiesgo(inhScore);
 
                 const resProb = item.probabilidadResidual || 1;
-                const resImp = item.impactoResidual || 1;
+                const resImp = item.impactoResidual || 2;
                 const resScore = resProb * resImp;
                 const resLevel = getNivelRiesgo(resScore);
 
                 const itemCodigos = obtenerCodigosControlSeguros(item);
                 const controlesAsignados = controles.filter((c) => itemCodigos.includes(c.codigo));
+
+                // Cálculo de mitigación acumulada
+                const ponderaciones = controlesAsignados.map((c) => calcularPonderacion(c.clase, c.tipo, c.frecuencia, c.formalidad));
+                const mitigacionTotal = calcularMitigacionMultiple(ponderaciones);
 
                 return (
                   <tr
@@ -917,7 +961,7 @@ export default function Matrix() {
 
                     <td className="p-3 align-top text-slate-700">
                       <div className="font-semibold">{item.proceso}</div>
-                      <div className="text-[10px] text-slate-400">{item.subproceso}</div>
+                      <div className="text-[10px] text-slate-400 mt-0.5">{item.subproceso}</div>
                     </td>
 
                     <td className="p-3 align-top text-slate-700">
@@ -927,16 +971,63 @@ export default function Matrix() {
                       )}
                     </td>
 
-                    <td className="p-3 align-top text-slate-800 leading-relaxed">
-                      <div className="font-medium text-slate-900">{item.quePuedeSuceder || item.descripcion}</div>
+                    {/* COLUMNA DETALLE DEL RIESGO RESTRUCTURADA Y COMPLETA */}
+                    <td className="p-3 align-top text-slate-800 leading-relaxed space-y-1">
+                      <div className="font-medium text-slate-900">
+                        {item.quePuedeSuceder || item.descripcion}
+                      </div>
+
                       {(item.porQuePuedeSuceder || item.causa) && (
-                        <div className="text-[11px] text-slate-500 mt-1">
-                          <b className="text-slate-600">Por qué:</b> {item.porQuePuedeSuceder || item.causa}
+                        <div className="text-[11px] text-slate-500">
+                          <b className="text-slate-700">Por qué:</b> {item.porQuePuedeSuceder || item.causa}
+                        </div>
+                      )}
+
+                      {item.consecuencia && (
+                        <div className="text-[11px] text-rose-700">
+                          <b className="text-rose-800">Consecuencias:</b> {item.consecuencia}
+                        </div>
+                      )}
+
+                      {/* BANDERAS DE RIESGOS ASOCIADOS */}
+                      {item.banderas && (
+                        <div className="flex flex-wrap gap-1 pt-1">
+                          {item.banderas.laft && (
+                            <span className="px-1.5 py-0.5 text-[9px] font-extrabold bg-purple-100 text-purple-800 rounded border border-purple-200">
+                              LAFT
+                            </span>
+                          )}
+                          {item.banderas.operativo && (
+                            <span className="px-1.5 py-0.5 text-[9px] font-extrabold bg-blue-100 text-blue-800 rounded border border-blue-200">
+                              OPERATIVO
+                            </span>
+                          )}
+                          {item.banderas.legal && (
+                            <span className="px-1.5 py-0.5 text-[9px] font-extrabold bg-amber-100 text-amber-800 rounded border border-amber-200">
+                              LEGAL
+                            </span>
+                          )}
+                          {item.banderas.reputacional && (
+                            <span className="px-1.5 py-0.5 text-[9px] font-extrabold bg-rose-100 text-rose-800 rounded border border-rose-200">
+                              REPUTACIONAL
+                            </span>
+                          )}
+                          {item.banderas.contagio && (
+                            <span className="px-1.5 py-0.5 text-[9px] font-extrabold bg-cyan-100 text-cyan-800 rounded border border-cyan-200">
+                              CONTAGIO
+                            </span>
+                          )}
+                        </div>
+                      )}
+
+                      {item.observaciones && (
+                        <div className="text-[10px] text-slate-400 italic pt-0.5">
+                          <b>Obs:</b> {item.observaciones}
                         </div>
                       )}
                     </td>
 
-                    {/* COLUMNA PERFIL INHERENTE */}
+                    {/* PERFIL INHERENTE */}
                     <td className="p-2 align-top text-center">
                       <div className="text-[10px] text-slate-500 font-mono mb-1">
                         P:{item.probabilidadInherente} | I:{item.impactoInherente}
@@ -946,8 +1037,9 @@ export default function Matrix() {
                       </div>
                     </td>
 
+                    {/* CONTROLES Y MITIGACIÓN */}
                     <td className="p-2 align-top">
-                      <div className="flex flex-wrap gap-1">
+                      <div className="flex flex-wrap gap-1 mb-1">
                         {controlesAsignados.length > 0 ? (
                           controlesAsignados.map((c) => (
                             <span
@@ -963,9 +1055,14 @@ export default function Matrix() {
                           <span className="text-slate-400 italic text-[10px]">Sin controles</span>
                         )}
                       </div>
+                      {controlesAsignados.length > 0 && (
+                        <div className="text-[10px] font-bold text-teal-700 bg-teal-50 px-1.5 py-0.5 rounded border border-teal-200 inline-block">
+                          Mitigación acumulada: {mitigacionTotal}%
+                        </div>
+                      )}
                     </td>
 
-                    {/* COLUMNA PERFIL RESIDUAL */}
+                    {/* PERFIL RESIDUAL */}
                     <td className="p-2 align-top text-center">
                       <div className="text-[10px] text-slate-500 font-mono mb-1">
                         P:{resProb} | I:{resImp}
