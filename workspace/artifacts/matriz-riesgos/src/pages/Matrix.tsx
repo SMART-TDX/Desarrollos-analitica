@@ -10,7 +10,9 @@ import {
   ShieldCheck,
   Check,
   FileSpreadsheet,
-  FileText
+  FileText,
+  AlertTriangle,
+  Activity
 } from "lucide-react";
 import { CONTROLES_OFICIALES, ControlRow, calcularPonderacion } from "./Controls";
 
@@ -143,8 +145,8 @@ export const RIESGOS_INICIALES: RiesgoRow[] = [
     banderas: { laft: true, operativo: true, legal: true, reputacional: true, contagio: false },
     factorRiesgo: "ESTUDIANTES",
     tipologia: "Renuencia del cliente a suministrar la información y documentación solicitada por la academia",
-    porQuePuedeSuceder: "No se realiza una identificacion de los clientes y los responsables del pago, antes de prestarle servicios",
-    causa: "No se realiza una identificacion de los clientes y los responsables del pago, antes de prestarle servicios",
+    porQuePuedeSuceder: "No se realiza una identificación de los clientes y los responsables del pago, antes de prestarle servicios",
+    causa: "No se realiza una identificación de los clientes y los responsables del pago, antes de prestarle servicios",
     consecuencia: "Sanciones administrativas de la Superintendencia de Sociedades y severo daño reputacional.",
     probabilidadInherente: 3,
     impactoInherente: 3,
@@ -152,7 +154,7 @@ export const RIESGOS_INICIALES: RiesgoRow[] = [
     impactoResidual: 2,
     tipoMonitoreo: "Mensual",
     responsable: "Analista Sagrilaft",
-    controlCodigos: ["CTR-LAFT-01", "CTR-LAFT-02", "CTR-LAFT-03", "CTR-LAFT-04", "CTR-LAFT-11"],
+    controlCodigos: ["CTR-LAFT-01", "CTR-LAFT-02", "CTR-LAFT-03"],
     observaciones: "Monitoreo continuo de listas restrictivas"
   },
   {
@@ -174,7 +176,7 @@ export const RIESGOS_INICIALES: RiesgoRow[] = [
     impactoResidual: 3,
     tipoMonitoreo: "Continuo / En tiempo real",
     responsable: "Líder de Cartera y Tesorería",
-    controlCodigos: ["CTR-LAFT-05"],
+    controlCodigos: ["CTR-LAFT-01"],
     observaciones: "Validación y causación de recibos de caja por cartera"
   }
 ];
@@ -491,7 +493,7 @@ export default function Matrix() {
                 <th style="width: 70px;">Código</th>
                 <th style="width: 110px;">Proceso / Subp.</th>
                 <th style="width: 110px;">Factor / Tipología</th>
-                <th>Análisis Cualitativo del Riesgo</th>
+                <th>Detalle del Riesgo</th>
                 <th style="width: 90px; text-align: center;">Perfil Inherente</th>
                 <th style="width: 90px; text-align: center;">Perfil Residual</th>
                 <th style="width: 120px;">Monitoreo / Resp.</th>
@@ -514,7 +516,9 @@ export default function Matrix() {
   const opcionesSubprocesos = Array.from(new Set([...listaSubprocesos, formData.subproceso || ""])).filter(Boolean);
   const opcionesFactores = Array.from(new Set([...listaFactores, formData.factorRiesgo])).filter(Boolean);
 
-  // VISTA FORMULARIO
+  // ==========================================
+  // VISTA FORMULARIO (EDICIÓN / CREACIÓN)
+  // ==========================================
   if (viewMode === "form") {
     const formControlCodigos = formData.controlCodigos || [];
 
@@ -533,7 +537,7 @@ export default function Matrix() {
                 {editingId ? "Editar Riesgo" : "Nuevo Riesgo"}
               </h1>
               <p className="text-xs text-slate-500">
-                Formulario de identificación y perfilamiento de riesgo
+                Formulario completo de identificación, detalle del riesgo y monitoreo
               </p>
             </div>
           </div>
@@ -547,8 +551,10 @@ export default function Matrix() {
           </button>
         </div>
 
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-5">
-          <h2 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-2">
+        {/* BLOQUE 1: IDENTIFICACIÓN DEL RIESGO */}
+        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+          <h2 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-2 flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-teal-600"></span>
             Identificación del Riesgo
           </h2>
 
@@ -559,8 +565,8 @@ export default function Matrix() {
                 type="text"
                 value={formData.codigo}
                 onChange={(e) => setFormData({ ...formData, codigo: e.target.value })}
-                placeholder="Ej. RIE-LAFT-05"
-                className="w-full p-2.5 border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-teal-600 focus:border-teal-600"
+                placeholder="Ej. RIE-LAFT-01"
+                className="w-full p-2.5 border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-teal-600 focus:border-teal-600 font-bold text-slate-900"
               />
             </div>
 
@@ -583,7 +589,7 @@ export default function Matrix() {
               <select
                 value={formData.subproceso || ""}
                 onChange={(e) => setFormData({ ...formData, subproceso: e.target.value })}
-                className="w-full p-2.5 border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-teal-600 focus:border-teal-600"
+                className="w-full p-2.5 border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-teal-600 focus:border-teal-600 text-slate-700"
               >
                 <option value="">-- Seleccione Subproceso --</option>
                 {opcionesSubprocesos.map((sp) => (
@@ -594,9 +600,11 @@ export default function Matrix() {
           </div>
         </div>
 
+        {/* BLOQUE 2: DETALLE DEL RIESGO (RESTAURADO EXPLÍCITAMENTE) */}
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-5">
-          <h2 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-2">
-            Análisis Cualitativo del Riesgo
+          <h2 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-2 flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-amber-600" />
+            Detalle del Riesgo
           </h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
@@ -605,7 +613,7 @@ export default function Matrix() {
               <select
                 value={formData.factorRiesgo}
                 onChange={(e) => setFormData({ ...formData, factorRiesgo: e.target.value })}
-                className="w-full p-2.5 border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-teal-600 focus:border-teal-600 font-medium"
+                className="w-full p-2.5 border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-teal-600 focus:border-teal-600 font-semibold"
               >
                 <option value="">-- Seleccione Factor de Riesgo --</option>
                 {opcionesFactores.map((f) => (
@@ -620,22 +628,22 @@ export default function Matrix() {
                 type="text"
                 value={formData.tipologia || ""}
                 onChange={(e) => setFormData({ ...formData, tipologia: e.target.value })}
-                placeholder="Ej. Renuencia del cliente a suministrar información..."
-                className="w-full p-2.5 border border-slate-300 rounded-md focus:ring-1 focus:ring-teal-600 focus:border-teal-600"
+                placeholder="Ej. Renuencia del cliente a suministrar la información..."
+                className="w-full p-2.5 border border-slate-300 rounded-md focus:ring-1 focus:ring-teal-600 focus:border-teal-600 text-slate-800"
               />
             </div>
           </div>
 
           <div>
             <label className="block font-medium text-slate-700 mb-1 text-xs">
-              ¿Qué puede suceder? *
+              ¿Qué puede suceder? (Descripción del Riesgo) *
             </label>
             <textarea
-              rows={2}
+              rows={3}
               value={formData.quePuedeSuceder || formData.descripcion || ""}
               onChange={(e) => setFormData({ ...formData, quePuedeSuceder: e.target.value, descripcion: e.target.value })}
               className="w-full p-2.5 border border-slate-300 rounded-md text-xs focus:ring-1 focus:ring-teal-600 focus:border-teal-600"
-              placeholder="Describa el evento de riesgo o situación que puede ocurrir..."
+              placeholder="Describa de forma clara la situación, evento o falla que puede ocurrir..."
             />
           </div>
 
@@ -646,7 +654,7 @@ export default function Matrix() {
                 rows={2}
                 value={formData.porQuePuedeSuceder || formData.causa || ""}
                 onChange={(e) => setFormData({ ...formData, porQuePuedeSuceder: e.target.value, causa: e.target.value })}
-                placeholder="Indique las causas, falencias o factores desencadenantes..."
+                placeholder="Indique las causas originadoras o vulnerabilidades..."
                 className="w-full p-2.5 border border-slate-300 rounded-md focus:ring-1 focus:ring-teal-600 focus:border-teal-600"
               />
             </div>
@@ -657,7 +665,7 @@ export default function Matrix() {
                 rows={2}
                 value={formData.consecuencia || ""}
                 onChange={(e) => setFormData({ ...formData, consecuencia: e.target.value })}
-                placeholder="Detalle el impacto legal, operativo, financiero o reputacional..."
+                placeholder="Detalle los efectos negativos (sanciones, pérdidas financieras, etc)..."
                 className="w-full p-2.5 border border-slate-300 rounded-md focus:ring-1 focus:ring-teal-600 focus:border-teal-600"
               />
             </div>
@@ -665,7 +673,7 @@ export default function Matrix() {
 
           {/* RIESGOS ASOCIADOS (BANDERAS) */}
           <div>
-            <label className="block font-medium text-slate-700 mb-2 text-xs">Riesgos Asociados (Tipos de Riesgo)</label>
+            <label className="block font-medium text-slate-700 mb-2 text-xs">Riesgos Asociados (Banderas)</label>
             <div className="flex flex-wrap gap-4 text-xs bg-slate-50 p-3 rounded-lg border border-slate-200">
               {[
                 { key: "laft", label: "LAFT" },
@@ -692,117 +700,135 @@ export default function Matrix() {
               ))}
             </div>
           </div>
+        </div>
 
-          <div className="pt-2 border-t border-slate-100">
-            <h3 className="text-xs font-bold text-slate-800 mb-3">Evaluación y Perfil Inherente</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-              <div>
-                <label className="block font-medium text-slate-700 mb-1">Probabilidad Inherente (1 a 5)</label>
-                <select
-                  value={formData.probabilidadInherente}
-                  onChange={(e) => setFormData({ ...formData, probabilidadInherente: Number(e.target.value) })}
-                  className="w-full p-2.5 border border-yellow-300 rounded-md font-bold bg-yellow-50/60 focus:ring-1 focus:ring-yellow-500"
-                >
-                  <option value={1}>1 - Raro</option>
-                  <option value={2}>2 - Improbable</option>
-                  <option value={3}>3 - Posible</option>
-                  <option value={4}>4 - Probable</option>
-                  <option value={5}>5 - Casi Seguro</option>
-                </select>
-              </div>
+        {/* BLOQUE 3: EVALUACIÓN DE PERFILES */}
+        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+          <h2 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-2 flex items-center gap-2">
+            <Activity className="w-4 h-4 text-indigo-600" />
+            Evaluación y Perfilamiento del Riesgo
+          </h2>
 
-              <div>
-                <label className="block font-medium text-slate-700 mb-1">Impacto Inherente (1 a 5)</label>
-                <select
-                  value={formData.impactoInherente}
-                  onChange={(e) => setFormData({ ...formData, impactoInherente: Number(e.target.value) })}
-                  className="w-full p-2.5 border border-yellow-300 rounded-md font-bold bg-yellow-50/60 focus:ring-1 focus:ring-yellow-500"
-                >
-                  <option value={1}>1 - Insignificante</option>
-                  <option value={2}>2 - Menor</option>
-                  <option value={3}>3 - Moderado</option>
-                  <option value={4}>4 - Mayor</option>
-                  <option value={5}>5 - Catastrófico</option>
-                </select>
-              </div>
-            </div>
-          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
+            {/* INHERENTE */}
+            <div className="bg-amber-50/50 p-4 rounded-lg border border-amber-200 space-y-3">
+              <h3 className="font-bold text-amber-900 border-b border-amber-200 pb-1">Perfil Inherente</h3>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-medium text-slate-700 mb-1">Probabilidad (1 a 5)</label>
+                  <select
+                    value={formData.probabilidadInherente}
+                    onChange={(e) => setFormData({ ...formData, probabilidadInherente: Number(e.target.value) })}
+                    className="w-full p-2 border border-amber-300 rounded font-bold bg-white focus:ring-1 focus:ring-amber-500"
+                  >
+                    <option value={1}>1 - Raro</option>
+                    <option value={2}>2 - Improbable</option>
+                    <option value={3}>3 - Posible</option>
+                    <option value={4}>4 - Probable</option>
+                    <option value={5}>5 - Casi Seguro</option>
+                  </select>
+                </div>
 
-          <div className="pt-2 border-t border-slate-100">
-            <h3 className="text-xs font-bold text-slate-800 mb-3">Evaluación y Perfil Residual</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-              <div>
-                <label className="block font-medium text-slate-700 mb-1">Probabilidad Residual (1 a 5)</label>
-                <select
-                  value={formData.probabilidadResidual || 1}
-                  onChange={(e) => setFormData({ ...formData, probabilidadResidual: Number(e.target.value) })}
-                  className="w-full p-2.5 border border-emerald-300 rounded-md font-bold bg-emerald-50/60 focus:ring-1 focus:ring-emerald-500"
-                >
-                  <option value={1}>1 - Raro</option>
-                  <option value={2}>2 - Improbable</option>
-                  <option value={3}>3 - Posible</option>
-                  <option value={4}>4 - Probable</option>
-                  <option value={5}>5 - Casi Seguro</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block font-medium text-slate-700 mb-1">Impacto Residual (1 a 5)</label>
-                <select
-                  value={formData.impactoResidual || 2}
-                  onChange={(e) => setFormData({ ...formData, impactoResidual: Number(e.target.value) })}
-                  className="w-full p-2.5 border border-emerald-300 rounded-md font-bold bg-emerald-50/60 focus:ring-1 focus:ring-emerald-500"
-                >
-                  <option value={1}>1 - Insignificante</option>
-                  <option value={2}>2 - Menor</option>
-                  <option value={3}>3 - Moderado</option>
-                  <option value={4}>4 - Mayor</option>
-                  <option value={5}>5 - Catastrófico</option>
-                </select>
+                <div>
+                  <label className="block font-medium text-slate-700 mb-1">Impacto (1 a 5)</label>
+                  <select
+                    value={formData.impactoInherente}
+                    onChange={(e) => setFormData({ ...formData, impactoInherente: Number(e.target.value) })}
+                    className="w-full p-2 border border-amber-300 rounded font-bold bg-white focus:ring-1 focus:ring-amber-500"
+                  >
+                    <option value={1}>1 - Insignificante</option>
+                    <option value={2}>2 - Menor</option>
+                    <option value={3}>3 - Moderado</option>
+                    <option value={4}>4 - Mayor</option>
+                    <option value={5}>5 - Catastrófico</option>
+                  </select>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="pt-2 border-t border-slate-100">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-              <div>
-                <label className="block font-medium text-slate-700 mb-1">Tipo de Monitoreo</label>
-                <select
-                  value={formData.tipoMonitoreo || "Mensual"}
-                  onChange={(e) => setFormData({ ...formData, tipoMonitoreo: e.target.value })}
-                  className="w-full p-2.5 border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-teal-600"
-                >
-                  {OPCIONES_MONITOREO.map((m) => (
-                    <option key={m} value={m}>{m}</option>
-                  ))}
-                </select>
-              </div>
+            {/* RESIDUAL */}
+            <div className="bg-emerald-50/50 p-4 rounded-lg border border-emerald-200 space-y-3">
+              <h3 className="font-bold text-emerald-900 border-b border-emerald-200 pb-1">Perfil Residual</h3>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-medium text-slate-700 mb-1">Probabilidad (1 a 5)</label>
+                  <select
+                    value={formData.probabilidadResidual || 1}
+                    onChange={(e) => setFormData({ ...formData, probabilidadResidual: Number(e.target.value) })}
+                    className="w-full p-2 border border-emerald-300 rounded font-bold bg-white focus:ring-1 focus:ring-emerald-500"
+                  >
+                    <option value={1}>1 - Raro</option>
+                    <option value={2}>2 - Improbable</option>
+                    <option value={3}>3 - Posible</option>
+                    <option value={4}>4 - Probable</option>
+                    <option value={5}>5 - Casi Seguro</option>
+                  </select>
+                </div>
 
-              <div>
-                <label className="block font-medium text-slate-700 mb-1">Responsable</label>
-                <input
-                  type="text"
-                  value={formData.responsable || ""}
-                  onChange={(e) => setFormData({ ...formData, responsable: e.target.value })}
-                  placeholder="Ej. Analista Sagrilaft"
-                  className="w-full p-2.5 border border-slate-300 rounded-md focus:ring-1 focus:ring-teal-600"
-                />
-              </div>
-
-              <div>
-                <label className="block font-medium text-slate-700 mb-1">Observaciones</label>
-                <input
-                  type="text"
-                  value={formData.observaciones || ""}
-                  onChange={(e) => setFormData({ ...formData, observaciones: e.target.value })}
-                  placeholder="Observaciones adicionales..."
-                  className="w-full p-2.5 border border-slate-300 rounded-md focus:ring-1 focus:ring-teal-600"
-                />
+                <div>
+                  <label className="block font-medium text-slate-700 mb-1">Impacto (1 a 5)</label>
+                  <select
+                    value={formData.impactoResidual || 2}
+                    onChange={(e) => setFormData({ ...formData, impactoResidual: Number(e.target.value) })}
+                    className="w-full p-2 border border-emerald-300 rounded font-bold bg-white focus:ring-1 focus:ring-emerald-500"
+                  >
+                    <option value={1}>1 - Insignificante</option>
+                    <option value={2}>2 - Menor</option>
+                    <option value={3}>3 - Moderado</option>
+                    <option value={4}>4 - Mayor</option>
+                    <option value={5}>5 - Catastrófico</option>
+                  </select>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
+        {/* BLOQUE 4: MONITOREO Y SEGUIMIENTO (RESTAURADO Y ORGANIZADO) */}
+        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+          <h2 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-2">
+            Monitoreo y Seguimiento
+          </h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+            <div>
+              <label className="block font-medium text-slate-700 mb-1">Tipo de Monitoreo</label>
+              <select
+                value={formData.tipoMonitoreo || "Mensual"}
+                onChange={(e) => setFormData({ ...formData, tipoMonitoreo: e.target.value })}
+                className="w-full p-2.5 border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-teal-600 font-medium"
+              >
+                {OPCIONES_MONITOREO.map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block font-medium text-slate-700 mb-1">Responsable</label>
+              <input
+                type="text"
+                value={formData.responsable || ""}
+                onChange={(e) => setFormData({ ...formData, responsable: e.target.value })}
+                placeholder="Ej. Analista Sagrilaft"
+                className="w-full p-2.5 border border-slate-300 rounded-md focus:ring-1 focus:ring-teal-600"
+              />
+            </div>
+
+            <div>
+              <label className="block font-medium text-slate-700 mb-1">Observaciones</label>
+              <input
+                type="text"
+                value={formData.observaciones || ""}
+                onChange={(e) => setFormData({ ...formData, observaciones: e.target.value })}
+                placeholder="Observaciones o notas adicionales..."
+                className="w-full p-2.5 border border-slate-300 rounded-md focus:ring-1 focus:ring-teal-600"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* BLOQUE 5: ASIGNACIÓN DE CONTROLES */}
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
           <div className="flex justify-between items-center border-b border-slate-100 pb-2">
             <div>
@@ -810,7 +836,7 @@ export default function Matrix() {
                 Asignación de Controles Mitigantes
               </h2>
               <p className="text-xs text-slate-500">
-                Seleccione los controles aplicables del catálogo.
+                Seleccione los controles aplicables del catálogo oficial.
               </p>
             </div>
             <span className="text-xs font-bold text-teal-800 bg-teal-100 px-3 py-1 rounded-full">
@@ -858,7 +884,9 @@ export default function Matrix() {
     );
   }
 
+  // ==========================================
   // VISTA TABLA PRINCIPAL
+  // ==========================================
   return (
     <div className="p-6 max-w-[1700px] mx-auto space-y-6 bg-slate-50 min-h-screen text-slate-800">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
@@ -910,7 +938,7 @@ export default function Matrix() {
         <Search className="w-5 h-5 text-slate-400" />
         <input
           type="text"
-          placeholder="Buscar por código, proceso, factor o qué puede suceder..."
+          placeholder="Buscar por código, proceso, factor o detalle del riesgo..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="w-full bg-transparent text-xs text-slate-800 focus:outline-none placeholder:text-slate-400"
@@ -923,13 +951,13 @@ export default function Matrix() {
             <thead>
               <tr className="bg-slate-100 text-slate-800 font-bold text-xs border-b-2 border-slate-300">
                 <th className="p-3.5 w-24">Código</th>
-                <th className="p-3.5 w-36">Proceso</th>
+                <th className="p-3.5 w-36">Proceso / Subp.</th>
                 <th className="p-3.5 w-40">Factor / Tipología</th>
-                <th className="p-3.5 min-w-[320px]">Detalle del Riesgo (¿Qué puede suceder? / Causas / Impacto)</th>
+                <th className="p-3.5 min-w-[320px]">Detalle del Riesgo</th>
                 <th className="p-3.5 w-28 text-center">Perfil Inherente</th>
                 <th className="p-3.5 min-w-[220px]">Controles Mitigantes</th>
                 <th className="p-3.5 w-28 text-center">Perfil Residual</th>
-                <th className="p-3.5 w-36">Monitoreo / Resp.</th>
+                <th className="p-3.5 w-36">Tipo de Monitoreo / Resp.</th>
                 <th className="p-3.5 w-20 text-center">Acciones</th>
               </tr>
             </thead>
@@ -946,7 +974,6 @@ export default function Matrix() {
                 const itemCodigos = obtenerCodigosControlSeguros(item);
                 const controlesAsignados = controles.filter((c) => itemCodigos.includes(c.codigo));
 
-                // Cálculo de mitigación acumulada
                 const ponderaciones = controlesAsignados.map((c) => calcularPonderacion(c.clase, c.tipo, c.frecuencia, c.formalidad));
                 const mitigacionTotal = calcularMitigacionMultiple(ponderaciones);
 
@@ -971,7 +998,7 @@ export default function Matrix() {
                       )}
                     </td>
 
-                    {/* COLUMNA DETALLE DEL RIESGO RESTRUCTURADA Y COMPLETA */}
+                    {/* COLUMNA DETALLE DEL RIESGO */}
                     <td className="p-3 align-top text-slate-800 leading-relaxed space-y-1">
                       <div className="font-medium text-slate-900">
                         {item.quePuedeSuceder || item.descripcion}
@@ -989,7 +1016,6 @@ export default function Matrix() {
                         </div>
                       )}
 
-                      {/* BANDERAS DE RIESGOS ASOCIADOS */}
                       {item.banderas && (
                         <div className="flex flex-wrap gap-1 pt-1">
                           {item.banderas.laft && (
@@ -1037,7 +1063,7 @@ export default function Matrix() {
                       </div>
                     </td>
 
-                    {/* CONTROLES Y MITIGACIÓN */}
+                    {/* CONTROLES */}
                     <td className="p-2 align-top">
                       <div className="flex flex-wrap gap-1 mb-1">
                         {controlesAsignados.length > 0 ? (
@@ -1072,6 +1098,7 @@ export default function Matrix() {
                       </div>
                     </td>
 
+                    {/* TIPO DE MONITOREO Y RESPONSABLE */}
                     <td className="p-3 align-top text-slate-700 text-[11px]">
                       <div><b>Monitoreo:</b> {item.tipoMonitoreo || "N/A"}</div>
                       <div className="text-slate-500 mt-0.5"><b>Resp:</b> {item.responsable || "N/A"}</div>
