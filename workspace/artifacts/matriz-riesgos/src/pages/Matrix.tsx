@@ -51,6 +51,15 @@ export function getNivelRiesgo(score: number): { label: string; bgBadge: string 
   }
 }
 
+function getColorsPDF(label: string): { bg: string; text: string } {
+  switch (label) {
+    case "BAJO": return { bg: "#d1fae5", text: "#065f46" };
+    case "MEDIO": return { bg: "#fef3c7", text: "#92400e" };
+    case "ALTO": return { bg: "#ffedd5", text: "#9a3412" };
+    case "EXTREMO": default: return { bg: "#ffe4e6", text: "#9f1239" };
+  }
+}
+
 export function calcularMitigacionMultiple(ponderaciones: number[]): number {
   if (!ponderaciones || ponderaciones.length === 0) return 0;
   let factorResidual = 1;
@@ -281,10 +290,10 @@ export default function Matrix() {
     return desc.includes(term) || cod.includes(term) || proc.includes(term);
   });
 
-  // EXPORTACIÓN A EXCEL (.CSV)
+  // EXPORTACIÓN COMPLETA A EXCEL (.CSV)
   const handleExportExcel = () => {
     let csvContent = "\uFEFF"; // UTF-8 BOM
-    csvContent += "Código;Proceso;Subproceso;Factor Riesgo;Descripción del Riesgo;Prob. Inh.;Imp. Inh.;Riesgo Inherente;Controles Asignados;Mitigación (%);Riesgo Residual\n";
+    csvContent += "Código;Proceso;Subproceso;Clasificación / Banderas;Factor Riesgo;Tipología;Descripción del Riesgo;Causa Raíz;Consecuencia / Impacto;Prob. Inh.;Imp. Inh.;Riesgo Inherente;Controles Asignados (Ponderación);Mitigación (%);Riesgo Residual\n";
 
     filteredRiesgos.forEach((r) => {
       const inhScore = (r.probabilidadInherente || 1) * (r.impactoInherente || 1);
@@ -296,14 +305,28 @@ export default function Matrix() {
       const resScore = Math.max(1, Math.round(inhScore * (1 - mitigacionTotal / 100)));
       const resLevel = getNivelRiesgo(resScore).label;
 
-      const listaControles = controlesAsignados.map(c => `[${c.codigo}] ${c.control}`).join(" | ");
+      const activeFlags = [];
+      if (r.banderas?.laft) activeFlags.push("LAFT");
+      if (r.banderas?.operativo) activeFlags.push("Operativo");
+      if (r.banderas?.legal) activeFlags.push("Legal");
+      if (r.banderas?.reputacional) activeFlags.push("Reputacional");
+      if (r.banderas?.contagio) activeFlags.push("Contagio");
+
+      const listaControles = controlesAsignados.map(c => {
+        const p = calcularPonderacion(c.clase, c.tipo, c.frecuencia, c.formalidad);
+        return `[${c.codigo}] ${c.control} (${p}%)`;
+      }).join(" | ");
 
       const row = [
         `"${r.codigo}"`,
         `"${r.proceso}"`,
         `"${r.subproceso || ''}"`,
+        `"${activeFlags.join(', ')}"`,
         `"${r.factorRiesgo}"`,
+        `"${r.tipologia || ''}"`,
         `"${(r.descripcion || r.riesgo || '').replace(/"/g, '""')}"`,
+        `"${(r.causa || '').replace(/"/g, '""')}"`,
+        `"${(r.consecuencia || '').replace(/"/g, '""')}"`,
         r.probabilidadInherente,
         r.impactoInherente,
         `"${inhScore} - ${inhLevel}"`,
@@ -319,13 +342,13 @@ export default function Matrix() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.setAttribute("download", `Matriz_Riesgos_LAFT_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.setAttribute("download", `Matriz_Riesgos_LAFT_Completa_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
-  // EXPORTACIÓN A PDF
+  // EXPORTACIÓN COMPLETA Y DETALLADA A PDF
   const handleExportPDF = () => {
     const printWindow = window.open("", "_blank");
     if (!printWindow) return;
@@ -333,29 +356,75 @@ export default function Matrix() {
     const rowsHTML = filteredRiesgos.map((item) => {
       const inhScore = (item.probabilidadInherente || 1) * (item.impactoInherente || 1);
       const inhLevel = getNivelRiesgo(inhScore);
+      const inhColors = getColorsPDF(inhLevel.label);
+
       const itemCodigos = obtenerCodigosControlSeguros(item);
       const controlesAsignados = controles.filter((c) => itemCodigos.includes(c.codigo));
       const ponderaciones = controlesAsignados.map((c) => calcularPonderacion(c.clase, c.tipo, c.frecuencia, c.formalidad));
       const mitigacionTotal = calcularMitigacionMultiple(ponderaciones);
       const resScore = Math.max(1, Math.round(inhScore * (1 - mitigacionTotal / 100)));
       const resLevel = getNivelRiesgo(resScore);
+      const resColors = getColorsPDF(resLevel.label);
+
+      // Extraer Banderas Activas
+      const activeFlags = [];
+      if (item.banderas?.laft) activeFlags.push("LAFT");
+      if (item.banderas?.operativo) activeFlags.push("Operativo");
+      if (item.banderas?.legal) activeFlags.push("Legal");
+      if (item.banderas?.reputacional) activeFlags.push("Reputacional");
+      if (item.banderas?.contagio) activeFlags.push("Contagio");
+
+      const flagsHTML = activeFlags.length > 0 
+        ? activeFlags.map(f => `<span style="background-color: #e2e8f0; color: #1e293b; padding: 2px 5px; border-radius: 4px; font-size: 8.5px; font-weight: bold; margin-right: 2px; display: inline-block; margin-top: 2px;">${f}</span>`).join("")
+        : "<span style='color: #94a3b8; font-size: 9px;'>N/A</span>";
 
       const controlesHTML = controlesAsignados.length > 0
-        ? controlesAsignados.map(c => `<div style="margin-bottom: 4px; font-size: 10px;"><b>${c.codigo}:</b> ${c.control}</div>`).join("")
-        : "<i>Sin controles asignados</i>";
+        ? controlesAsignados.map(c => {
+            const p = calcularPonderacion(c.clase, c.tipo, c.frecuencia, c.formalidad);
+            return `<div style="margin-bottom: 4px; font-size: 9px; line-height: 1.2;"><b>[${c.codigo}]</b> ${c.control} <span style="color:#4338ca; font-weight:bold;">(${p}%)</span></div>`;
+          }).join("")
+        : "<i style='color: #94a3b8; font-size: 9px;'>Sin controles asignados</i>";
 
       return `
-        <tr>
-          <td style="padding: 8px; border: 1px solid #cbd5e1; font-weight: bold;">${item.codigo}</td>
-          <td style="padding: 8px; border: 1px solid #cbd5e1;">${item.proceso}</td>
-          <td style="padding: 8px; border: 1px solid #cbd5e1;">${item.factorRiesgo}</td>
-          <td style="padding: 8px; border: 1px solid #cbd5e1;">${item.descripcion || item.riesgo}</td>
-          <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: center;">${item.probabilidadInherente}</td>
-          <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: center;">${item.impactoInherente}</td>
-          <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: center; font-weight: bold;">${inhScore} - ${inhLevel.label}</td>
-          <td style="padding: 8px; border: 1px solid #cbd5e1;">${controlesHTML}</td>
-          <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: center; font-weight: bold;">${mitigacionTotal}%</td>
-          <td style="padding: 8px; border: 1px solid #cbd5e1; text-align: center; font-weight: bold;">${resScore} - ${resLevel.label}</td>
+        <tr style="page-break-inside: avoid;">
+          <td style="padding: 6px; border: 1px solid #cbd5e1; vertical-align: top;">
+            <div style="font-weight: bold; font-size: 10px; color: #0f172a;">${item.codigo}</div>
+            <div style="margin-top: 4px;">${flagsHTML}</div>
+          </td>
+          <td style="padding: 6px; border: 1px solid #cbd5e1; vertical-align: top;">
+            <div style="font-weight: bold; color: #1e293b; font-size: 9.5px;">${item.proceso || 'N/A'}</div>
+            <div style="font-size: 9px; color: #64748b; margin-top: 2px;"><b>Subproceso:</b> ${item.subproceso || 'N/A'}</div>
+          </td>
+          <td style="padding: 6px; border: 1px solid #cbd5e1; vertical-align: top;">
+            <div style="font-weight: bold; color: #1e293b; font-size: 9.5px;">${item.factorRiesgo || 'N/A'}</div>
+            <div style="font-size: 9px; color: #64748b; margin-top: 2px;"><b>Tipología:</b> ${item.tipologia || 'N/A'}</div>
+          </td>
+          <td style="padding: 6px; border: 1px solid #cbd5e1; vertical-align: top;">
+            <div style="font-weight: 600; color: #0f172a; font-size: 9.5px; margin-bottom: 4px;">${item.descripcion || item.riesgo || ''}</div>
+            <div style="font-size: 8.5px; color: #334155; margin-top: 3px; background-color: #f8fafc; padding: 3px; border-radius: 3px;">
+              <b>Causa Raíz:</b> ${item.causa || 'N/A'}
+            </div>
+            <div style="font-size: 8.5px; color: #334155; margin-top: 2px; background-color: #f8fafc; padding: 3px; border-radius: 3px;">
+              <b>Consecuencia:</b> ${item.consecuencia || 'N/A'}
+            </div>
+          </td>
+          <td style="padding: 6px; border: 1px solid #cbd5e1; text-align: center; vertical-align: top;">
+            <div style="font-size: 8.5px; color: #64748b; margin-bottom: 3px;">P: <b>${item.probabilidadInherente}</b> | I: <b>${item.impactoInherente}</b></div>
+            <div style="padding: 4px 2px; border-radius: 4px; font-weight: bold; font-size: 9.5px; background-color: ${inhColors.bg}; color: ${inhColors.text};">
+              ${inhScore} - ${inhLevel.label}
+            </div>
+          </td>
+          <td style="padding: 6px; border: 1px solid #cbd5e1; vertical-align: top;">
+            ${controlesHTML}
+          </td>
+          <td style="padding: 6px; border: 1px solid #cbd5e1; text-align: center; font-weight: bold; color: #3730a3; vertical-align: top; font-size: 11px;">
+            ${mitigacionTotal}%
+          </td>
+          <td style="padding: 6px; border: 1px solid #cbd5e1; text-align: center; vertical-align: top;">
+            <div style="padding: 4px 2px; border-radius: 4px; font-weight: bold; font-size: 9.5px; background-color: ${resColors.bg}; color: ${resColors.text};">
+              ${resScore} - ${resLevel.label}
+            </div>
+          </td>
         </tr>
       `;
     }).join("");
@@ -364,32 +433,33 @@ export default function Matrix() {
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Matriz de Riesgos LAFT / PADM</title>
+          <title>Matriz Completa de Riesgos LAFT / PADM</title>
           <style>
-            @page { size: A4 landscape; margin: 10mm; }
-            body { font-family: Arial, sans-serif; font-size: 11px; color: #1e293b; margin: 0; padding: 10px; }
-            h1 { font-size: 18px; margin-bottom: 4px; color: #0f172a; }
-            p { font-size: 11px; color: #64748b; margin-top: 0; margin-bottom: 16px; }
-            table { width: 100%; border-collapse: collapse; font-size: 10px; }
-            th { background-color: #f1f5f9; color: #0f172a; border: 1px solid #cbd5e1; padding: 8px; text-align: left; font-weight: bold; }
+            @page { size: A4 landscape; margin: 8mm; }
+            body { font-family: Arial, sans-serif; font-size: 10px; color: #0f172a; margin: 0; padding: 5px; }
+            .header-box { border-bottom: 2px solid #0f172a; padding-bottom: 6px; margin-bottom: 10px; }
+            h1 { font-size: 16px; margin: 0 0 2px 0; color: #0f172a; }
+            p { font-size: 9.5px; color: #475569; margin: 0; }
+            table { width: 100%; border-collapse: collapse; font-size: 9px; }
+            th { background-color: #f1f5f9; color: #0f172a; border: 1px solid #cbd5e1; padding: 6px; text-align: left; font-weight: bold; }
           </style>
         </head>
         <body>
-          <h1>Matriz de Riesgos LAFT / PADM</h1>
-          <p>Reporte Oficial de Evaluación de Riesgos Inherentes, Controles Asignados y Riesgos Residuales.</p>
+          <div class="header-box">
+            <h1>Matriz Integral de Riesgos LAFT / PADM</h1>
+            <p>Reporte Consolidado con Análisis Cualitativo (Proceso, Subproceso, Causa, Consecuencia, Tipología) y Evaluaciones ResiduaIes.</p>
+          </div>
           <table>
             <thead>
               <tr>
-                <th style="width: 80px;">Código</th>
-                <th style="width: 100px;">Proceso</th>
-                <th style="width: 100px;">Factor Riesgo</th>
-                <th>Descripción del Riesgo</th>
-                <th style="width: 40px; text-align: center;">Prob.</th>
-                <th style="width: 40px; text-align: center;">Imp.</th>
-                <th style="width: 80px; text-align: center;">Riesgo Inh.</th>
-                <th style="width: 220px;">Controles Asignados</th>
-                <th style="width: 60px; text-align: center;">Mitigación</th>
-                <th style="width: 80px; text-align: center;">Riesgo Res.</th>
+                <th style="width: 80px;">Código / Clasif.</th>
+                <th style="width: 100px;">Proceso / Subp.</th>
+                <th style="width: 100px;">Factor / Tipología</th>
+                <th>Descripción, Causa y Consecuencia del Riesgo</th>
+                <th style="width: 85px; text-align: center;">Riesgo Inh.</th>
+                <th style="width: 220px;">Controles Asignados (Ponderación)</th>
+                <th style="width: 55px; text-align: center;">Mitigación</th>
+                <th style="width: 85px; text-align: center;">Riesgo Res.</th>
               </tr>
             </thead>
             <tbody>
@@ -694,7 +764,7 @@ export default function Matrix() {
           <button
             onClick={handleExportPDF}
             className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-rose-800 bg-rose-100 hover:bg-rose-200 rounded-lg transition-colors border border-rose-300"
-            title="Descargar reporte en PDF"
+            title="Descargar reporte detallado en PDF"
           >
             <FileText className="w-4 h-4 text-rose-700" />
             PDF
@@ -709,7 +779,7 @@ export default function Matrix() {
             Restablecer Matriz
           </button>
 
-          {/* Botón Nuevo Riesgo (ROJO) */}
+          {/* Botón Nuevo Riesgo */}
           <button
             onClick={handleOpenNewForm}
             className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg shadow-sm transition-colors"
@@ -737,20 +807,16 @@ export default function Matrix() {
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
-              {/* Encabezado sin color de fondo (transparente/neutro) */}
               <tr className="bg-slate-100 text-slate-800 font-bold text-xs border-b-2 border-slate-300">
                 <th className="p-3.5 w-28">Código</th>
                 <th className="p-3.5 w-36">Proceso</th>
                 <th className="p-3.5 w-40">Factor Riesgo</th>
                 <th className="p-3.5 min-w-[280px]">Descripción del Riesgo</th>
-                
                 <th className="p-3.5 w-20 text-center">Prob. Inh.</th>
                 <th className="p-3.5 w-20 text-center">Imp. Inh.</th>
                 <th className="p-3.5 w-32 text-center">Riesgo Inherente</th>
-                
                 <th className="p-3.5 min-w-[320px]">Controles Asignados (Catálogo)</th>
                 <th className="p-3.5 w-32 text-center">Mitigación Acumulada (%)</th>
-                
                 <th className="p-3.5 w-32 text-center">Riesgo Residual</th>
                 <th className="p-3.5 w-24 text-center">Acciones</th>
               </tr>
