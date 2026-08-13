@@ -433,7 +433,7 @@ export default function Matrix() {
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Matriz Completa de Riesgos LAFT / PADM</title>
+          <title>Matriz de riesgos sagrilaf/title>
           <style>
             @page { size: A4 landscape; margin: 8mm; }
             body { font-family: Arial, sans-serif; font-size: 10px; color: #0f172a; margin: 0; padding: 5px; }
