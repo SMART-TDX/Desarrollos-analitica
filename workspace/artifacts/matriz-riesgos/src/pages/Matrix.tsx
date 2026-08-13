@@ -21,8 +21,9 @@ export interface RiesgoRow {
   codigo: string;
   proceso: string;
   subproceso?: string;
-  descripcion: string;
   quePuedeSuceder?: string;
+  descripcionEvento?: string;
+  descripcion?: string; // Para compatibilidad
   banderas?: {
     laft: boolean;
     operativo: boolean;
@@ -39,7 +40,6 @@ export interface RiesgoRow {
   impactoInherente: number;
   probabilidadResidual?: number;
   impactoResidual?: number;
-  tipoMonitoreo?: string;
   responsable?: string;
   controlCodigos?: string[];
   controlCodigo?: string;
@@ -73,17 +73,6 @@ const DEFAULTS_FACTORES = [
   "PRODUCTOS Y SERVICIOS",
   "PROVEEDORES",
   "TECNOLÓGICO"
-];
-
-const OPCIONES_MONITOREO = [
-  "Continuo / En tiempo real",
-  "Diario",
-  "Semanal",
-  "Mensual",
-  "Bimestral",
-  "Trimestral",
-  "Semestral",
-  "Anual"
 ];
 
 // CALIFICACIÓN DEL PERFIL DE RIESGO
@@ -140,19 +129,17 @@ export const RIESGOS_INICIALES: RiesgoRow[] = [
     codigo: "RIE-LAFT-01",
     proceso: "Gestión Comercial",
     subproceso: "COMERCIALL-TELEMERCADEO-VENTAS",
-    descripcion: "Vinculación de clientes o contrapartes en listas restrictivas o con antecedentes LAFT",
-    quePuedeSuceder: "El Estudiantes o el responsables del pago, se encuentren realizando o vinculados en grupos que llevan actividades delictivas.",
+    quePuedeSuceder: "El Estudiante o el responsable del pago se encuentre realizando o vinculado en actividades delictivas.",
+    descripcionEvento: "Vinculación de clientes o contrapartes en listas restrictivas o con antecedentes LAFT sin previo filtro.",
     banderas: { laft: true, operativo: true, legal: true, reputacional: true, contagio: false },
     factorRiesgo: "ESTUDIANTES",
     tipologia: "Renuencia del cliente a suministrar la información y documentación solicitada por la academia",
-    porQuePuedeSuceder: "No se realiza una identificación de los clientes y los responsables del pago, antes de prestarle servicios",
-    causa: "No se realiza una identificación de los clientes y los responsables del pago, antes de prestarle servicios",
+    porQuePuedeSuceder: "No se realiza una identificación de los clientes y los responsables del pago antes de prestarle servicios",
     consecuencia: "Sanciones administrativas de la Superintendencia de Sociedades y severo daño reputacional.",
     probabilidadInherente: 3,
     impactoInherente: 3,
     probabilidadResidual: 1,
     impactoResidual: 2,
-    tipoMonitoreo: "Mensual",
     responsable: "Analista Sagrilaft",
     controlCodigos: ["CTR-LAFT-01", "CTR-LAFT-02", "CTR-LAFT-03"],
     observaciones: "Monitoreo continuo de listas restrictivas"
@@ -162,19 +149,17 @@ export const RIESGOS_INICIALES: RiesgoRow[] = [
     codigo: "RIE-LAFT-02",
     proceso: "GESTION ADMINISTRATIVA Y FINANCIERA",
     subproceso: "CARTERA",
-    descripcion: "Recaudo de efectivo o transferencias desde cuentas de origen no justificado",
     quePuedeSuceder: "Aceptación de pagos por matrícula o servicios con fondos cuyo origen ilícito no es justificado.",
+    descripcionEvento: "Recaudo de efectivo o transferencias desde cuentas de origen no justificado o de terceros sin vinculación formal.",
     banderas: { laft: true, operativo: true, legal: true, reputacional: true, contagio: false },
     factorRiesgo: "PRODUCTOS Y SERVICIOS",
     tipologia: "Paso de dinero de origen ilícito mediante consignaciones en efectivo de terceros",
     porQuePuedeSuceder: "Pagos de terceros no identificados o falta de conciliación bancaria diaria.",
-    causa: "Pagos de terceros no identificados o falta de conciliación bancaria diaria.",
     consecuencia: "Ingreso de recursos ilícitos a la contabilidad de la organización e investigaciones penales.",
     probabilidadInherente: 2,
     impactoInherente: 3,
     probabilidadResidual: 1,
     impactoResidual: 3,
-    tipoMonitoreo: "Continuo / En tiempo real",
     responsable: "Líder de Cartera y Tesorería",
     controlCodigos: ["CTR-LAFT-01"],
     observaciones: "Validación y causación de recibos de caja por cartera"
@@ -218,8 +203,8 @@ export default function Matrix() {
         if (Array.isArray(parsed) && parsed.length > 0) {
           return parsed.map((r: any) => ({
             ...r,
-            descripcion: r.descripcion || r.quePuedeSuceder || "",
             quePuedeSuceder: r.quePuedeSuceder || r.descripcion || "",
+            descripcionEvento: r.descripcionEvento || r.descripcion || "",
             porQuePuedeSuceder: r.porQuePuedeSuceder || r.causa || "",
             controlCodigos: obtenerCodigosControlSeguros(r),
             banderas: r.banderas || { laft: true, operativo: false, legal: false, reputacional: false, contagio: false }
@@ -241,8 +226,8 @@ export default function Matrix() {
     codigo: "",
     proceso: DEFAULTS_PROCESOS[0] || "",
     subproceso: DEFAULTS_SUBPROCESOS[0] || "",
-    descripcion: "",
     quePuedeSuceder: "",
+    descripcionEvento: "",
     banderas: { laft: true, operativo: false, legal: false, reputacional: false, contagio: false },
     factorRiesgo: DEFAULTS_FACTORES[0] || "",
     tipologia: "",
@@ -252,7 +237,6 @@ export default function Matrix() {
     impactoInherente: 3,
     probabilidadResidual: 1,
     impactoResidual: 2,
-    tipoMonitoreo: "Mensual",
     responsable: "Analista Sagrilaft",
     controlCodigos: [],
     observaciones: ""
@@ -274,8 +258,8 @@ export default function Matrix() {
       codigo: nextCode,
       proceso: listaProcesos[0] || "",
       subproceso: listaSubprocesos[0] || "",
-      descripcion: "",
       quePuedeSuceder: "",
+      descripcionEvento: "",
       banderas: { laft: true, operativo: true, legal: true, reputacional: true, contagio: false },
       factorRiesgo: listaFactores[0] || "",
       tipologia: "",
@@ -285,7 +269,6 @@ export default function Matrix() {
       impactoInherente: 3,
       probabilidadResidual: 1,
       impactoResidual: 2,
-      tipoMonitoreo: "Mensual",
       responsable: "Analista Sagrilaft",
       controlCodigos: ["CTR-LAFT-01"],
       observaciones: ""
@@ -301,10 +284,10 @@ export default function Matrix() {
       subproceso: item.subproceso || listaSubprocesos[0] || "",
       factorRiesgo: item.factorRiesgo || listaFactores[0] || "",
       quePuedeSuceder: item.quePuedeSuceder || item.descripcion || "",
+      descripcionEvento: item.descripcionEvento || item.descripcion || "",
       porQuePuedeSuceder: item.porQuePuedeSuceder || item.causa || "",
       probabilidadResidual: item.probabilidadResidual || 1,
       impactoResidual: item.impactoResidual || 2,
-      tipoMonitoreo: item.tipoMonitoreo || "Mensual",
       responsable: item.responsable || "Analista Sagrilaft",
       controlCodigos: obtenerCodigosControlSeguros(item),
       banderas: item.banderas || { laft: true, operativo: false, legal: false, reputacional: false, contagio: false }
@@ -322,7 +305,7 @@ export default function Matrix() {
 
     const payload = {
       ...formData,
-      descripcion: formData.quePuedeSuceder || formData.descripcion,
+      descripcion: formData.quePuedeSuceder || formData.descripcionEvento || "",
       causa: formData.porQuePuedeSuceder || formData.causa
     };
 
@@ -362,7 +345,7 @@ export default function Matrix() {
   };
 
   const filteredRiesgos = riesgos.filter((r) => {
-    const desc = (r.quePuedeSuceder || r.descripcion || "").toLowerCase();
+    const desc = (r.quePuedeSuceder || r.descripcionEvento || r.descripcion || "").toLowerCase();
     const cod = (r.codigo || "").toLowerCase();
     const proc = (r.proceso || "").toLowerCase();
     const term = searchTerm.toLowerCase();
@@ -371,7 +354,7 @@ export default function Matrix() {
 
   const handleExportExcel = () => {
     let csvContent = "\uFEFF";
-    csvContent += "Código;Proceso;Subproceso;Factor Riesgo;¿Qué puede suceder?;Tipología;¿Por qué puede suceder?;Consecuencias;Riesgos Asociados;Prob. Inh.;Imp. Inh.;Perfil Inherente;Controles;Mitigación (%);Prob. Res.;Imp. Res.;Perfil Residual;Tipo Monitoreo;Responsable;Observaciones\n";
+    csvContent += "Código;Proceso;Subproceso;Factor Riesgo;¿Qué puede suceder?;Descripción Evento;Tipología;¿Por qué puede suceder?;Consecuencias;Riesgos Asociados;Prob. Inh.;Imp. Inh.;Perfil Inherente;Controles;Mitigación (%);Prob. Res.;Imp. Res.;Perfil Residual;Responsable;Observaciones\n";
 
     filteredRiesgos.forEach((r) => {
       const inhScore = (r.probabilidadInherente || 1) * (r.impactoInherente || 1);
@@ -396,7 +379,8 @@ export default function Matrix() {
         `"${r.proceso}"`,
         `"${r.subproceso || ''}"`,
         `"${r.factorRiesgo}"`,
-        `"${(r.quePuedeSuceder || r.descripcion || '').replace(/"/g, '""')}"`,
+        `"${(r.quePuedeSuceder || '').replace(/"/g, '""')}"`,
+        `"${(r.descripcionEvento || r.descripcion || '').replace(/"/g, '""')}"`,
         `"${(r.tipologia || '').replace(/"/g, '""')}"`,
         `"${(r.porQuePuedeSuceder || r.causa || '').replace(/"/g, '""')}"`,
         `"${(r.consecuencia || '').replace(/"/g, '""')}"`,
@@ -409,7 +393,6 @@ export default function Matrix() {
         resProb,
         resImp,
         `"${resLevel}"`,
-        `"${r.tipoMonitoreo || ''}"`,
         `"${r.responsable || ''}"`,
         `"${(r.observaciones || '').replace(/"/g, '""')}"`
       ].join(";");
@@ -448,7 +431,8 @@ export default function Matrix() {
           <td style="padding: 6px; border: 1px solid #cbd5e1;"><b>${item.proceso}</b><br/><span style="color:#64748b; font-size:8px;">${item.subproceso || ''}</span></td>
           <td style="padding: 6px; border: 1px solid #cbd5e1;"><b>${item.factorRiesgo}</b><br/><span style="color:#0284c7; font-size:8px;">${item.tipologia || ''}</span></td>
           <td style="padding: 6px; border: 1px solid #cbd5e1;">
-            <b>¿Qué puede suceder?:</b> ${item.quePuedeSuceder || item.descripcion || ''}<br/>
+            <b>¿Qué puede suceder?:</b> ${item.quePuedeSuceder || ''}<br/>
+            <b>Descripción del Evento:</b> ${item.descripcionEvento || item.descripcion || ''}<br/>
             <span style="color:#475569;"><b>Por qué:</b> ${item.porQuePuedeSuceder || item.causa || ''}</span><br/>
             <span style="color:#dc2626;"><b>Consecuencia:</b> ${item.consecuencia || ''}</span>
           </td>
@@ -465,8 +449,8 @@ export default function Matrix() {
             </div>
           </td>
           <td style="padding: 6px; border: 1px solid #cbd5e1;">
-            <div><b>Monitoreo:</b> ${item.tipoMonitoreo || 'N/A'}</div>
             <div><b>Responsable:</b> ${item.responsable || 'N/A'}</div>
+            <div><span style="color:#64748b; font-size:8px;">${item.observaciones || ''}</span></div>
           </td>
         </tr>
       `;
@@ -496,7 +480,7 @@ export default function Matrix() {
                 <th>Detalle del Riesgo</th>
                 <th style="width: 90px; text-align: center;">Perfil Inherente</th>
                 <th style="width: 90px; text-align: center;">Perfil Residual</th>
-                <th style="width: 120px;">Monitoreo / Resp.</th>
+                <th style="width: 120px;">Responsable / Obs.</th>
               </tr>
             </thead>
             <tbody>
@@ -521,6 +505,9 @@ export default function Matrix() {
   // ==========================================
   if (viewMode === "form") {
     const formControlCodigos = formData.controlCodigos || [];
+    const controlesSeleccionados = controles.filter((c) => formControlCodigos.includes(c.codigo));
+    const ponderacionesForm = controlesSeleccionados.map((c) => calcularPonderacion(c.clase, c.tipo, c.frecuencia, c.formalidad));
+    const mitigacionForm = calcularMitigacionMultiple(ponderacionesForm);
 
     return (
       <div className="p-6 max-w-[1400px] mx-auto space-y-6 bg-slate-50 min-h-screen text-slate-800">
@@ -537,7 +524,7 @@ export default function Matrix() {
                 {editingId ? "Editar Riesgo" : "Nuevo Riesgo"}
               </h1>
               <p className="text-xs text-slate-500">
-                Formulario completo de identificación, detalle del riesgo y monitoreo
+                Formulario completo de identificación, detalle del riesgo y seguimiento
               </p>
             </div>
           </div>
@@ -551,7 +538,7 @@ export default function Matrix() {
           </button>
         </div>
 
-        {/* BLOQUE 1: IDENTIFICACIÓN DEL RIESGO */}
+        {/* SECCIÓN 1: IDENTIFICACIÓN DEL RIESGO */}
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
           <h2 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-2 flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-teal-600"></span>
@@ -600,7 +587,7 @@ export default function Matrix() {
           </div>
         </div>
 
-        {/* BLOQUE 2: DETALLE DEL RIESGO (RESTAURADO EXPLÍCITAMENTE) */}
+        {/* SECCIÓN 2: DETALLE DEL RIESGO (CON CAMPOS SEPARADOS) */}
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-5">
           <h2 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-2 flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 text-amber-600" />
@@ -634,17 +621,35 @@ export default function Matrix() {
             </div>
           </div>
 
-          <div>
-            <label className="block font-medium text-slate-700 mb-1 text-xs">
-              ¿Qué puede suceder? (Descripción del Riesgo) *
-            </label>
-            <textarea
-              rows={3}
-              value={formData.quePuedeSuceder || formData.descripcion || ""}
-              onChange={(e) => setFormData({ ...formData, quePuedeSuceder: e.target.value, descripcion: e.target.value })}
-              className="w-full p-2.5 border border-slate-300 rounded-md text-xs focus:ring-1 focus:ring-teal-600 focus:border-teal-600"
-              placeholder="Describa de forma clara la situación, evento o falla que puede ocurrir..."
-            />
+          {/* CAMPOS SEPARADOS: ¿QUÉ PUEDE SUCEDER? Y DESCRIPCIÓN DEL EVENTO */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+            <div>
+              <label className="block font-medium text-slate-700 mb-1">
+                ¿Qué puede suceder? *
+              </label>
+              <textarea
+                rows={3}
+                value={formData.quePuedeSuceder || ""}
+                onChange={(e) => setFormData({ ...formData, quePuedeSuceder: e.target.value })}
+                className="w-full p-2.5 border border-slate-300 rounded-md text-xs focus:ring-1 focus:ring-teal-600 focus:border-teal-600"
+                placeholder="Ej. El estudiante o responsable del pago se encuentre realizando o vinculado en actividades ilícitas..."
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block font-medium text-slate-700 mb-1">
+                Descripción del Evento *
+              </label>
+              <textarea
+                rows={3}
+                value={formData.descripcionEvento || ""}
+                onChange={(e) => setFormData({ ...formData, descripcionEvento: e.target.value })}
+                className="w-full p-2.5 border border-slate-300 rounded-md text-xs focus:ring-1 focus:ring-teal-600 focus:border-teal-600"
+                placeholder="Describa a detalle las circunstancias, origen o modalidad del evento de riesgo..."
+                required
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
@@ -665,7 +670,7 @@ export default function Matrix() {
                 rows={2}
                 value={formData.consecuencia || ""}
                 onChange={(e) => setFormData({ ...formData, consecuencia: e.target.value })}
-                placeholder="Detalle los efectos negativos (sanciones, pérdidas financieras, etc)..."
+                placeholder="Detalle los efectos negativos (sanciones, pérdidas financieras, reputacionales, etc)..."
                 className="w-full p-2.5 border border-slate-300 rounded-md focus:ring-1 focus:ring-teal-600 focus:border-teal-600"
               />
             </div>
@@ -702,7 +707,7 @@ export default function Matrix() {
           </div>
         </div>
 
-        {/* BLOQUE 3: EVALUACIÓN DE PERFILES */}
+        {/* SECCIÓN 3: EVALUACIÓN DE PERFILES */}
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
           <h2 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-2 flex items-center gap-2">
             <Activity className="w-4 h-4 text-indigo-600" />
@@ -744,6 +749,19 @@ export default function Matrix() {
                   </select>
                 </div>
               </div>
+
+              {(() => {
+                const scoreInh = formData.probabilidadInherente * formData.impactoInherente;
+                const infoInh = getNivelRiesgo(scoreInh);
+                return (
+                  <div className="pt-2 flex justify-between items-center text-xs border-t border-amber-200/60">
+                    <span className="font-semibold text-slate-700">Puntuación: {scoreInh}</span>
+                    <span className={`px-2.5 py-1 rounded-md text-[10px] ${infoInh.bgBadge}`}>
+                      {infoInh.label}
+                    </span>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* RESIDUAL */}
@@ -768,7 +786,7 @@ export default function Matrix() {
                 <div>
                   <label className="block font-medium text-slate-700 mb-1">Impacto (1 a 5)</label>
                   <select
-                    value={formData.impactoResidual || 2}
+                    value={formData.impactoResidual || 1}
                     onChange={(e) => setFormData({ ...formData, impactoResidual: Number(e.target.value) })}
                     className="w-full p-2 border border-emerald-300 rounded font-bold bg-white focus:ring-1 focus:ring-emerald-500"
                   >
@@ -780,104 +798,104 @@ export default function Matrix() {
                   </select>
                 </div>
               </div>
+
+              {(() => {
+                const scoreRes = (formData.probabilidadResidual || 1) * (formData.impactoResidual || 1);
+                const infoRes = getNivelRiesgo(scoreRes);
+                return (
+                  <div className="pt-2 flex justify-between items-center text-xs border-t border-emerald-200/60">
+                    <span className="font-semibold text-slate-700">Puntuación: {scoreRes}</span>
+                    <span className={`px-2.5 py-1 rounded-md text-[10px] ${infoRes.bgBadge}`}>
+                      {infoRes.label}
+                    </span>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>
 
-        {/* BLOQUE 4: MONITOREO Y SEGUIMIENTO (RESTAURADO Y ORGANIZADO) */}
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
-          <h2 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-2">
-            Monitoreo y Seguimiento
-          </h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-            <div>
-              <label className="block font-medium text-slate-700 mb-1">Tipo de Monitoreo</label>
-              <select
-                value={formData.tipoMonitoreo || "Mensual"}
-                onChange={(e) => setFormData({ ...formData, tipoMonitoreo: e.target.value })}
-                className="w-full p-2.5 border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-teal-600 font-medium"
-              >
-                {OPCIONES_MONITOREO.map((m) => (
-                  <option key={m} value={m}>{m}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block font-medium text-slate-700 mb-1">Responsable</label>
-              <input
-                type="text"
-                value={formData.responsable || ""}
-                onChange={(e) => setFormData({ ...formData, responsable: e.target.value })}
-                placeholder="Ej. Analista Sagrilaft"
-                className="w-full p-2.5 border border-slate-300 rounded-md focus:ring-1 focus:ring-teal-600"
-              />
-            </div>
-
-            <div>
-              <label className="block font-medium text-slate-700 mb-1">Observaciones</label>
-              <input
-                type="text"
-                value={formData.observaciones || ""}
-                onChange={(e) => setFormData({ ...formData, observaciones: e.target.value })}
-                placeholder="Observaciones o notas adicionales..."
-                className="w-full p-2.5 border border-slate-300 rounded-md focus:ring-1 focus:ring-teal-600"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* BLOQUE 5: ASIGNACIÓN DE CONTROLES */}
+        {/* SECCIÓN 4: ASIGNACIÓN DE CONTROLES */}
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
           <div className="flex justify-between items-center border-b border-slate-100 pb-2">
-            <div>
-              <h2 className="text-sm font-bold text-slate-900">
-                Asignación de Controles Mitigantes
-              </h2>
-              <p className="text-xs text-slate-500">
-                Seleccione los controles aplicables del catálogo oficial.
-              </p>
-            </div>
-            <span className="text-xs font-bold text-teal-800 bg-teal-100 px-3 py-1 rounded-full">
-              {formControlCodigos.length} Controles Asignados
+            <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-teal-600" />
+              Controles Asignados
+            </h2>
+            <span className="text-xs bg-teal-50 text-teal-800 border border-teal-200 px-3 py-1 rounded-full font-semibold">
+              Mitigación Calculada: {mitigacionForm}%
             </span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-80 overflow-y-auto p-2 border border-slate-200 rounded-lg bg-slate-50/50 text-xs">
+          <div className="max-h-60 overflow-y-auto border border-slate-200 rounded-lg p-2 space-y-2 text-xs bg-slate-50/50">
             {controles.map((ctrl) => {
               const isSelected = formControlCodigos.includes(ctrl.codigo);
-              const pCtrl = calcularPonderacion(ctrl.clase, ctrl.tipo, ctrl.frecuencia, ctrl.formalidad);
-
+              const pond = calcularPonderacion(ctrl.clase, ctrl.tipo, ctrl.frecuencia, ctrl.formalidad);
               return (
                 <div
-                  key={ctrl.id}
+                  key={ctrl.id || ctrl.codigo}
                   onClick={() => toggleControlInForm(ctrl.codigo)}
-                  className={`p-3 rounded-lg border cursor-pointer transition-all flex items-start gap-3 ${
+                  className={`p-3 rounded-lg border transition-all cursor-pointer flex items-start gap-3 ${
                     isSelected
-                      ? "bg-indigo-50/90 border-indigo-500 text-indigo-950 shadow-xs"
-                      : "bg-white border-slate-200 text-slate-700 hover:bg-slate-100"
+                      ? "bg-teal-50 border-teal-300 shadow-xs"
+                      : "bg-white border-slate-200 hover:border-slate-300"
                   }`}
                 >
-                  <div className={`mt-0.5 w-4 h-4 rounded flex items-center justify-center border ${
-                    isSelected ? "bg-indigo-600 border-indigo-600 text-white" : "border-slate-300 bg-white"
-                  }`}>
-                    {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
-                  </div>
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => {}}
+                    className="mt-0.5 rounded text-teal-600 focus:ring-teal-500 w-4 h-4"
+                  />
                   <div className="flex-1">
                     <div className="flex justify-between items-center mb-1">
-                      <span className="font-bold text-xs">{ctrl.codigo}</span>
-                      <span className="font-mono text-[11px] font-bold px-1.5 py-0.5 bg-slate-200/70 rounded">
-                        Ponderación: {pCtrl}%
+                      <span className="font-bold text-slate-900">{ctrl.codigo} - {ctrl.control}</span>
+                      <span className="font-semibold text-teal-700 bg-teal-100/60 px-2 py-0.5 rounded text-[10px]">
+                        Eficiencia: {pond}%
                       </span>
                     </div>
-                    <p className="text-[11px] leading-tight text-slate-600">
-                      {ctrl.control}
-                    </p>
+                    <p className="text-[11px] text-slate-600 leading-tight">{ctrl.descripcion}</p>
                   </div>
                 </div>
               );
             })}
+          </div>
+        </div>
+
+        {/* SECCIÓN 5: MONITOREO Y SEGUIMIENTO (2 COLUMNAS, SIN TIPO DE MONITOREO) */}
+        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+          <h2 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-2">
+            Monitoreo y Seguimiento
+          </h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+            {/* Responsable */}
+            <div>
+              <label className="block font-medium text-slate-700 mb-1">
+                Responsable
+              </label>
+              <input
+                type="text"
+                value={formData.responsable || ""}
+                onChange={(e) => setFormData({ ...formData, responsable: e.target.value })}
+                className="w-full p-2.5 border border-slate-300 rounded-md focus:ring-1 focus:ring-teal-600 focus:border-teal-600 text-xs"
+                placeholder="Ej. Analista Sagrilaft"
+              />
+            </div>
+
+            {/* Observaciones */}
+            <div>
+              <label className="block font-medium text-slate-700 mb-1">
+                Observaciones
+              </label>
+              <input
+                type="text"
+                value={formData.observaciones || ""}
+                onChange={(e) => setFormData({ ...formData, observaciones: e.target.value })}
+                className="w-full p-2.5 border border-slate-300 rounded-md focus:ring-1 focus:ring-teal-600 focus:border-teal-600 text-xs"
+                placeholder="Ingrese observaciones o notas del seguimiento..."
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -885,48 +903,49 @@ export default function Matrix() {
   }
 
   // ==========================================
-  // VISTA TABLA PRINCIPAL
+  // VISTA TABLA (MATRIZ GENERAL)
   // ==========================================
   return (
-    <div className="p-6 max-w-[1700px] mx-auto space-y-6 bg-slate-50 min-h-screen text-slate-800">
+    <div className="p-6 max-w-[1600px] mx-auto space-y-6 bg-slate-50 min-h-screen text-slate-800">
+      {/* HEADER DE LA TABLA */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">
-            Matriz de Riesgos LAFT / PADM
+          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+            Matriz de Riesgos LAFT
           </h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Gestión cualitativa y perfilamiento del riesgo (Aceptable, Tolerable, Inaceptable).
+          <p className="text-xs text-slate-500 mt-1">
+            Gestión integral de riesgos, perfiles inherentes/residuales y asignación de controles
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={handleExportExcel}
-            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-emerald-800 bg-emerald-100 hover:bg-emerald-200 rounded-lg transition-colors border border-emerald-300"
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition-colors"
           >
-            <FileSpreadsheet className="w-4 h-4 text-emerald-700" />
+            <FileSpreadsheet className="w-4 h-4" />
             Excel
           </button>
 
           <button
             onClick={handleExportPDF}
-            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-rose-800 bg-rose-100 hover:bg-rose-200 rounded-lg transition-colors border border-rose-300"
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg transition-colors"
           >
-            <FileText className="w-4 h-4 text-rose-700" />
+            <FileText className="w-4 h-4" />
             PDF
           </button>
 
           <button
             onClick={handleReset}
-            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors border border-slate-200"
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-lg transition-colors"
+            title="Restablecer a valores iniciales"
           >
             <RotateCcw className="w-4 h-4" />
-            Restablecer
           </button>
 
           <button
             onClick={handleOpenNewForm}
-            className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg shadow-sm transition-colors"
+            className="flex items-center gap-2 px-4 py-2 text-xs font-semibold text-white bg-teal-700 hover:bg-teal-800 rounded-lg shadow-sm transition-colors"
           >
             <Plus className="w-4 h-4" />
             Nuevo Riesgo
@@ -934,197 +953,192 @@ export default function Matrix() {
         </div>
       </div>
 
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center gap-3">
-        <Search className="w-5 h-5 text-slate-400" />
+      {/* BARRA DE BÚSQUEDA */}
+      <div className="relative">
+        <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
         <input
           type="text"
-          placeholder="Buscar por código, proceso, factor o detalle del riesgo..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full bg-transparent text-xs text-slate-800 focus:outline-none placeholder:text-slate-400"
+          placeholder="Buscar riesgo por código, proceso, que puede suceder o descripción del evento..."
+          className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-teal-500 focus:outline-none shadow-xs"
         />
       </div>
 
+      {/* TABLA PRINCIPAL DE RIESGOS */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs">
+          <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="bg-slate-100 text-slate-800 font-bold text-xs border-b-2 border-slate-300">
-                <th className="p-3.5 w-24">Código</th>
-                <th className="p-3.5 w-36">Proceso / Subp.</th>
-                <th className="p-3.5 w-40">Factor / Tipología</th>
-                <th className="p-3.5 min-w-[320px]">Detalle del Riesgo</th>
-                <th className="p-3.5 w-28 text-center">Perfil Inherente</th>
-                <th className="p-3.5 min-w-[220px]">Controles Mitigantes</th>
-                <th className="p-3.5 w-28 text-center">Perfil Residual</th>
-                <th className="p-3.5 w-36">Tipo de Monitoreo / Resp.</th>
-                <th className="p-3.5 w-20 text-center">Acciones</th>
+              <tr className="bg-slate-100/80 text-slate-700 font-bold border-b border-slate-200 uppercase tracking-wider text-[11px]">
+                <th className="p-3">Código</th>
+                <th className="p-3">Proceso / Subp.</th>
+                <th className="p-3">Factor / Tipología</th>
+                <th className="p-3 min-w-[280px]">Detalle del Riesgo</th>
+                <th className="p-3 text-center">Riesgos Assoc.</th>
+                <th className="p-3 text-center">Perfil Inherente</th>
+                <th className="p-3 min-w-[180px]">Controles / Mitigación</th>
+                <th className="p-3 text-center">Perfil Residual</th>
+                <th className="p-3">Responsable</th>
+                <th className="p-3 text-center">Acciones</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-200">
-              {filteredRiesgos.map((item, idx) => {
-                const inhScore = (item.probabilidadInherente || 1) * (item.impactoInherente || 1);
-                const inhLevel = getNivelRiesgo(inhScore);
+            <tbody className="divide-y divide-slate-100 text-slate-700">
+              {filteredRiesgos.length === 0 ? (
+                <tr>
+                  <td colSpan={10} className="p-8 text-center text-slate-400 text-xs">
+                    No se encontraron riesgos registrados.
+                  </td>
+                </tr>
+              ) : (
+                filteredRiesgos.map((item) => {
+                  const inhScore = (item.probabilidadInherente || 1) * (item.impactoInherente || 1);
+                  const inhInfo = getNivelRiesgo(inhScore);
 
-                const resProb = item.probabilidadResidual || 1;
-                const resImp = item.impactoResidual || 2;
-                const resScore = resProb * resImp;
-                const resLevel = getNivelRiesgo(resScore);
+                  const resProb = item.probabilidadResidual || 1;
+                  const resImp = item.impactoResidual || 1;
+                  const resScore = resProb * resImp;
+                  const resInfo = getNivelRiesgo(resScore);
 
-                const itemCodigos = obtenerCodigosControlSeguros(item);
-                const controlesAsignados = controles.filter((c) => itemCodigos.includes(c.codigo));
+                  const codigosControles = obtenerCodigosControlSeguros(item);
+                  const ctrs = controles.filter((c) => codigosControles.includes(c.codigo));
+                  const pongs = ctrs.map((c) => calcularPonderacion(c.clase, c.tipo, c.frecuencia, c.formalidad));
+                  const mitigacion = calcularMitigacionMultiple(pongs);
 
-                const ponderaciones = controlesAsignados.map((c) => calcularPonderacion(c.clase, c.tipo, c.frecuencia, c.formalidad));
-                const mitigacionTotal = calcularMitigacionMultiple(ponderaciones);
+                  const flags = item.banderas || { laft: false, operativo: false, legal: false, reputacional: false, contagio: false };
+                  const activeFlags = Object.keys(flags).filter((k) => (flags as any)[k]);
 
-                return (
-                  <tr
-                    key={item.id}
-                    className={idx % 2 === 0 ? "bg-white hover:bg-slate-50/80" : "bg-slate-50/40 hover:bg-slate-100/60"}
-                  >
-                    <td className="p-3 font-bold text-slate-900 align-top">
-                      {item.codigo}
-                    </td>
+                  return (
+                    <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="p-3 font-bold text-slate-900 whitespace-nowrap">
+                        {item.codigo}
+                      </td>
 
-                    <td className="p-3 align-top text-slate-700">
-                      <div className="font-semibold">{item.proceso}</div>
-                      <div className="text-[10px] text-slate-400 mt-0.5">{item.subproceso}</div>
-                    </td>
-
-                    <td className="p-3 align-top text-slate-700">
-                      <div className="font-bold text-slate-800">{item.factorRiesgo}</div>
-                      {item.tipologia && (
-                        <div className="text-[10px] text-teal-700 font-medium mt-0.5">{item.tipologia}</div>
-                      )}
-                    </td>
-
-                    {/* COLUMNA DETALLE DEL RIESGO */}
-                    <td className="p-3 align-top text-slate-800 leading-relaxed space-y-1">
-                      <div className="font-medium text-slate-900">
-                        {item.quePuedeSuceder || item.descripcion}
-                      </div>
-
-                      {(item.porQuePuedeSuceder || item.causa) && (
-                        <div className="text-[11px] text-slate-500">
-                          <b className="text-slate-700">Por qué:</b> {item.porQuePuedeSuceder || item.causa}
-                        </div>
-                      )}
-
-                      {item.consecuencia && (
-                        <div className="text-[11px] text-rose-700">
-                          <b className="text-rose-800">Consecuencias:</b> {item.consecuencia}
-                        </div>
-                      )}
-
-                      {item.banderas && (
-                        <div className="flex flex-wrap gap-1 pt-1">
-                          {item.banderas.laft && (
-                            <span className="px-1.5 py-0.5 text-[9px] font-extrabold bg-purple-100 text-purple-800 rounded border border-purple-200">
-                              LAFT
-                            </span>
-                          )}
-                          {item.banderas.operativo && (
-                            <span className="px-1.5 py-0.5 text-[9px] font-extrabold bg-blue-100 text-blue-800 rounded border border-blue-200">
-                              OPERATIVO
-                            </span>
-                          )}
-                          {item.banderas.legal && (
-                            <span className="px-1.5 py-0.5 text-[9px] font-extrabold bg-amber-100 text-amber-800 rounded border border-amber-200">
-                              LEGAL
-                            </span>
-                          )}
-                          {item.banderas.reputacional && (
-                            <span className="px-1.5 py-0.5 text-[9px] font-extrabold bg-rose-100 text-rose-800 rounded border border-rose-200">
-                              REPUTACIONAL
-                            </span>
-                          )}
-                          {item.banderas.contagio && (
-                            <span className="px-1.5 py-0.5 text-[9px] font-extrabold bg-cyan-100 text-cyan-800 rounded border border-cyan-200">
-                              CONTAGIO
-                            </span>
-                          )}
-                        </div>
-                      )}
-
-                      {item.observaciones && (
-                        <div className="text-[10px] text-slate-400 italic pt-0.5">
-                          <b>Obs:</b> {item.observaciones}
-                        </div>
-                      )}
-                    </td>
-
-                    {/* PERFIL INHERENTE */}
-                    <td className="p-2 align-top text-center">
-                      <div className="text-[10px] text-slate-500 font-mono mb-1">
-                        P:{item.probabilidadInherente} | I:{item.impactoInherente}
-                      </div>
-                      <div className={`px-2 py-1 rounded-md text-[11px] uppercase tracking-wider ${inhLevel.bgBadge}`}>
-                        {inhLevel.label}
-                      </div>
-                    </td>
-
-                    {/* CONTROLES */}
-                    <td className="p-2 align-top">
-                      <div className="flex flex-wrap gap-1 mb-1">
-                        {controlesAsignados.length > 0 ? (
-                          controlesAsignados.map((c) => (
-                            <span
-                              key={c.id}
-                              className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-indigo-50 text-indigo-900 border border-indigo-200 rounded text-[10px] font-medium"
-                              title={c.control}
-                            >
-                              <ShieldCheck className="w-3 h-3 text-indigo-600" />
-                              <b>{c.codigo}</b>
-                            </span>
-                          ))
-                        ) : (
-                          <span className="text-slate-400 italic text-[10px]">Sin controles</span>
+                      <td className="p-3">
+                        <div className="font-semibold text-slate-900">{item.proceso}</div>
+                        {item.subproceso && (
+                          <div className="text-[10px] text-slate-500">{item.subproceso}</div>
                         )}
-                      </div>
-                      {controlesAsignados.length > 0 && (
-                        <div className="text-[10px] font-bold text-teal-700 bg-teal-50 px-1.5 py-0.5 rounded border border-teal-200 inline-block">
-                          Mitigación acumulada: {mitigacionTotal}%
+                      </td>
+
+                      <td className="p-3">
+                        <div className="font-semibold text-slate-800">{item.factorRiesgo}</div>
+                        {item.tipologia && (
+                          <div className="text-[10px] text-teal-700 font-medium">{item.tipologia}</div>
+                        )}
+                      </td>
+
+                      <td className="p-3 space-y-1">
+                        {item.quePuedeSuceder && (
+                          <div>
+                            <span className="font-bold text-slate-800">¿Qué puede suceder?: </span>
+                            <span className="text-slate-700">{item.quePuedeSuceder}</span>
+                          </div>
+                        )}
+                        {item.descripcionEvento && (
+                          <div>
+                            <span className="font-bold text-slate-800">Evento: </span>
+                            <span className="text-slate-600">{item.descripcionEvento}</span>
+                          </div>
+                        )}
+                        {(item.porQuePuedeSuceder || item.causa) && (
+                          <div className="text-[11px] text-slate-500">
+                            <span className="font-medium text-slate-600">Por qué: </span>
+                            {item.porQuePuedeSuceder || item.causa}
+                          </div>
+                        )}
+                        {item.consecuencia && (
+                          <div className="text-[11px] text-rose-700">
+                            <span className="font-medium">Consecuencia: </span>
+                            {item.consecuencia}
+                          </div>
+                        )}
+                      </td>
+
+                      <td className="p-3 text-center">
+                        <div className="flex flex-wrap justify-center gap-1">
+                          {activeFlags.map((f) => (
+                            <span
+                              key={f}
+                              className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-slate-200 text-slate-700"
+                            >
+                              {f}
+                            </span>
+                          ))}
                         </div>
-                      )}
-                    </td>
+                      </td>
 
-                    {/* PERFIL RESIDUAL */}
-                    <td className="p-2 align-top text-center">
-                      <div className="text-[10px] text-slate-500 font-mono mb-1">
-                        P:{resProb} | I:{resImp}
-                      </div>
-                      <div className={`px-2 py-1 rounded-md text-[11px] uppercase tracking-wider ${resLevel.bgBadge}`}>
-                        {resLevel.label}
-                      </div>
-                    </td>
+                      <td className="p-3 text-center">
+                        <div className="text-[10px] text-slate-500 mb-1">
+                          P:{item.probabilidadInherente} | I:{item.impactoInherente}
+                        </div>
+                        <span className={`inline-block px-2.5 py-1 rounded text-[10px] ${inhInfo.bgBadge}`}>
+                          {inhInfo.label}
+                        </span>
+                      </td>
 
-                    {/* TIPO DE MONITOREO Y RESPONSABLE */}
-                    <td className="p-3 align-top text-slate-700 text-[11px]">
-                      <div><b>Monitoreo:</b> {item.tipoMonitoreo || "N/A"}</div>
-                      <div className="text-slate-500 mt-0.5"><b>Resp:</b> {item.responsable || "N/A"}</div>
-                    </td>
+                      <td className="p-3">
+                        <div className="flex justify-between items-center mb-1 text-[11px]">
+                          <span className="font-semibold text-slate-700">Mitigación:</span>
+                          <span className="font-bold text-teal-700">{mitigacion}%</span>
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {ctrs.length === 0 ? (
+                            <span className="text-[10px] text-slate-400 italic">Sin controles</span>
+                          ) : (
+                            ctrs.map((c) => (
+                              <span
+                                key={c.codigo}
+                                className="px-1.5 py-0.5 bg-teal-50 text-teal-800 border border-teal-200 rounded text-[10px] font-medium"
+                                title={c.control}
+                              >
+                                {c.codigo}
+                              </span>
+                            ))
+                          )}
+                        </div>
+                      </td>
 
-                    <td className="p-2 align-top text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        <button
-                          onClick={() => handleOpenEditForm(item)}
-                          className="text-slate-500 hover:text-indigo-600 transition-colors p-1"
-                          title="Editar riesgo"
-                        >
-                          <Edit3 className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteRiesgo(item.id)}
-                          className="text-slate-400 hover:text-rose-600 transition-colors p-1"
-                          title="Eliminar riesgo"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
+                      <td className="p-3 text-center">
+                        <div className="text-[10px] text-slate-500 mb-1">
+                          P:{resProb} | I:{resImp}
+                        </div>
+                        <span className={`inline-block px-2.5 py-1 rounded text-[10px] ${resInfo.bgBadge}`}>
+                          {resInfo.label}
+                        </span>
+                      </td>
+
+                      <td className="p-3">
+                        <div className="font-medium text-slate-800">{item.responsable || "N/A"}</div>
+                        {item.observaciones && (
+                          <div className="text-[10px] text-slate-500 truncate max-w-[120px]" title={item.observaciones}>
+                            {item.observaciones}
+                          </div>
+                        )}
+                      </td>
+
+                      <td className="p-3 text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <button
+                            onClick={() => handleOpenEditForm(item)}
+                            className="p-1.5 text-slate-600 hover:text-teal-700 hover:bg-teal-50 rounded transition-colors"
+                            title="Editar riesgo"
+                          >
+                            <Edit3 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteRiesgo(item.id)}
+                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
+                            title="Eliminar riesgo"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>
