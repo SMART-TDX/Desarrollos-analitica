@@ -3,7 +3,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui";
 import { Button, Input } from "@/components/ui";
 import { toast } from "sonner";
-import { Plus, Trash2, Settings, List } from "lucide-react";
+import { Plus, Trash2, Settings, List, RotateCcw } from "lucide-react";
 
 // Categorías de listas e información de pesos
 const LISTA_CATEGORIES = ["PROCESO", "SUBPROCESO", "FACTOR_RIESGO"];
@@ -15,9 +15,9 @@ const LISTA_LABELS: Record<string, string> = {
   FACTOR_RIESGO: "Factores de Riesgo",
 };
 
-export const STORAGE_KEY = "laft_parametros_v1";
+export const STORAGE_KEY = "laft_parametros_v2";
 
-// Datos iniciales actualizados según la tarjeta SAGRILAFT
+// Datos iniciales actualizados con las reglas de pesos de SAGRILAFT
 export const DEFAULT_PARAMETROS = [
   // PROCESOS
   { id: 1, categoria: "PROCESO", nombre: "GESTION ADMINISTRATIVA Y FINANCIERA", valor: 0, descripcion: "" },
@@ -52,18 +52,47 @@ export const DEFAULT_PARAMETROS = [
   { id: 23, categoria: "CLASE", nombre: "Correctivo", valor: 0.15, descripcion: "Control correctivo" },
 
   // 2. TIPO
-  { id: 24, categoria: "TIPO", nombre: "Automático", valor: 0.45, descripcion: "Ejecutado por sistema" },
-  { id: 25, categoria: "TIPO", nombre: "Semiautomático", valor: 0.35, descripcion: "Ejecución mixta sistema/humana" },
-  { id: 26, categoria: "TIPO", nombre: "Manual", valor: 0.20, descripcion: "Ejecutado por persona" },
+  { id: 24, categoria: "TIPO", nombre: "Automático", valor: 0.45, descripcion: "Ejecutado por sistema (45%)" },
+  { id: 25, categoria: "TIPO", nombre: "Semiautomático", valor: 0.35, descripcion: "Ejecución mixta (35%)" },
+  { id: 26, categoria: "TIPO", nombre: "Manual", valor: 0.20, descripcion: "Ejecutado por persona (20%)" },
 
   // 3. FRECUENCIA
-  { id: 27, categoria: "FRECUENCIA", nombre: "Permanente", valor: 0.45, descripcion: "Ejecución continua" },
-  { id: 28, categoria: "FRECUENCIA", nombre: "Ocasional", valor: 0.30, descripcion: "Ejecución ante eventos" },
+  { id: 27, categoria: "FRECUENCIA", nombre: "Permanente", valor: 0.45, descripcion: "Ejecución continua/permanente (45%)" },
+  { id: 28, categoria: "FRECUENCIA", nombre: "Ocasional", valor: 0.30, descripcion: "Ejecución ante eventos (30%)" },
+  { id: 29, categoria: "FRECUENCIA", nombre: "Periódico", valor: 0.20, descripcion: "Ejecución periódica (20%)" },
 
   // 4. FORMALIDAD
-  { id: 29, categoria: "FORMALIDAD", nombre: "DODI (Doc/Div)", valor: 0.45, descripcion: "Documentado y Divulgado" },
-  { id: 30, categoria: "FORMALIDAD", nombre: "NODO (No Doc)", valor: 0.15, descripcion: "No Documentado" },
+  { id: 30, categoria: "FORMALIDAD", nombre: "DODI", valor: 0.45, descripcion: "Documentado y Divulgado (45%)" },
+  { id: 31, categoria: "FORMALIDAD", nombre: "NODO", valor: 0.15, descripcion: "No Documentado (15%)" },
 ];
+
+/**
+ * Función helper para obtener los parámetros en cualquier parte de la app (Ej: Hoja de Controles)
+ */
+export function getParametros() {
+  if (typeof window === "undefined") return DEFAULT_PARAMETROS;
+  const saved = localStorage.getItem(STORAGE_KEY);
+  return saved ? JSON.parse(saved) : DEFAULT_PARAMETROS;
+}
+
+/**
+ * Función helper para obtener un mapa de pesos { "PERMANENTE": 0.45, "DODI": 0.45, ... }
+ * Utilízala en tu Hoja de Controles para calcular efectividad.
+ */
+export function getPesosMap(): Record<string, number> {
+  const params = getParametros();
+  const pesosMap: Record<string, number> = {};
+
+  params.forEach((p: any) => {
+    if (PESO_CATEGORIES.includes(p.categoria)) {
+      // Guardar clave en mayúsculas y limpia para evitar errores de coincidencia
+      const key = p.nombre.trim().toUpperCase();
+      pesosMap[key] = p.valor;
+    }
+  });
+
+  return pesosMap;
+}
 
 function AddListaItem({
   categoria,
@@ -140,7 +169,6 @@ function ListaCard({
   );
 }
 
-// Fila con campo Input para editar el peso directamente
 function PesoRow({ p, onWeightChange }: { p: any; onWeightChange: (id: number, newValor: number) => void }) {
   const [val, setVal] = useState(Math.round((p.valor || 0) * 100));
 
@@ -177,17 +205,15 @@ function PesoRow({ p, onWeightChange }: { p: any; onWeightChange: (id: number, n
 
 export default function Parameters() {
   const [parametros, setParametros] = useState<any[]>(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    return saved ? JSON.parse(saved) : DEFAULT_PARAMETROS;
+    return getParametros();
   });
 
   const [activeTab, setActiveTab] = useState<"listas" | "pesos">("listas");
 
-  // Guardar en localStorage y notificar a otros componentes
   const saveParametros = (newParametros: any[]) => {
     setParametros(newParametros);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(newParametros));
-    // Disparar evento para que otras pestañas/componentes se enteren del cambio
+    // Notifica a la hoja de controles y otros componentes en tiempo real
     window.dispatchEvent(new Event("laft_parametros_updated"));
   };
 
@@ -218,6 +244,13 @@ export default function Parameters() {
     toast.success(`"${nombre}" eliminado`);
   };
 
+  const handleResetDefaults = () => {
+    if (confirm("¿Desea restablecer todos los parámetros y pesos a los valores iniciales de SAGRILAFT?")) {
+      saveParametros(DEFAULT_PARAMETROS);
+      toast.success("Parámetros restablecidos por defecto");
+    }
+  };
+
   const grouped = parametros.reduce(
     (acc, p) => {
       if (!acc[p.categoria]) acc[p.categoria] = [];
@@ -230,7 +263,12 @@ export default function Parameters() {
   return (
     <div className="flex flex-col h-full bg-background">
       <div className="flex-none p-6 border-b pb-0">
-        <h1 className="text-2xl font-bold text-foreground mb-1">Parámetros del Sistema</h1>
+        <div className="flex items-center justify-between mb-2">
+          <h1 className="text-2xl font-bold text-foreground">Parámetros del Sistema</h1>
+          <Button variant="outline" size="sm" onClick={handleResetDefaults} className="gap-2 text-xs">
+            <RotateCcw className="w-3.5 h-3.5" /> Restablecer Pesos
+          </Button>
+        </div>
         <p className="text-muted-foreground text-sm mb-6">
           Gestione las listas desplegables y los pesos de efectividad de controles.
         </p>
