@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { 
   Plus, 
   RotateCcw, 
@@ -8,7 +8,6 @@ import {
   Save, 
   Edit3, 
   ShieldCheck,
-  Check,
   FileSpreadsheet,
   FileText,
   AlertTriangle,
@@ -123,6 +122,56 @@ function obtenerCodigosControlSeguros(item: RiesgoRow): string[] {
   return [];
 }
 
+// Función auxiliar para obtener listas actualizadas directamente desde localStorage
+export function obtenerListasParametrosActualizadas() {
+  let procesos = [...DEFAULTS_PROCESOS];
+  let subprocesos = [...DEFAULTS_SUBPROCESOS];
+  let factores = [...DEFAULTS_FACTORES];
+
+  try {
+    // 1. Intentar objeto consolidado 'laft_parametros_v1'
+    const savedV1 = localStorage.getItem("laft_parametros_v1");
+    if (savedV1) {
+      const p = JSON.parse(savedV1);
+      if (Array.isArray(p.procesos) && p.procesos.length > 0) procesos = p.procesos;
+      if (Array.isArray(p.subprocesos) && p.subprocesos.length > 0) subprocesos = p.subprocesos;
+      if (Array.isArray(p.factores) && p.factores.length > 0) factores = p.factores;
+    }
+
+    // 2. Intentar objeto consolidado 'laft_parametros'
+    const savedGen = localStorage.getItem("laft_parametros");
+    if (savedGen) {
+      const p = JSON.parse(savedGen);
+      if (Array.isArray(p.procesos) && p.procesos.length > 0) procesos = p.procesos;
+      if (Array.isArray(p.subprocesos) && p.subprocesos.length > 0) subprocesos = p.subprocesos;
+      if (Array.isArray(p.factores) && p.factores.length > 0) factores = p.factores;
+    }
+
+    // 3. Intentar claves independientes (laft_procesos, laft_subprocesos, laft_factores)
+    const savedP = localStorage.getItem("laft_procesos") || localStorage.getItem("procesos");
+    if (savedP) {
+      const arr = JSON.parse(savedP);
+      if (Array.isArray(arr) && arr.length > 0) procesos = arr;
+    }
+
+    const savedSP = localStorage.getItem("laft_subprocesos") || localStorage.getItem("subprocesos");
+    if (savedSP) {
+      const arr = JSON.parse(savedSP);
+      if (Array.isArray(arr) && arr.length > 0) subprocesos = arr;
+    }
+
+    const savedF = localStorage.getItem("laft_factores") || localStorage.getItem("factores");
+    if (savedF) {
+      const arr = JSON.parse(savedF);
+      if (Array.isArray(arr) && arr.length > 0) factores = arr;
+    }
+  } catch (e) {
+    console.error("Error al obtener parámetros actualizados de localStorage:", e);
+  }
+
+  return { procesos, subprocesos, factores };
+}
+
 export const RIESGOS_INICIALES: RiesgoRow[] = [
   {
     id: "1",
@@ -181,19 +230,29 @@ export default function Matrix() {
   const [listaSubprocesos, setListaSubprocesos] = useState<string[]>(DEFAULTS_SUBPROCESOS);
   const [listaFactores, setListaFactores] = useState<string[]>(DEFAULTS_FACTORES);
 
-  useEffect(() => {
-    try {
-      const savedParams = localStorage.getItem("laft_parametros_v1");
-      if (savedParams) {
-        const parsed = JSON.parse(savedParams);
-        if (parsed.procesos?.length) setListaProcesos(parsed.procesos);
-        if (parsed.subprocesos?.length) setListaSubprocesos(parsed.subprocesos);
-        if (parsed.factores?.length) setListaFactores(parsed.factores);
-      }
-    } catch (e) {
-      console.error("Error al cargar parámetros:", e);
-    }
+  // Función para recargar los parámetros desde localStorage
+  const recargarParametros = useCallback(() => {
+    const { procesos, subprocesos, factores } = obtenerListasParametrosActualizadas();
+    setListaProcesos(procesos);
+    setListaSubprocesos(subprocesos);
+    setListaFactores(factores);
   }, []);
+
+  // Cargar parámetros al montar y escuchar eventos de actualización
+  useEffect(() => {
+    recargarParametros();
+
+    const handleStorageChange = () => recargarParametros();
+    window.addEventListener("storage", handleStorageChange);
+    window.addEventListener("laft_params_updated", handleStorageChange);
+    window.addEventListener("focus", handleStorageChange);
+
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener("laft_params_updated", handleStorageChange);
+      window.removeEventListener("focus", handleStorageChange);
+    };
+  }, [recargarParametros]);
 
   const [riesgos, setRiesgos] = useState<RiesgoRow[]>(() => {
     try {
@@ -224,12 +283,12 @@ export default function Matrix() {
   const [formData, setFormData] = useState<RiesgoRow>({
     id: "",
     codigo: "",
-    proceso: DEFAULTS_PROCESOS[0] || "",
-    subproceso: DEFAULTS_SUBPROCESOS[0] || "",
+    proceso: "",
+    subproceso: "",
     quePuedeSuceder: "",
     descripcionEvento: "",
     banderas: { laft: true, operativo: false, legal: false, reputacional: false, contagio: false },
-    factorRiesgo: DEFAULTS_FACTORES[0] || "",
+    factorRiesgo: "",
     tipologia: "",
     porQuePuedeSuceder: "",
     consecuencia: "",
@@ -251,17 +310,24 @@ export default function Matrix() {
   }, [riesgos]);
 
   const handleOpenNewForm = () => {
+    // Recargar parámetros inmediatamente antes de abrir el formulario
+    const { procesos, subprocesos, factores } = obtenerListasParametrosActualizadas();
+    setListaProcesos(procesos);
+    setListaSubprocesos(subprocesos);
+    setListaFactores(factores);
+
     const nextNum = riesgos.length + 1;
     const nextCode = `RIE-LAFT-${nextNum < 10 ? "0" + nextNum : nextNum}`;
+    
     setFormData({
       id: Date.now().toString(),
       codigo: nextCode,
-      proceso: listaProcesos[0] || "",
-      subproceso: listaSubprocesos[0] || "",
+      proceso: procesos[0] || "",
+      subproceso: subprocesos[0] || "",
       quePuedeSuceder: "",
       descripcionEvento: "",
       banderas: { laft: true, operativo: true, legal: true, reputacional: true, contagio: false },
-      factorRiesgo: listaFactores[0] || "",
+      factorRiesgo: factores[0] || "",
       tipologia: "",
       porQuePuedeSuceder: "",
       consecuencia: "",
@@ -278,11 +344,17 @@ export default function Matrix() {
   };
 
   const handleOpenEditForm = (item: RiesgoRow) => {
+    // Recargar parámetros inmediatamente antes de abrir el formulario
+    const { procesos, subprocesos, factores } = obtenerListasParametrosActualizadas();
+    setListaProcesos(procesos);
+    setListaSubprocesos(subprocesos);
+    setListaFactores(factores);
+
     setFormData({
       ...item,
-      proceso: item.proceso || listaProcesos[0] || "",
-      subproceso: item.subproceso || listaSubprocesos[0] || "",
-      factorRiesgo: item.factorRiesgo || listaFactores[0] || "",
+      proceso: item.proceso || procesos[0] || "",
+      subproceso: item.subproceso || subprocesos[0] || "",
+      factorRiesgo: item.factorRiesgo || factores[0] || "",
       quePuedeSuceder: item.quePuedeSuceder || item.descripcion || "",
       descripcionEvento: item.descripcionEvento || item.descripcion || "",
       porQuePuedeSuceder: item.porQuePuedeSuceder || item.causa || "",
@@ -496,6 +568,7 @@ export default function Matrix() {
     printWindow.document.close();
   };
 
+  // Aseguramos que el valor del formulario esté siempre presente en las opciones desplegables
   const opcionesProcesos = Array.from(new Set([...listaProcesos, formData.proceso])).filter(Boolean);
   const opcionesSubprocesos = Array.from(new Set([...listaSubprocesos, formData.subproceso || ""])).filter(Boolean);
   const opcionesFactores = Array.from(new Set([...listaFactores, formData.factorRiesgo])).filter(Boolean);
@@ -587,7 +660,7 @@ export default function Matrix() {
           </div>
         </div>
 
-        {/* SECCIÓN 2: DETALLE DEL RIESGO (CON CAMPOS SEPARADOS) */}
+        {/* SECCIÓN 2: DETALLE DEL RIESGO */}
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-5">
           <h2 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-2 flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 text-amber-600" />
@@ -621,7 +694,6 @@ export default function Matrix() {
             </div>
           </div>
 
-          {/* CAMPOS SEPARADOS: ¿QUÉ PUEDE SUCEDER? Y DESCRIPCIÓN DEL EVENTO */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
             <div>
               <label className="block font-medium text-slate-700 mb-1">
@@ -862,14 +934,13 @@ export default function Matrix() {
           </div>
         </div>
 
-        {/* SECCIÓN 5: MONITOREO Y SEGUIMIENTO (2 COLUMNAS, SIN TIPO DE MONITOREO) */}
+        {/* SECCIÓN 5: MONITOREO Y SEGUIMIENTO */}
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
           <h2 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-2">
             Monitoreo y Seguimiento
           </h2>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-            {/* Responsable */}
             <div>
               <label className="block font-medium text-slate-700 mb-1">
                 Responsable
@@ -883,7 +954,6 @@ export default function Matrix() {
               />
             </div>
 
-            {/* Observaciones */}
             <div>
               <label className="block font-medium text-slate-700 mb-1">
                 Observaciones
