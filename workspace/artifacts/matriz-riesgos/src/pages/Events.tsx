@@ -6,15 +6,15 @@ import { RIESGOS_INICIALES, calcularMitigacionMultiple, RiesgoRow } from "./Matr
 export interface EventoRow {
   id: string;
   codigo: string;
-  tipo: string; // LAFT, REPS, TEC, FADM
-  tipoIncidencia: string; // Operativa, Legal, Reputacional, Tecnológica
-  factor: string; // CLI, EMP, PRV, TEC
-  etapa: string; // VIN, POR, LUN, AIRE LIBRE, ESTAFA
+  tipo: string;
+  tipoIncidencia: string;
+  factor: string;
+  etapa: string;
   descripcion: string;
-  codigoRiesgo: string; // Seleccionado de la Matriz
-  codigoControl: string; // Seleccionado de la lista de Controles
-  probabilidad: number; // 1 - 5
-  impacto: number; // 1 - 5
+  codigoRiesgo: string;
+  codigoControl: string;
+  probabilidad: number;
+  impacto: number;
   apetito: number;
   estado: "Prioritario" | "Controlado" | "En seguimiento";
   creado: string;
@@ -36,122 +36,42 @@ const EVENTOS_INICIALES: EventoRow[] = [
     apetito: 2,
     estado: "Prioritario",
     creado: "21/7/2026"
-  },
-  {
-    id: "evt-10",
-    codigo: "EVENTO-10",
-    tipo: "REPS",
-    tipoIncidencia: "Reputacional",
-    factor: "CLI",
-    etapa: "POR",
-    descripcion: "Relación indirecta con investigaciones de listas o noticias restrictivas.",
-    codigoRiesgo: "R-LAFT-002",
-    codigoControl: "CTR-LAFT-01",
-    probabilidad: 1,
-    impacto: 3,
-    apetito: 2,
-    estado: "Controlado",
-    creado: "21/7/2026"
-  },
-  {
-    id: "evt-11",
-    codigo: "EVENTO-11",
-    tipo: "LAFT",
-    tipoIncidencia: "Legal / Cumplimiento",
-    factor: "EMP",
-    etapa: "LUN",
-    descripcion: "Omisión deliberada de Reporte de Operación Sospechosa (ROS).",
-    codigoRiesgo: "R-LAFT-002",
-    codigoControl: "CTR-LAFT-07",
-    probabilidad: 2,
-    impacto: 3,
-    apetito: 2,
-    estado: "Prioritario",
-    creado: "21/7/2026"
-  },
-  {
-    id: "evt-17",
-    codigo: "EVENTO-17",
-    tipo: "TEC",
-    tipoIncidencia: "Tecnológica",
-    factor: "TEC",
-    etapa: "AIRE LIBRE",
-    descripcion: "Incumplimiento de Debida Diligencia por fallas continuas en la plataforma tecnológica.",
-    codigoRiesgo: "R-LAFT-003",
-    codigoControl: "CTR-LAFT-26",
-    probabilidad: 2,
-    impacto: 3,
-    apetito: 2,
-    estado: "En seguimiento",
-    creado: "21/7/2026"
   }
 ];
 
 const STORAGE_KEYS_EVENTOS = ["laft_eventos_v1", "laft_eventos", "laft_matriz_eventos"];
 
-// Carga completa e incondicional de TODOS los controles
+// Carga exacta y directa de la lista activa de Controles
 const obtenerTodosLosControles = () => {
-  const mapa = new Map<string, any>();
-
-  // 1. Cargar el catálogo completo oficial
-  if (Array.isArray(CONTROLES_OFICIALES)) {
-    CONTROLES_OFICIALES.forEach(c => {
-      if (c && c.codigo) {
-        mapa.set(c.codigo.trim().toUpperCase(), { ...c });
-      }
-    });
-  }
-
-  // 2. Fusionar con cualquier cambio realizado en localStorage
   const keys = [
     "laft_controles_v3",
     "laft_controles_v2",
     "laft_controles_v1",
     "laft_controles",
-    "laft_matriz_controles",
     "controles"
   ];
 
-  keys.forEach(key => {
+  for (const key of keys) {
     try {
       const saved = localStorage.getItem(key);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          parsed.forEach(c => {
-            if (c && c.codigo) {
-              const codKey = c.codigo.trim().toUpperCase();
-              const existente = mapa.get(codKey) || {};
-              mapa.set(codKey, { ...existente, ...c });
-            }
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.sort((a, b) => {
+            const numA = parseInt((a.codigo || "").replace(/\D/g, ""), 10) || 0;
+            const numB = parseInt((b.codigo || "").replace(/\D/g, ""), 10) || 0;
+            return numA - numB;
           });
         }
       }
     } catch (e) {}
-  });
-
-  const lista = Array.from(mapa.values()).filter(c => c && c.codigo);
-
-  // Orden numérico estricto (1 al 26+)
-  return lista.sort((a, b) => {
-    const numA = parseInt((a.codigo || "").replace(/\D/g, ""), 10) || 0;
-    const numB = parseInt((b.codigo || "").replace(/\D/g, ""), 10) || 0;
-    return numA - numB;
-  });
-};
-
-// Carga completa e incondicional de TODOS los riesgos
-const obtenerTodosLosRiesgos = (): RiesgoRow[] => {
-  const mapa = new Map<string, RiesgoRow>();
-
-  if (Array.isArray(RIESGOS_INICIALES)) {
-    RIESGOS_INICIALES.forEach(r => {
-      if (r && r.codigo) {
-        mapa.set(r.codigo.trim().toUpperCase(), { ...r });
-      }
-    });
   }
 
+  return Array.isArray(CONTROLES_OFICIALES) ? CONTROLES_OFICIALES : [];
+};
+
+// Carga exacta y directa de la lista activa de Riesgos de la Matriz
+const obtenerTodosLosRiesgos = (): RiesgoRow[] => {
   const keys = [
     "laft_matriz_riesgos_v3",
     "laft_matriz_riesgos_v2",
@@ -160,31 +80,23 @@ const obtenerTodosLosRiesgos = (): RiesgoRow[] => {
     "laft_matriz"
   ];
 
-  keys.forEach(key => {
+  for (const key of keys) {
     try {
       const saved = localStorage.getItem(key);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          parsed.forEach(r => {
-            if (r && r.codigo) {
-              const codKey = r.codigo.trim().toUpperCase();
-              const existente = mapa.get(codKey) || {};
-              mapa.set(codKey, { ...existente, ...r });
-            }
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.sort((a, b) => {
+            const numA = parseInt((a.codigo || "").replace(/\D/g, ""), 10) || 0;
+            const numB = parseInt((b.codigo || "").replace(/\D/g, ""), 10) || 0;
+            return numA - numB;
           });
         }
       }
     } catch (e) {}
-  });
+  }
 
-  const lista = Array.from(mapa.values()).filter(r => r && r.codigo);
-
-  return lista.sort((a, b) => {
-    const numA = parseInt((a.codigo || "").replace(/\D/g, ""), 10) || 0;
-    const numB = parseInt((b.codigo || "").replace(/\D/g, ""), 10) || 0;
-    return numA - numB;
-  });
+  return Array.isArray(RIESGOS_INICIALES) ? RIESGOS_INICIALES : [];
 };
 
 export default function Events() {
@@ -215,17 +127,19 @@ export default function Events() {
 
   useEffect(() => {
     recargarCatalogos();
-    window.addEventListener("laft-data-updated", recargarCatalogos);
-    window.addEventListener("storage", recargarCatalogos);
-    window.addEventListener("focus", recargarCatalogos);
+    const handleUpdate = () => recargarCatalogos();
+
+    window.addEventListener("laft-data-updated", handleUpdate);
+    window.addEventListener("storage", handleUpdate);
+    window.addEventListener("focus", handleUpdate);
+
     return () => {
-      window.removeEventListener("laft-data-updated", recargarCatalogos);
-      window.removeEventListener("storage", recargarCatalogos);
-      window.removeEventListener("focus", recargarCatalogos);
+      window.removeEventListener("laft-data-updated", handleUpdate);
+      window.removeEventListener("storage", handleUpdate);
+      window.removeEventListener("focus", handleUpdate);
     };
   }, [recargarCatalogos]);
 
-  // Form State
   const [formData, setFormData] = useState<Partial<EventoRow>>({
     codigo: "",
     tipo: "LAFT",
@@ -246,8 +160,7 @@ export default function Events() {
     STORAGE_KEYS_EVENTOS.forEach(key => {
       localStorage.setItem(key, JSON.stringify(nuevosEventos));
     });
-    window.dispatchEvent(new Event("laft-data-updated"));
-    window.dispatchEvent(new Event("storage"));
+    window.dispatchEvent(new CustomEvent("laft-data-updated"));
   };
 
   const getInfoRiesgoResidual = (codRiesgo: string) => {
@@ -290,8 +203,8 @@ export default function Events() {
       setFormData(evt);
     } else {
       setEditingEvento(null);
-      const defaultRiesgo = riesgosMatriz[0]?.codigo || "R-LAFT-001";
-      const defaultControl = controlesList[0]?.codigo || "CTR-LAFT-01";
+      const defaultRiesgo = riesgosMatriz[0]?.codigo || "";
+      const defaultControl = controlesList[0]?.codigo || "";
       setFormData({
         codigo: `EVENTO-${eventos.length + 1}`,
         tipo: "LAFT",
@@ -383,7 +296,7 @@ export default function Events() {
 
         <button
           onClick={() => handleOpenModal()}
-          className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-white bg-teal-600 hover:bg-teal-700 rounded-lg transition-colors shadow-sm"
+          className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-white bg-teal-600 hover:bg-teal-700 rounded-lg transition-colors shadow-sm cursor-pointer"
         >
           <Plus className="w-4 h-4" />
           Nuevo Evento
@@ -519,14 +432,14 @@ export default function Events() {
                     <div className="flex items-center justify-center gap-1.5">
                       <button
                         onClick={() => handleOpenModal(evt)}
-                        className="p-1 hover:bg-slate-200 rounded text-slate-600 transition-colors"
+                        className="p-1 hover:bg-slate-200 rounded text-slate-600 transition-colors cursor-pointer"
                         title="Editar"
                       >
                         <Edit3 className="w-3.5 h-3.5" />
                       </button>
                       <button
                         onClick={() => handleDelete(evt.id)}
-                        className="p-1 hover:bg-rose-100 rounded text-rose-600 transition-colors"
+                        className="p-1 hover:bg-rose-100 rounded text-rose-600 transition-colors cursor-pointer"
                         title="Eliminar"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -558,7 +471,7 @@ export default function Events() {
               </h3>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="p-1 hover:bg-slate-200 rounded text-slate-500"
+                className="p-1 hover:bg-slate-200 rounded text-slate-500 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -629,7 +542,7 @@ export default function Events() {
                 </div>
               </div>
 
-              {/* Selector de Riesgos y Controles */}
+              {/* Selector de Riesgos y Controles Sincronizados */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-lg border border-slate-200">
                 <div>
                   <label className="block font-bold text-teal-900 mb-1">
@@ -655,7 +568,7 @@ export default function Events() {
 
                 <div>
                   <label className="block font-bold text-amber-950 mb-1">
-                    Control Aplicado (Lista Completa: {controlesList.length})
+                    Control Aplicado (Lista Activa: {controlesList.length})
                   </label>
                   <select
                     required
@@ -740,13 +653,13 @@ export default function Events() {
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 font-bold text-slate-600 hover:bg-slate-100 rounded"
+                  className="px-4 py-2 font-bold text-slate-600 hover:bg-slate-100 rounded cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 font-bold text-white bg-teal-600 hover:bg-teal-700 rounded shadow-sm"
+                  className="px-5 py-2 font-bold text-white bg-teal-600 hover:bg-teal-700 rounded shadow-sm cursor-pointer"
                 >
                   Guardar Evento
                 </button>
