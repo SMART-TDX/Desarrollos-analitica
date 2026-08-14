@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, Badge } from "@/components/ui";
-import { ShieldAlert, CheckCircle, AlertOctagon, Activity } from "lucide-react";
+import { ShieldAlert, CheckCircle, AlertOctagon, Activity, RefreshCw } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend } from "recharts";
 
 const COLORS: Record<string, string> = {
@@ -13,7 +13,7 @@ const COLORS: Record<string, string> = {
   Extremo: "#991b1b"
 };
 
-// Helper para normalizar texto (eliminar diferencias de mayúsculas y tildes)
+// Helper para normalizar texto (elimina tildes, espacios y mayúsculas)
 const normalizeStr = (str: string) =>
   str
     ? str
@@ -23,8 +23,15 @@ const normalizeStr = (str: string) =>
         .replace(/[\u0300-\u036f]/g, "")
     : "";
 
-// Escáner dinámico e inteligente de LocalStorage
-const autoDetectLocalStorageData = () => {
+// Detecta e ignora si los datos corresponden a los datos de prueba estáticos iniciales
+const isMockData = (arr: any[]) => {
+  if (!Array.isArray(arr) || arr.length === 0) return false;
+  // Si contiene R-LAFT001 (sin guion medio) es la lista sintética de prueba previa
+  return arr.some(item => item.codigo === "R-LAFT001" || item.codigo === "R-LAFT004" || item.codigo === "R-LAFT005");
+};
+
+// Escáner dinámico de memoria LocalStorage inteligente
+const getRealData = () => {
   let riesgos: any[] = [];
   let controles: any[] = [];
   let eventos: any[] = [];
@@ -44,45 +51,55 @@ const autoDetectLocalStorageData = () => {
 
         const keyLower = key.toLowerCase();
 
-        // Detectar si es la lista de RIESGOS (ej. R-LAFT-001)
-        if (
+        // Detectar RIESGOS reales (Excluyendo datos mock de 5 elementos)
+        const isRiesgoKey =
           keyLower.includes("riesgo") ||
           keyLower.includes("matrix") ||
           keyLower.includes("matriz") ||
           sample.codigo?.toString().toUpperCase().startsWith("R-") ||
-          sample.codigo?.toString().toUpperCase().startsWith("RIE") ||
-          "perfilResidual" in sample ||
-          "perfilInherente" in sample ||
-          ("proceso" in sample && ("mitigacion" in sample || "consecuencia" in sample))
-        ) {
-          if (parsed.length > riesgos.length) riesgos = parsed;
+          sample.codigo?.toString().toUpperCase().startsWith("RIE");
+
+        if (isRiesgoKey && !isMockData(parsed)) {
+          riesgos = parsed;
         }
 
-        // Detectar si es la lista de CONTROLES (ej. CTR-LAFT-026)
-        if (
+        // Detectar CONTROLES reales
+        const isControlKey =
           keyLower.includes("control") ||
           sample.codigo?.toString().toUpperCase().startsWith("CTR") ||
-          "mecanismo" in sample ||
           "frecuencia" in sample ||
-          "diseno" in sample
-        ) {
+          "diseno" in sample;
+
+        if (isControlKey) {
           if (parsed.length > controles.length) controles = parsed;
         }
 
-        // Detectar si es la lista de EVENTOS (ej. EVENTO-1)
-        if (
+        // Detectar EVENTOS reales
+        const isEventoKey =
           keyLower.includes("evento") ||
           sample.codigo?.toString().toUpperCase().startsWith("EVE") ||
           sample.codigo?.toString().toUpperCase().startsWith("EVENTO") ||
-          sample.id?.toString().toUpperCase().startsWith("EVENTO") ||
-          "factor" in sample ||
-          "probabilidad" in sample
-        ) {
+          sample.id?.toString().toUpperCase().startsWith("EVENTO");
+
+        if (isEventoKey) {
           if (parsed.length > eventos.length) eventos = parsed;
         }
       }
     } catch (e) {
-      // Ignorar valores que no sean JSON válido
+      // Omitir llaves que no sean formato JSON
+    }
+  }
+
+  // Limpiar llaves mock antiguas si existen en el navegador
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key) {
+      try {
+        const val = JSON.parse(localStorage.getItem(key) || "[]");
+        if (isMockData(val)) {
+          localStorage.removeItem(key);
+        }
+      } catch (e) {}
     }
   }
 
@@ -109,10 +126,9 @@ export default function Dashboard() {
   });
 
   const cargarDatos = useCallback(() => {
-    // 1. Escanear datos reales guardados
-    const { riesgos, controles, eventos } = autoDetectLocalStorageData();
+    const { riesgos, controles, eventos } = getRealData();
 
-    // --- Agrupar Riesgos por Perfil ---
+    // --- Agrupar Riesgos por Perfil Residual / Inherente ---
     const perfilCounts: Record<string, number> = {};
     riesgos.forEach((r: any) => {
       const pRaw = r.perfilResidual || r.perfilInherente || r.perfil || "Tolerable";
@@ -155,7 +171,7 @@ export default function Dashboard() {
       count: item.count
     }));
 
-    // --- Calcular Controles Activos ---
+    // --- Controles ---
     const controlesActivos = controles.filter(
       (c: any) => (c.estado || "ACTIVO").toString().toUpperCase() === "ACTIVO"
     ).length;
@@ -186,13 +202,13 @@ export default function Dashboard() {
   useEffect(() => {
     cargarDatos();
 
-    // Eventos de escucha en tiempo real
+    // Sincronización multi-pestaña y local
     window.addEventListener("storage", cargarDatos);
     window.addEventListener("laft-data-updated", cargarDatos);
     window.addEventListener("focus", cargarDatos);
 
-    // Sondeo rápido cada segundo
-    const interval = setInterval(cargarDatos, 1000);
+    // Polling ultrarrápido (cada 500ms para actualización en tiempo real)
+    const interval = setInterval(cargarDatos, 500);
 
     return () => {
       window.removeEventListener("storage", cargarDatos);
@@ -210,9 +226,20 @@ export default function Dashboard() {
 
   return (
     <div className="flex-1 overflow-y-auto p-8 bg-background">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-foreground">Dashboard Consolidado</h1>
-        <p className="text-muted-foreground text-sm mt-1">Resumen general en tiempo real de la matriz de riesgos LAFT</p>
+      <div className="mb-8 flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Dashboard Consolidado</h1>
+          <p className="text-muted-foreground text-sm mt-1">
+            Resumen en tiempo real de la matriz de riesgos Sagrlaft
+          </p>
+        </div>
+        <button
+          onClick={cargarDatos}
+          className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-muted-foreground bg-secondary hover:bg-secondary/80 rounded-md transition-colors"
+        >
+          <RefreshCw className="h-3.5 w-3.5" />
+          Actualizar Datos
+        </button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
