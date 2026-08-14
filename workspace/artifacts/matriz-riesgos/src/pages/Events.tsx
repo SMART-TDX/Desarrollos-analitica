@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Plus, Trash2, Edit3, Search, X } from "lucide-react";
 import { CONTROLES_OFICIALES, calcularPonderacion } from "./Controls";
 import { RIESGOS_INICIALES, calcularMitigacionMultiple, RiesgoRow } from "./Matrix";
@@ -89,8 +89,48 @@ const EVENTOS_INICIALES: EventoRow[] = [
 
 const STORAGE_KEYS = ["laft_eventos_v1", "laft_eventos", "laft_matriz_eventos"];
 
+// Función para obtener TODOS los controles combinando lista base y LocalStorage
+const obtenerTodosLosControles = () => {
+  let guardados: any[] = [];
+  const keys = ["laft_controles_v1", "laft_controles", "laft_matriz_controles"];
+  for (const key of keys) {
+    try {
+      const saved = localStorage.getItem(key);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          guardados = parsed;
+          break;
+        }
+      }
+    } catch (e) {}
+  }
+
+  // Mapa para fusionar sin duplicados y asegurar que estén TODOS los 27 controles
+  const mapa = new Map();
+  CONTROLES_OFICIALES.forEach(c => mapa.set(c.codigo, c));
+  guardados.forEach(c => {
+    if (c.codigo) {
+      mapa.set(c.codigo, { ...mapa.get(c.codigo), ...c });
+    }
+  });
+
+  return Array.from(mapa.values());
+};
+
+// Función para obtener TODOS los riesgos desde la Matriz
+const obtenerTodosLosRiesgos = (): RiesgoRow[] => {
+  try {
+    const saved = localStorage.getItem("laft_matriz_riesgos_v3");
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch (e) {}
+  return RIESGOS_INICIALES;
+};
+
 export default function Events() {
-  // Estado de Eventos
   const [eventos, setEventos] = useState<EventoRow[]>(() => {
     for (const key of STORAGE_KEYS) {
       try {
@@ -104,27 +144,27 @@ export default function Events() {
     return EVENTOS_INICIALES;
   });
 
-  // Carga dinámica de Riesgos desde la Matriz
-  const [riesgosMatriz] = useState<RiesgoRow[]>(() => {
-    try {
-      const saved = localStorage.getItem("laft_matriz_riesgos_v3");
-      if (saved) return JSON.parse(saved);
-    } catch (e) {}
-    return RIESGOS_INICIALES;
-  });
-
-  // Carga dinámica de Controles
-  const [controlesList] = useState(() => {
-    try {
-      const saved = localStorage.getItem("laft_controles_v1");
-      if (saved) return JSON.parse(saved);
-    } catch (e) {}
-    return CONTROLES_OFICIALES;
-  });
+  const [riesgosMatriz, setRiesgosMatriz] = useState<RiesgoRow[]>(obtenerTodosLosRiesgos);
+  const [controlesList, setControlesList] = useState<any[]>(obtenerTodosLosControles);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEvento, setEditingEvento] = useState<EventoRow | null>(null);
+
+  // Recargar listas dinámicamente si cambian los datos globales
+  const recargarCatalogos = useCallback(() => {
+    setControlesList(obtenerTodosLosControles());
+    setRiesgosMatriz(obtenerTodosLosRiesgos());
+  }, []);
+
+  useEffect(() => {
+    window.addEventListener("laft-data-updated", recargarCatalogos);
+    window.addEventListener("storage", recargarCatalogos);
+    return () => {
+      window.removeEventListener("laft-data-updated", recargarCatalogos);
+      window.removeEventListener("storage", recargarCatalogos);
+    };
+  }, [recargarCatalogos]);
 
   // Form State
   const [formData, setFormData] = useState<Partial<EventoRow>>({
@@ -142,7 +182,7 @@ export default function Events() {
     estado: "Prioritario"
   });
 
-  // Guardar en LocalStorage y notificar
+  // Guardar en LocalStorage y notificar a la app
   const guardarEventos = (nuevosEventos: EventoRow[]) => {
     setEventos(nuevosEventos);
     STORAGE_KEYS.forEach(key => {
@@ -152,7 +192,7 @@ export default function Events() {
     window.dispatchEvent(new Event("storage"));
   };
 
-  // Helper para calcular Perfil Residual del Riesgo Seleccionado
+  // Helper para obtener nivel residual del riesgo vinculado
   const getInfoRiesgoResidual = (codRiesgo: string) => {
     if (!codRiesgo) return { pRes: 1, iRes: 1, nivelRes: 1 };
     const codLimpio = codRiesgo.replace("-", "").toUpperCase();
@@ -163,7 +203,7 @@ export default function Events() {
     const pInh = riesgo.probabilidadInherente || 1;
     const iInh = riesgo.impactoInherente || 1;
     const itemCodigos = Array.isArray(riesgo.controlCodigos) ? riesgo.controlCodigos : [];
-    const controlesAsignados = CONTROLES_OFICIALES.filter(c => itemCodigos.includes(c.codigo));
+    const controlesAsignados = controlesList.filter(c => itemCodigos.includes(c.codigo));
     const ponderaciones = controlesAsignados.map(c =>
       calcularPonderacion(c.clase, c.tipo, c.frecuencia, c.formalidad)
     );
@@ -177,7 +217,7 @@ export default function Events() {
     return { pRes, iRes, nivelRes: pRes * iRes };
   };
 
-  // Helper para obtener % de Mitigación Teórica del Control Seleccionado
+  // Helper para obtener la mitigación del control
   const getMitigacionControl = (codControl: string) => {
     if (!codControl) return 0;
     const codLimpio = codControl.replace("-", "").toUpperCase();
@@ -188,6 +228,7 @@ export default function Events() {
   };
 
   const handleOpenModal = (evt?: EventoRow) => {
+    recargarCatalogos();
     if (evt) {
       setEditingEvento(evt);
       setFormData(evt);
@@ -280,7 +321,7 @@ export default function Events() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Eventos de Riesgo SAGRILAFT</h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Registro consolidado de eventos, tipo de incidencia, matriz de riesgos, controles y cálculo de brechas
+            Registro de eventos, matriz de riesgos, controles asignados y cálculo dinámico de brechas
           </p>
         </div>
 
@@ -311,7 +352,7 @@ export default function Events() {
         </div>
       </div>
 
-      {/* Tabla Principal con Brechas y Listas Desplegables */}
+      {/* Tabla Principal */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto">
         <table className="w-full text-left text-xs border-collapse">
           <thead>
@@ -340,7 +381,6 @@ export default function Events() {
               const { pRes, iRes, nivelRes } = getInfoRiesgoResidual(evt.codigoRiesgo);
               const mitigacionTeorica = getMitigacionControl(evt.codigoControl);
 
-              // Cálculo de Brechas
               const brechaRiesgoNivel = nivelEvt - nivelRes;
               const brechaControlPct = Math.round((nivelEvt / Math.max(1, nivelRes)) * 100);
 
@@ -359,7 +399,7 @@ export default function Events() {
                   <td className="py-3 px-2 font-semibold text-slate-600">{evt.etapa}</td>
                   <td className="py-3 px-3 text-slate-800 leading-relaxed">{evt.descripcion}</td>
 
-                  {/* Código Riesgo Vinculado */}
+                  {/* Código Riesgo */}
                   <td className="py-3 px-3 bg-teal-50/30 border-x border-teal-100/50">
                     <div className="flex flex-col">
                       <span className="inline-block px-2 py-0.5 rounded border border-teal-200 bg-teal-100/70 text-teal-900 font-bold font-mono text-[11px] w-max">
@@ -371,7 +411,7 @@ export default function Events() {
                     </div>
                   </td>
 
-                  {/* Código Control Aplicado */}
+                  {/* Código Control */}
                   <td className="py-3 px-3 bg-amber-50/30 border-r border-amber-100/50">
                     <div className="flex flex-col">
                       <span className="inline-block px-2 py-0.5 rounded border border-amber-300 bg-amber-100/80 text-amber-950 font-bold font-mono text-[11px] w-max">
@@ -533,11 +573,11 @@ export default function Events() {
                 </div>
               </div>
 
-              {/* Riesgo y Control Vinculados via Select Dropdown */}
+              {/* Riesgos y Controles con Carga Completa */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-lg border border-slate-200">
                 <div>
                   <label className="block font-bold text-teal-900 mb-1">
-                    Riesgo Vinculado (Desde Matriz)
+                    Riesgo Vinculado (Matriz)
                   </label>
                   <select
                     required
@@ -556,7 +596,7 @@ export default function Events() {
 
                 <div>
                   <label className="block font-bold text-amber-950 mb-1">
-                    Control Aplicado (Desde Lista)
+                    Control Aplicado (Lista Completa: {controlesList.length})
                   </label>
                   <select
                     required
