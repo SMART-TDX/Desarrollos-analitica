@@ -1,46 +1,91 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Plus, Trash2, Edit3, X, AlertTriangle, Shield, CheckCircle } from "lucide-react";
+import { Plus, Trash2, Edit3, X, AlertTriangle, ShieldAlert, CheckCircle2, TrendingUp, TrendingDown } from "lucide-react";
 
-// Tipos de datos
+// Estructura de Evento con métricas de Brecha
 export interface EventoRow {
   id: string;
   codigoEvento: string;
   tipoEvento: string;
   tipoIncidencia: string;
-  factor: string;
-  etapa: string;
   riesgoVinculado: string;
   controlAplicado: string;
   descripcion: string;
-  probabilidad: number;
-  impacto: number;
-  apetito: number;
-  estado: string;
+
+  // Métricas Manuales del Evento
+  probabilidadEvento: number;
+  impactoEvento: number;
+  nivelEvento: number;
+
+  // Métricas Residuales del Riesgo (Traídas de la Matriz)
+  probabilidadResidual: number;
+  impactoResidual: number;
+  nivelResidual: number;
+
+  // Brecha de Riesgo Calculada (Nivel Evento - Nivel Residual)
+  brechaRiesgo: number;
 }
 
-interface OptionItem {
+interface RiesgoItem {
+  codigo: string;
+  nombre: string;
+  probabilidadResidual: number;
+  impactoResidual: number;
+}
+
+interface ControlItem {
   codigo: string;
   nombre: string;
 }
 
-// 1. Obtener Controles sincronizado con Controls.tsx (v4)
-const obtenerControlesActuales = (): OptionItem[] => {
+// 1. Obtener Riesgos Reales desde LocalStorage (incluye Perfil Residual)
+const obtenerRiesgosActuales = (): RiesgoItem[] => {
+  const keys = ["laft_matriz_riesgos_v4", "laft_matriz_riesgos_v3", "laft_matriz_riesgos", "laft_riesgos"];
+  for (const key of keys) {
+    try {
+      const saved = localStorage.getItem(key);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.map((r: any) => {
+            const pRes = Number(r.probabilidadResidual) || Number(r.probabilidadInherente) || 2;
+            const iRes = Number(r.impactoResidual) || Number(r.impactoInherente) || 3;
+            return {
+              codigo: r.codigo || r.idRiesgo || r.id || "R-LAFT-001",
+              nombre: r.riesgo || r.nombre || r.descripcion || "Riesgo sin nombre",
+              probabilidadResidual: pRes,
+              impactoResidual: iRes
+            };
+          });
+        }
+      }
+    } catch (e) {
+      console.error("Error leyendo riesgos en Eventos:", e);
+    }
+  }
+
+  // Fallback de respaldo si no hay riesgos creados
+  return [
+    { codigo: "R-LAFT-001", nombre: "Vinculación de clientes o contrapartes en listas de sanción", probabilidadResidual: 2, impactoResidual: 3 },
+    { codigo: "R-LAFT-002", nombre: "Operaciones inusuales no detectadas en el sistema de monitoreo", probabilidadResidual: 2, impactoResidual: 2 },
+    { codigo: "R-LAFT-003", nombre: "Uso de productos para lavado de activos", probabilidadResidual: 1, impactoResidual: 4 }
+  ];
+};
+
+// 2. Obtener Controles Reales desde LocalStorage (v4)
+const obtenerControlesActuales = (): ControlItem[] => {
   try {
     const saved = localStorage.getItem("laft_catalogo_controles_v4");
     if (saved) {
       const parsed = JSON.parse(saved);
       if (Array.isArray(parsed) && parsed.length > 0) {
         return parsed.map((c: any) => ({
-          codigo: c.codigo || c.id || "CTR",
+          codigo: c.codigo || c.id || "CTR-LAFT-01",
           nombre: c.control || c.nombre || "Control sin nombre"
         }));
       }
     }
-  } catch (e) {
-    console.error("Error al leer controles en Eventos:", e);
-  }
+  } catch (e) {}
 
-  // Fallbacks de seguridad
   const fallbackKeys = ["laft_catalogo_controles_v3", "laft_controles_v3", "laft_controles"];
   for (const key of fallbackKeys) {
     try {
@@ -49,82 +94,60 @@ const obtenerControlesActuales = (): OptionItem[] => {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
           return parsed.map((c: any) => ({
-            codigo: c.codigo || c.id || "CTR",
+            codigo: c.codigo || c.id || "CTR-LAFT-01",
             nombre: c.control || c.nombre || "Control sin nombre"
           }));
         }
       }
     } catch (e) {}
   }
-  return [];
-};
 
-// 2. Obtener Riesgos de la Matriz (v4)
-const obtenerRiesgosActuales = (): OptionItem[] => {
-  const keys = ["laft_matriz_riesgos_v4", "laft_matriz_riesgos_v3", "laft_matriz_riesgos", "laft_riesgos"];
-  for (const key of keys) {
-    try {
-      const saved = localStorage.getItem(key);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.map((r: any) => ({
-            codigo: r.codigo || r.idRiesgo || r.id || "RIESGO",
-            nombre: r.riesgo || r.nombre || r.descripcion || "Riesgo sin nombre"
-          }));
-        }
-      }
-    } catch (e) {}
-  }
-  return [];
+  return [
+    { codigo: "CTR-LAFT-01", nombre: "Consulta previa en listas restrictivas y vinculante antes del enrolamiento" },
+    { codigo: "CTR-LAFT-02", nombre: "Verificación periódica de contrapartes existentes en listas" }
+  ];
 };
 
 export default function Events() {
   const [eventos, setEventos] = useState<EventoRow[]>(() => {
     try {
-      const saved = localStorage.getItem("laft_eventos_v1");
+      const saved = localStorage.getItem("laft_eventos_v2");
       if (saved) return JSON.parse(saved);
     } catch (e) {}
     return [];
   });
 
-  const [controlesOptions, setControlesOptions] = useState<OptionItem[]>(obtenerControlesActuales);
-  const [riesgosOptions, setRiesgosOptions] = useState<OptionItem[]>(obtenerRiesgosActuales);
-  
+  const [riesgosOptions, setRiesgosOptions] = useState<RiesgoItem[]>(obtenerRiesgosActuales);
+  const [controlesOptions, setControlesOptions] = useState<ControlItem[]>(obtenerControlesActuales);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  // Formulario del Modal
+  // Formulario de Registro
   const [formData, setFormData] = useState<EventoRow>({
     id: "",
     codigoEvento: `EVENTO-${eventos.length + 1}`,
     tipoEvento: "LAFT",
-    tipoIncidencia: "Operativa",
-    factor: "CLI",
-    etapa: "VIN",
+    tipoIncidencia: "FADM = Fallas Administrativas / Control",
     riesgoVinculado: "",
     controlAplicado: "",
     descripcion: "",
-    probabilidad: 2,
-    impacto: 3,
-    apetito: 2,
-    estado: "Prioritario"
+    probabilidadEvento: 3,
+    impactoEvento: 3,
+    nivelEvento: 9,
+    probabilidadResidual: 2,
+    impactoResidual: 3,
+    nivelResidual: 6,
+    brechaRiesgo: 3
   });
 
-  // Cargar y sincronizar datos reales
+  // Cargar y sincronizar catálogos
   const recargarSincronizacion = useCallback(() => {
-    const cOptions = obtenerControlesActuales();
     const rOptions = obtenerRiesgosActuales();
+    const cOptions = obtenerControlesActuales();
 
-    setControlesOptions(cOptions);
     setRiesgosOptions(rOptions);
-
-    // Ajustar seleccionados por defecto si el formulario está abierto
-    setFormData(prev => ({
-      ...prev,
-      riesgoVinculado: prev.riesgoVinculado || (rOptions.length > 0 ? `${rOptions[0].codigo} - ${rOptions[0].nombre}` : ""),
-      controlAplicado: prev.controlAplicado || (cOptions.length > 0 ? `${cOptions[0].codigo} - ${cOptions[0].nombre}` : "")
-    }));
+    setControlesOptions(cOptions);
   }, []);
 
   useEffect(() => {
@@ -143,30 +166,83 @@ export default function Events() {
     };
   }, [recargarSincronizacion]);
 
-  // Guardar eventos
+  // Persistir eventos en localStorage
   useEffect(() => {
-    localStorage.setItem("laft_eventos_v1", JSON.stringify(eventos));
+    localStorage.setItem("laft_eventos_v2", JSON.stringify(eventos));
     window.dispatchEvent(new CustomEvent("laft-data-updated"));
   }, [eventos]);
+
+  // Actualizar perfil residual al cambiar el Riesgo Seleccionado
+  const handleRiesgoChange = (riesgoCodigoNombre: string) => {
+    const riesgoEncontrado = riesgosOptions.find(
+      r => `${r.codigo} - ${r.nombre}` === riesgoCodigoNombre || r.codigo === riesgoCodigoNombre
+    );
+
+    const pRes = riesgoEncontrado ? riesgoEncontrado.probabilidadResidual : 2;
+    const iRes = riesgoEncontrado ? riesgoEncontrado.impactoResidual : 2;
+    const nRes = pRes * iRes;
+
+    const nEv = formData.probabilidadEvento * formData.impactoEvento;
+    const brecha = nEv - nRes;
+
+    setFormData(prev => ({
+      ...prev,
+      riesgoVinculado: riesgoCodigoNombre,
+      probabilidadResidual: pRes,
+      impactoResidual: iRes,
+      nivelResidual: nRes,
+      brechaRiesgo: brecha
+    }));
+  };
+
+  // Recalcular nivel de evento y brecha en tiempo real
+  const handleMetricaEventoChange = (pEv: number, iEv: number) => {
+    const nEv = pEv * iEv;
+    const brecha = nEv - formData.nivelResidual;
+
+    setFormData(prev => ({
+      ...prev,
+      probabilidadEvento: pEv,
+      impactoEvento: iEv,
+      nivelEvento: nEv,
+      brechaRiesgo: brecha
+    }));
+  };
 
   const handleOpenModal = () => {
     recargarSincronizacion();
     setEditingId(null);
+
+    const rInicial = riesgosOptions.length > 0 ? riesgosOptions[0] : null;
+    const rVal = rInicial ? `${rInicial.codigo} - ${rInicial.nombre}` : "";
+    const pRes = rInicial ? rInicial.probabilidadResidual : 2;
+    const iRes = rInicial ? rInicial.impactoResidual : 3;
+    const nRes = pRes * iRes;
+
+    const pEv = 3;
+    const iEv = 3;
+    const nEv = pEv * iEv;
+
+    const cInicial = controlesOptions.length > 0 ? controlesOptions[0] : null;
+    const cVal = cInicial ? `${cInicial.codigo} - ${cInicial.nombre}` : "";
+
     setFormData({
       id: "",
       codigoEvento: `EVENTO-${eventos.length + 1}`,
       tipoEvento: "LAFT",
-      tipoIncidencia: "Operativa",
-      factor: "CLI",
-      etapa: "VIN",
-      riesgoVinculado: riesgosOptions.length > 0 ? `${riesgosOptions[0].codigo} - ${riesgosOptions[0].nombre}` : "",
-      controlAplicado: controlesOptions.length > 0 ? `${controlesOptions[0].codigo} - ${controlesOptions[0].nombre}` : "",
+      tipoIncidencia: "FADM = Fallas Administrativas / Control",
+      riesgoVinculado: rVal,
+      controlAplicado: cVal,
       descripcion: "",
-      probabilidad: 2,
-      impacto: 3,
-      apetito: 2,
-      estado: "Prioritario"
+      probabilidadEvento: pEv,
+      impactoEvento: iEv,
+      nivelEvento: nEv,
+      probabilidadResidual: pRes,
+      impactoResidual: iRes,
+      nivelResidual: nRes,
+      brechaRiesgo: nEv - nRes
     });
+
     setIsModalOpen(true);
   };
 
@@ -178,7 +254,7 @@ export default function Events() {
   };
 
   const handleDelete = (id: string) => {
-    if (confirm("¿Está seguro de eliminar este evento de riesgo?")) {
+    if (confirm("¿Está seguro de eliminar este evento registrado?")) {
       setEventos(prev => prev.filter(e => e.id !== id));
     }
   };
@@ -186,7 +262,7 @@ export default function Events() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (editingId) {
-      setEventos(prev => prev.map(ev => ev.id === editingId ? formData : ev));
+      setEventos(prev => prev.map(ev => (ev.id === editingId ? formData : ev)));
     } else {
       setEventos(prev => [...prev, { ...formData, id: Date.now().toString() }]);
     }
@@ -203,7 +279,7 @@ export default function Events() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Registro de Eventos Materializados</h1>
-            <p className="text-xs text-slate-500">Gestión e incidencias asociadas a Controles y Riesgos LAFT</p>
+            <p className="text-xs text-slate-500">Evaluación del nivel de evento vs. Perfil Residual del Riesgo Vinculado</p>
           </div>
         </div>
 
@@ -216,18 +292,18 @@ export default function Events() {
         </button>
       </div>
 
-      {/* Tabla de Eventos Registrados */}
+      {/* Tabla de Eventos */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
         <table className="w-full text-left border-collapse text-xs">
           <thead>
             <tr className="bg-slate-100 text-slate-800 font-bold border-b border-slate-200">
               <th className="p-3">Código</th>
-              <th className="p-3">Tipo</th>
-              <th className="p-3">Incidencia</th>
+              <th className="p-3">Tipo Evento</th>
+              <th className="p-3">Tipo Incidencia</th>
               <th className="p-3">Riesgo Vinculado</th>
-              <th className="p-3">Control Aplicado</th>
-              <th className="p-3">Descripción</th>
-              <th className="p-3 text-center">Estado</th>
+              <th className="p-3 text-center bg-slate-200/50">Nivel Evento ($P \times I$)</th>
+              <th className="p-3 text-center bg-teal-50 text-teal-900">Nivel Residual ($P_{res} \times I_{res}$)</th>
+              <th className="p-3 text-center font-extrabold">Brecha del Riesgo</th>
               <th className="p-3 text-center">Acciones</th>
             </tr>
           </thead>
@@ -235,44 +311,58 @@ export default function Events() {
             {eventos.length === 0 ? (
               <tr>
                 <td colSpan={8} className="p-8 text-center text-slate-400 font-medium">
-                  No hay eventos registrados. Haz clic en "Nuevo Evento" para registrar uno.
+                  No hay eventos registrados. Haz clic en "Nuevo Evento" para crear uno.
                 </td>
               </tr>
             ) : (
-              eventos.map((e) => (
-                <tr key={e.id} className="hover:bg-slate-50">
-                  <td className="p-3 font-bold text-slate-900">{e.codigoEvento}</td>
-                  <td className="p-3">{e.tipoEvento}</td>
-                  <td className="p-3">{e.tipoIncidencia}</td>
-                  <td className="p-3 max-w-[200px] truncate text-slate-700">{e.riesgoVinculado || "N/A"}</td>
-                  <td className="p-3 max-w-[200px] truncate text-slate-700">{e.controlAplicado || "N/A"}</td>
-                  <td className="p-3 max-w-[250px] truncate">{e.descripcion || "Sin descripción"}</td>
-                  <td className="p-3 text-center">
-                    <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-                      {e.estado}
-                    </span>
-                  </td>
-                  <td className="p-3 text-center">
-                    <div className="flex justify-center gap-1">
-                      <button onClick={() => handleEdit(e)} className="p-1 text-slate-500 hover:text-teal-600">
-                        <Edit3 className="w-4 h-4" />
-                      </button>
-                      <button onClick={() => handleDelete(e.id)} className="p-1 text-slate-400 hover:text-rose-600">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
+              eventos.map(e => {
+                const excede = e.brechaRiesgo > 0;
+                return (
+                  <tr key={e.id} className="hover:bg-slate-50">
+                    <td className="p-3 font-bold text-slate-900">{e.codigoEvento}</td>
+                    <td className="p-3 font-semibold">{e.tipoEvento}</td>
+                    <td className="p-3 text-slate-700 max-w-[200px] truncate">{e.tipoIncidencia}</td>
+                    <td className="p-3 text-slate-700 max-w-[220px] truncate">{e.riesgoVinculado || "N/A"}</td>
+                    <td className="p-3 text-center font-bold text-slate-900 bg-slate-50">
+                      {e.nivelEvento} <span className="text-[10px] text-slate-400">({e.probabilidadEvento}x{e.impactoEvento})</span>
+                    </td>
+                    <td className="p-3 text-center font-bold text-teal-800 bg-teal-50/50">
+                      {e.nivelResidual} <span className="text-[10px] text-teal-600">({e.probabilidadResidual}x{e.impactoResidual})</span>
+                    </td>
+                    <td className="p-3 text-center">
+                      <span
+                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-extrabold border ${
+                          excede
+                            ? "bg-rose-50 text-rose-700 border-rose-200"
+                            : "bg-emerald-50 text-emerald-700 border-emerald-200"
+                        }`}
+                      >
+                        {excede ? <TrendingUp className="w-3.5 h-3.5 text-rose-600" /> : <TrendingDown className="w-3.5 h-3.5 text-emerald-600" />}
+                        {e.brechaRiesgo > 0 ? `+${e.brechaRiesgo}` : e.brechaRiesgo} {excede ? "(Excedida)" : "(Tolerada)"}
+                      </span>
+                    </td>
+                    <td className="p-3 text-center">
+                      <div className="flex justify-center gap-1">
+                        <button onClick={() => handleEdit(e)} className="p-1 text-slate-500 hover:text-teal-600">
+                          <Edit3 className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => handleDelete(e.id)} className="p-1 text-slate-400 hover:text-rose-600">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
       </div>
 
-      {/* MODAL CONECTADO CON CATALOGOS V4 */}
+      {/* MODAL AJUSTADO (SIN FACTOR, ETAPA, APETITO NI ESTADO) */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-3xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-3xl overflow-hidden">
             {/* Header Modal */}
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
               <h2 className="text-lg font-bold text-slate-900">
@@ -286,16 +376,16 @@ export default function Events() {
               </button>
             </div>
 
-            {/* Formulario Modal */}
+            {/* Formulario */}
             <form onSubmit={handleSubmit} className="p-6 space-y-5 text-xs">
-              {/* Fila 1 */}
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+              {/* FILA 1: Código, Tipo Evento, Tipo Incidencia */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Código Evento</label>
                   <input
                     type="text"
                     value={formData.codigoEvento}
-                    onChange={(e) => setFormData({ ...formData, codigoEvento: e.target.value })}
+                    onChange={e => setFormData({ ...formData, codigoEvento: e.target.value })}
                     className="w-full p-2.5 border border-slate-200 rounded-lg bg-slate-50 font-bold"
                   />
                 </div>
@@ -303,7 +393,7 @@ export default function Events() {
                   <label className="block font-semibold text-slate-700 mb-1">Tipo Evento</label>
                   <select
                     value={formData.tipoEvento}
-                    onChange={(e) => setFormData({ ...formData, tipoEvento: e.target.value })}
+                    onChange={e => setFormData({ ...formData, tipoEvento: e.target.value })}
                     className="w-full p-2.5 border border-slate-200 rounded-lg bg-white"
                   >
                     <option value="LAFT">LAFT</option>
@@ -315,37 +405,20 @@ export default function Events() {
                   <label className="block font-semibold text-slate-700 mb-1">Tipo Incidencia</label>
                   <select
                     value={formData.tipoIncidencia}
-                    onChange={(e) => setFormData({ ...formData, tipoIncidencia: e.target.value })}
-                    className="w-full p-2.5 border border-slate-200 rounded-lg bg-white"
+                    onChange={e => setFormData({ ...formData, tipoIncidencia: e.target.value })}
+                    className="w-full p-2.5 border border-slate-200 rounded-lg bg-white font-medium"
                   >
-                    <option value="Operativa">Operativa</option>
-                    <option value="Legal">Legal</option>
-                    <option value="Reputacional">Reputacional</option>
+                    <option value="TEC = Tecnológico">TEC = Tecnológico</option>
+                    <option value="FADM = Fallas Administrativas / Control">FADM = Fallas Administrativas / Control</option>
+                    <option value="LAFT = Lavado de Activos / Financiación del terrorismo">
+                      LAFT = Lavado de Activos / Financiación del terrorismo
+                    </option>
+                    <option value="OPER = Operativo">OPER = Operativo</option>
                   </select>
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Factor</label>
-                  <input
-                    type="text"
-                    value={formData.factor}
-                    onChange={(e) => setFormData({ ...formData, factor: e.target.value })}
-                    className="w-full p-2.5 border border-slate-200 rounded-lg bg-white"
-                    placeholder="CLI"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Etapa</label>
-                  <input
-                    type="text"
-                    value={formData.etapa}
-                    onChange={(e) => setFormData({ ...formData, etapa: e.target.value })}
-                    className="w-full p-2.5 border border-slate-200 rounded-lg bg-white"
-                    placeholder="VIN"
-                  />
                 </div>
               </div>
 
-              {/* Fila 2: Riesgo Vinculado y Control Aplicado (Totalmente dinámicos) */}
+              {/* FILA 2: Riesgo Vinculado y Control Aplicado */}
               <div className="p-4 bg-emerald-50/40 border border-emerald-100 rounded-xl grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block font-bold text-amber-900 mb-1.5">
@@ -353,13 +426,13 @@ export default function Events() {
                   </label>
                   <select
                     value={formData.riesgoVinculado}
-                    onChange={(e) => setFormData({ ...formData, riesgoVinculado: e.target.value })}
+                    onChange={e => handleRiesgoChange(e.target.value)}
                     className="w-full p-2.5 border border-amber-200 rounded-lg bg-white text-amber-900 font-medium"
                   >
                     {riesgosOptions.length === 0 ? (
                       <option value="">No hay riesgos registrados</option>
                     ) : (
-                      riesgosOptions.map((r) => {
+                      riesgosOptions.map(r => {
                         const val = `${r.codigo} - ${r.nombre}`;
                         return (
                           <option key={r.codigo} value={val}>
@@ -377,13 +450,13 @@ export default function Events() {
                   </label>
                   <select
                     value={formData.controlAplicado}
-                    onChange={(e) => setFormData({ ...formData, controlAplicado: e.target.value })}
+                    onChange={e => setFormData({ ...formData, controlAplicado: e.target.value })}
                     className="w-full p-2.5 border border-amber-200 rounded-lg bg-white text-amber-900 font-medium"
                   >
                     {controlesOptions.length === 0 ? (
-                      <option value="">No hay controles registrados en el catálogo</option>
+                      <option value="">No hay controles registrados</option>
                     ) : (
-                      controlesOptions.map((c) => {
+                      controlesOptions.map(c => {
                         const val = `${c.codigo} - ${c.nombre}`;
                         return (
                           <option key={c.codigo} value={val}>
@@ -396,69 +469,102 @@ export default function Events() {
                 </div>
               </div>
 
-              {/* Fila 3: Descripción */}
+              {/* FILA 3: Descripción del Evento */}
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">Evento / Descripción</label>
                 <textarea
-                  rows={3}
+                  rows={2}
                   value={formData.descripcion}
-                  onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
+                  onChange={e => setFormData({ ...formData, descripcion: e.target.value })}
                   className="w-full p-2.5 border border-slate-200 rounded-lg bg-white resize-none"
                   placeholder="Detalle los hechos del evento registrado..."
                 ></textarea>
               </div>
 
-              {/* Fila 4: Métricas y Estado */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Probabilidad (P)</label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={5}
-                    value={formData.probabilidad}
-                    onChange={(e) => setFormData({ ...formData, probabilidad: parseInt(e.target.value) || 1 })}
-                    className="w-full p-2.5 border border-slate-200 rounded-lg bg-white"
-                  />
+              {/* FILA 4: MÉTRICAS MANUALES VS PERFIL RESIDUAL Y BRECHA */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                {/* Métricas Evento (Manual) */}
+                <div className="space-y-2">
+                  <h3 className="font-bold text-slate-800 text-[11px] uppercase tracking-wider">Nivel de Evento (Manual)</h3>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block font-medium text-slate-600 mb-0.5">Prob. Evento (P)</label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={5}
+                        value={formData.probabilidadEvento}
+                        onChange={e =>
+                          handleMetricaEventoChange(parseInt(e.target.value) || 1, formData.impactoEvento)
+                        }
+                        className="w-full p-2 border border-slate-300 rounded bg-white font-bold text-center"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-medium text-slate-600 mb-0.5">Imp. Evento (I)</label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={5}
+                        value={formData.impactoEvento}
+                        onChange={e =>
+                          handleMetricaEventoChange(formData.probabilidadEvento, parseInt(e.target.value) || 1)
+                        }
+                        className="w-full p-2 border border-slate-300 rounded bg-white font-bold text-center"
+                      />
+                    </div>
+                  </div>
+                  <div className="p-2 bg-white rounded border border-slate-200 text-center">
+                    <span className="text-[10px] text-slate-500 font-medium">Nivel Evento: </span>
+                    <span className="font-black text-slate-900 text-sm">{formData.nivelEvento}</span>
+                  </div>
                 </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Impacto (I)</label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={5}
-                    value={formData.impacto}
-                    onChange={(e) => setFormData({ ...formData, impacto: parseInt(e.target.value) || 1 })}
-                    className="w-full p-2.5 border border-slate-200 rounded-lg bg-white"
-                  />
+
+                {/* Métricas Residuales del Riesgo (Traídas de Matriz) */}
+                <div className="space-y-2">
+                  <h3 className="font-bold text-teal-800 text-[11px] uppercase tracking-wider">Perfil Residual (Desde Riesgo)</h3>
+                  <div className="grid grid-cols-2 gap-2 text-center">
+                    <div className="p-2 bg-teal-50/60 rounded border border-teal-100">
+                      <div className="text-[10px] text-teal-600 font-medium">P. Residual</div>
+                      <div className="font-bold text-teal-900">{formData.probabilidadResidual}</div>
+                    </div>
+                    <div className="p-2 bg-teal-50/60 rounded border border-teal-100">
+                      <div className="text-[10px] text-teal-600 font-medium">I. Residual</div>
+                      <div className="font-bold text-teal-900">{formData.impactoResidual}</div>
+                    </div>
+                  </div>
+                  <div className="p-2 bg-teal-100/50 rounded border border-teal-200 text-center">
+                    <span className="text-[10px] text-teal-700 font-medium">Nivel Residual: </span>
+                    <span className="font-black text-teal-950 text-sm">{formData.nivelResidual}</span>
+                  </div>
                 </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Apetito</label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={5}
-                    value={formData.apetito}
-                    onChange={(e) => setFormData({ ...formData, apetito: parseInt(e.target.value) || 1 })}
-                    className="w-full p-2.5 border border-slate-200 rounded-lg bg-white"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Estado</label>
-                  <select
-                    value={formData.estado}
-                    onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
-                    className="w-full p-2.5 border border-slate-200 rounded-lg bg-white font-semibold text-slate-800"
+
+                {/* Brecha del Riesgo Calculada */}
+                <div className="flex flex-col justify-between space-y-2">
+                  <h3 className="font-bold text-slate-800 text-[11px] uppercase tracking-wider">Brecha del Riesgo</h3>
+                  <div
+                    className={`p-3 rounded-xl border flex flex-col items-center justify-center h-full text-center ${
+                      formData.brechaRiesgo > 0
+                        ? "bg-rose-50 border-rose-200 text-rose-800"
+                        : "bg-emerald-50 border-emerald-200 text-emerald-800"
+                    }`}
                   >
-                    <option value="Prioritario">Prioritario</option>
-                    <option value="En Gestión">En Gestión</option>
-                    <option value="Mitigado">Mitigado</option>
-                    <option value="Cerrado">Cerrado</option>
-                  </select>
+                    <div className="flex items-center gap-1 font-black text-lg">
+                      {formData.brechaRiesgo > 0 ? (
+                        <ShieldAlert className="w-5 h-5 text-rose-600" />
+                      ) : (
+                        <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                      )}
+                      <span>{formData.brechaRiesgo > 0 ? `+${formData.brechaRiesgo}` : formData.brechaRiesgo}</span>
+                    </div>
+                    <div className="text-[10px] font-bold mt-1">
+                      {formData.brechaRiesgo > 0 ? "Excede Capacidad Cobertura" : "Dentro de Perfil Tolerado"}
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              {/* Footer Acciones */}
+              {/* Acciones */}
               <div className="flex justify-end items-center gap-3 pt-3 border-t border-slate-100">
                 <button
                   type="button"
