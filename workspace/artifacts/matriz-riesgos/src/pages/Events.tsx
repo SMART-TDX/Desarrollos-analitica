@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Plus, Trash2, Edit3, Search, X } from "lucide-react";
-import { CONTROLES_OFICIALES, calcularPonderacion } from "./Controls";
+import { CONTROLES_OFICIALES, ControlRow, calcularPonderacion } from "./Controls";
 import { RIESGOS_INICIALES, calcularMitigacionMultiple, RiesgoRow } from "./Matrix";
 
 export interface EventoRow {
@@ -41,28 +41,29 @@ const EVENTOS_INICIALES: EventoRow[] = [
 
 const STORAGE_KEYS_EVENTOS = ["laft_eventos_v1", "laft_eventos", "laft_matriz_eventos"];
 
-// Carga exacta y directa de la lista activa de Controles
-const obtenerTodosLosControles = () => {
-  const keys = [
-    "laft_controles_v3",
-    "laft_controles_v2",
-    "laft_controles_v1",
-    "laft_controles",
-    "controles"
-  ];
+// Carga directa y prioritaria de la lista activa de Controles (v3)
+const obtenerTodosLosControles = (): ControlRow[] => {
+  try {
+    const saved = localStorage.getItem("laft_controles_v3");
+    if (saved !== null) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed)) {
+        return parsed.sort((a, b) => {
+          const numA = parseInt((a.codigo || "").replace(/\D/g, ""), 10) || 0;
+          const numB = parseInt((b.codigo || "").replace(/\D/g, ""), 10) || 0;
+          return numA - numB;
+        });
+      }
+    }
+  } catch (e) {}
 
-  for (const key of keys) {
+  const fallbackKeys = ["laft_controles_v2", "laft_controles_v1", "laft_controles", "controles"];
+  for (const key of fallbackKeys) {
     try {
       const saved = localStorage.getItem(key);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.sort((a, b) => {
-            const numA = parseInt((a.codigo || "").replace(/\D/g, ""), 10) || 0;
-            const numB = parseInt((b.codigo || "").replace(/\D/g, ""), 10) || 0;
-            return numA - numB;
-          });
-        }
+        if (Array.isArray(parsed)) return parsed;
       }
     } catch (e) {}
   }
@@ -70,28 +71,29 @@ const obtenerTodosLosControles = () => {
   return Array.isArray(CONTROLES_OFICIALES) ? CONTROLES_OFICIALES : [];
 };
 
-// Carga exacta y directa de la lista activa de Riesgos de la Matriz
+// Carga directa y prioritaria de la lista activa de Riesgos de la Matriz (v3)
 const obtenerTodosLosRiesgos = (): RiesgoRow[] => {
-  const keys = [
-    "laft_matriz_riesgos_v3",
-    "laft_matriz_riesgos_v2",
-    "laft_matriz_riesgos",
-    "laft_riesgos",
-    "laft_matriz"
-  ];
+  try {
+    const saved = localStorage.getItem("laft_matriz_riesgos_v3");
+    if (saved !== null) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed)) {
+        return parsed.sort((a, b) => {
+          const numA = parseInt((a.codigo || "").replace(/\D/g, ""), 10) || 0;
+          const numB = parseInt((b.codigo || "").replace(/\D/g, ""), 10) || 0;
+          return numA - numB;
+        });
+      }
+    }
+  } catch (e) {}
 
-  for (const key of keys) {
+  const fallbackKeys = ["laft_matriz_riesgos_v2", "laft_matriz_riesgos", "laft_riesgos", "laft_matriz"];
+  for (const key of fallbackKeys) {
     try {
       const saved = localStorage.getItem(key);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.sort((a, b) => {
-            const numA = parseInt((a.codigo || "").replace(/\D/g, ""), 10) || 0;
-            const numB = parseInt((b.codigo || "").replace(/\D/g, ""), 10) || 0;
-            return numA - numB;
-          });
-        }
+        if (Array.isArray(parsed)) return parsed;
       }
     } catch (e) {}
   }
@@ -286,7 +288,7 @@ export default function Events() {
   return (
     <div className="p-6 max-w-[1600px] mx-auto space-y-6 bg-slate-50 min-h-screen text-slate-800">
       {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-xs">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Eventos de Riesgo SAGRILAFT</h1>
           <p className="text-xs text-slate-500 mt-0.5">
@@ -296,7 +298,7 @@ export default function Events() {
 
         <button
           onClick={() => handleOpenModal()}
-          className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-white bg-teal-600 hover:bg-teal-700 rounded-lg transition-colors shadow-sm cursor-pointer"
+          className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-white bg-teal-600 hover:bg-teal-700 rounded-lg transition-colors shadow-xs cursor-pointer"
         >
           <Plus className="w-4 h-4" />
           Nuevo Evento
@@ -304,7 +306,7 @@ export default function Events() {
       </div>
 
       {/* Buscador */}
-      <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+      <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
         <div className="relative w-full md:w-96">
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
@@ -322,7 +324,7 @@ export default function Events() {
       </div>
 
       {/* Tabla Principal */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto">
+      <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-x-auto">
         <table className="w-full text-left text-xs border-collapse">
           <thead>
             <tr className="bg-slate-100/80 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider">
@@ -659,7 +661,7 @@ export default function Events() {
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 font-bold text-white bg-teal-600 hover:bg-teal-700 rounded shadow-sm cursor-pointer"
+                  className="px-5 py-2 font-bold text-white bg-teal-600 hover:bg-teal-700 rounded shadow-xs cursor-pointer"
                 >
                   Guardar Evento
                 </button>
