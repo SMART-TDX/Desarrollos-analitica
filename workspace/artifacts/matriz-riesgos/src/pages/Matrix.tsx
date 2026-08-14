@@ -130,55 +130,76 @@ function obtenerCodigosControlSeguros(item: RiesgoRow): string[] {
   return [];
 }
 
-// Función auxiliar para obtener listas actualizadas directamente desde localStorage o parámetros
+// Función auxiliar exhaustiva para obtener listas actualizadas directamente desde localStorage o parámetros
 export function obtenerListasParametrosActualizadas(defaultsOverride?: {
   procesos?: string[];
   subprocesos?: string[];
   factores?: string[];
 }) {
-  let procesos = defaultsOverride?.procesos || [...DEFAULTS_PROCESOS];
-  let subprocesos = defaultsOverride?.subprocesos || [...DEFAULTS_SUBPROCESOS];
-  let factores = defaultsOverride?.factores || [...DEFAULTS_FACTORES];
+  let procesos = defaultsOverride?.procesos && defaultsOverride.procesos.length > 0 
+    ? defaultsOverride.procesos 
+    : [...DEFAULTS_PROCESOS];
+
+  let subprocesos = defaultsOverride?.subprocesos && defaultsOverride.subprocesos.length > 0 
+    ? defaultsOverride.subprocesos 
+    : [...DEFAULTS_SUBPROCESOS];
+
+  let factores = defaultsOverride?.factores && defaultsOverride.factores.length > 0 
+    ? defaultsOverride.factores 
+    : [...DEFAULTS_FACTORES];
 
   try {
-    // 1. Intentar objeto consolidado 'laft_parametros_v1'
-    const savedV1 = localStorage.getItem("laft_parametros_v1");
-    if (savedV1) {
-      const p = JSON.parse(savedV1);
-      if (Array.isArray(p.procesos) && p.procesos.length > 0) procesos = p.procesos;
-      if (Array.isArray(p.subprocesos) && p.subprocesos.length > 0) subprocesos = p.subprocesos;
-      if (Array.isArray(p.factores) && p.factores.length > 0) factores = p.factores;
+    // 1. Revisar objetos consolidados
+    const keysToTry = [
+      "laft_parametros_v1",
+      "laft_parametros",
+      "laft_parametros_v2",
+      "laft_parametros_v3",
+      "laft_config_parametros"
+    ];
+
+    for (const key of keysToTry) {
+      const saved = localStorage.getItem(key);
+      if (saved) {
+        const p = JSON.parse(saved);
+        if ((!defaultsOverride?.procesos || defaultsOverride.procesos.length === 0) && Array.isArray(p.procesos) && p.procesos.length > 0) {
+          procesos = p.procesos;
+        }
+        if ((!defaultsOverride?.subprocesos || defaultsOverride.subprocesos.length === 0) && Array.isArray(p.subprocesos) && p.subprocesos.length > 0) {
+          subprocesos = p.subprocesos;
+        }
+        if ((!defaultsOverride?.factores || defaultsOverride.factores.length === 0) && Array.isArray(p.factores) && p.factores.length > 0) {
+          factores = p.factores;
+        }
+      }
     }
 
-    // 2. Intentar objeto consolidado 'laft_parametros'
-    const savedGen = localStorage.getItem("laft_parametros");
-    if (savedGen) {
-      const p = JSON.parse(savedGen);
-      if (Array.isArray(p.procesos) && p.procesos.length > 0) procesos = p.procesos;
-      if (Array.isArray(p.subprocesos) && p.subprocesos.length > 0) subprocesos = p.subprocesos;
-      if (Array.isArray(p.factores) && p.factores.length > 0) factores = p.factores;
+    // 2. Revisar claves independientes en localStorage
+    if (!defaultsOverride?.procesos || defaultsOverride.procesos.length === 0) {
+      const savedP = localStorage.getItem("laft_procesos") || localStorage.getItem("procesos") || localStorage.getItem("laft_lista_procesos");
+      if (savedP) {
+        const arr = JSON.parse(savedP);
+        if (Array.isArray(arr) && arr.length > 0) procesos = arr;
+      }
     }
 
-    // 3. Intentar claves independientes (laft_procesos, laft_subprocesos, laft_factores)
-    const savedP = localStorage.getItem("laft_procesos") || localStorage.getItem("procesos");
-    if (savedP) {
-      const arr = JSON.parse(savedP);
-      if (Array.isArray(arr) && arr.length > 0) procesos = arr;
+    if (!defaultsOverride?.subprocesos || defaultsOverride.subprocesos.length === 0) {
+      const savedSP = localStorage.getItem("laft_subprocesos") || localStorage.getItem("subprocesos") || localStorage.getItem("laft_lista_subprocesos");
+      if (savedSP) {
+        const arr = JSON.parse(savedSP);
+        if (Array.isArray(arr) && arr.length > 0) subprocesos = arr;
+      }
     }
 
-    const savedSP = localStorage.getItem("laft_subprocesos") || localStorage.getItem("subprocesos");
-    if (savedSP) {
-      const arr = JSON.parse(savedSP);
-      if (Array.isArray(arr) && arr.length > 0) subprocesos = arr;
-    }
-
-    const savedF = localStorage.getItem("laft_factores") || localStorage.getItem("factores");
-    if (savedF) {
-      const arr = JSON.parse(savedF);
-      if (Array.isArray(arr) && arr.length > 0) factores = arr;
+    if (!defaultsOverride?.factores || defaultsOverride.factores.length === 0) {
+      const savedF = localStorage.getItem("laft_factores") || localStorage.getItem("factores") || localStorage.getItem("laft_lista_factores");
+      if (savedF) {
+        const arr = JSON.parse(savedF);
+        if (Array.isArray(arr) && arr.length > 0) factores = arr;
+      }
     }
   } catch (e) {
-    console.error("Error al obtener parámetros actualizados de localStorage:", e);
+    console.error("Error al obtener parámetros de localStorage:", e);
   }
 
   return { procesos, subprocesos, factores };
@@ -247,29 +268,30 @@ export default function Matrix({
     return CONTROLES_OFICIALES;
   });
 
-  const [listaProcesos, setListaProcesos] = useState<string[]>(procesosProp || DEFAULTS_PROCESOS);
-  const [listaSubprocesos, setListaSubprocesos] = useState<string[]>(subprocesosProp || DEFAULTS_SUBPROCESOS);
-  const [listaFactores, setListaFactores] = useState<string[]>(factoresProp || DEFAULTS_FACTORES);
+  const [listaProcesos, setListaProcesos] = useState<string[]>(() => {
+    return obtenerListasParametrosActualizadas({ procesos: procesosProp }).procesos;
+  });
+  const [listaSubprocesos, setListaSubprocesos] = useState<string[]>(() => {
+    return obtenerListasParametrosActualizadas({ subprocesos: subprocesosProp }).subprocesos;
+  });
+  const [listaFactores, setListaFactores] = useState<string[]>(() => {
+    return obtenerListasParametrosActualizadas({ factores: factoresProp }).factores;
+  });
 
-  // Función para recargar los parámetros desde localStorage o props
+  // Función para recargar los parámetros sin bloqueos
   const recargarParametros = useCallback(() => {
-    if (procesosProp || subprocesosProp || factoresProp) {
-      if (procesosProp) setListaProcesos(procesosProp);
-      if (subprocesosProp) setListaSubprocesos(subprocesosProp);
-      if (factoresProp) setListaFactores(factoresProp);
-      return;
-    }
-    const { procesos, subprocesos, factores } = obtenerListasParametrosActualizadas({
+    const actual = obtenerListasParametrosActualizadas({
       procesos: procesosProp,
       subprocesos: subprocesosProp,
       factores: factoresProp
     });
-    setListaProcesos(procesos);
-    setListaSubprocesos(subprocesos);
-    setListaFactores(factores);
+
+    setListaProcesos(actual.procesos);
+    setListaSubprocesos(actual.subprocesos);
+    setListaFactores(actual.factores);
   }, [procesosProp, subprocesosProp, factoresProp]);
 
-  // Cargar parámetros al montar y escuchar eventos de actualización
+  // Cargar parámetros al montar, actualizar props o recibir eventos de almacenamiento
   useEffect(() => {
     recargarParametros();
 
@@ -341,12 +363,12 @@ export default function Matrix({
   }, [riesgos]);
 
   const handleOpenNewForm = () => {
-    // Recargar parámetros inmediatamente antes de abrir el formulario
     const { procesos, subprocesos, factores } = obtenerListasParametrosActualizadas({
       procesos: procesosProp,
       subprocesos: subprocesosProp,
       factores: factoresProp
     });
+
     setListaProcesos(procesos);
     setListaSubprocesos(subprocesos);
     setListaFactores(factores);
@@ -379,12 +401,12 @@ export default function Matrix({
   };
 
   const handleOpenEditForm = (item: RiesgoRow) => {
-    // Recargar parámetros inmediatamente antes de abrir el formulario
     const { procesos, subprocesos, factores } = obtenerListasParametrosActualizadas({
       procesos: procesosProp,
       subprocesos: subprocesosProp,
       factores: factoresProp
     });
+
     setListaProcesos(procesos);
     setListaSubprocesos(subprocesos);
     setListaFactores(factores);
@@ -607,7 +629,7 @@ export default function Matrix({
     printWindow.document.close();
   };
 
-  // Aseguramos que el valor del formulario esté siempre presente en las opciones desplegables
+  // Construcción dinámica de opciones asegurando que los valores guardados estén incluidos
   const opcionesProcesos = Array.from(new Set([...listaProcesos, formData.proceso])).filter(Boolean);
   const opcionesSubprocesos = Array.from(new Set([...listaSubprocesos, formData.subproceso || ""])).filter(Boolean);
   const opcionesFactores = Array.from(new Set([...listaFactores, formData.factorRiesgo])).filter(Boolean);
