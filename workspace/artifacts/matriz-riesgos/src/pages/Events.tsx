@@ -89,59 +89,77 @@ const EVENTOS_INICIALES: EventoRow[] = [
 
 const STORAGE_KEYS_EVENTOS = ["laft_eventos_v1", "laft_eventos", "laft_matriz_eventos"];
 
-// Función para obtener ÚNICAMENTE controles válidos y filtrados
+// Función para obtener los 26 controles fusionando el catálogo base con el localStorage
 const obtenerTodosLosControles = () => {
+  const mapa = new Map<string, any>();
+
+  // 1. Cargar primero el catálogo oficial completo
+  if (Array.isArray(CONTROLES_OFICIALES)) {
+    CONTROLES_OFICIALES.forEach(c => {
+      if (c && c.codigo) {
+        mapa.set(c.codigo.trim().toUpperCase(), c);
+      }
+    });
+  }
+
+  // 2. FUSIONAR lo que esté guardado en localStorage sin detener el bucle
   const keys = [
     "laft_controles_v3",
     "laft_controles_v2",
     "laft_controles_v1",
     "laft_controles",
-    "laft_matriz_controles"
+    "laft_matriz_controles",
+    "controles"
   ];
 
-  let rawData: any[] = [];
-
-  // Buscar en la clave activa más reciente
-  for (const key of keys) {
+  keys.forEach(key => {
     try {
       const saved = localStorage.getItem(key);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          rawData = parsed;
-          break; // Toma la lista más reciente disponible
+        if (Array.isArray(parsed)) {
+          parsed.forEach(c => {
+            if (c && c.codigo) {
+              const codKey = c.codigo.trim().toUpperCase();
+              const existente = mapa.get(codKey) || {};
+              mapa.set(codKey, { ...existente, ...c });
+            }
+          });
         }
       }
     } catch (e) {}
-  }
+  });
 
-  // Si no hay nada en localStorage, recurrir a los catalogados oficialmente
-  if (rawData.length === 0 && Array.isArray(CONTROLES_OFICIALES)) {
-    rawData = CONTROLES_OFICIALES;
-  }
-
-  // Depuración y Filtro de Basura/Fantasmas
-  const controlesDepurados = rawData.filter(c => {
+  // 3. Filtrar registros inválidos o nombres fantasmas
+  const resultado = Array.from(mapa.values()).filter(c => {
     if (!c || !c.codigo) return false;
     const nombre = (c.nombre || c.descripcion || "").trim();
-
-    // Descartar si está vacío, si dice "Sin descripción" o si el nombre es exactamente igual al código
     if (!nombre || nombre === "Sin descripción" || nombre === c.codigo) {
       return false;
     }
     return true;
   });
 
-  // Ordenar numéricamente por código (CTR-LAFT-1 ... CTR-LAFT-26)
-  return controlesDepurados.sort((a, b) => {
+  // 4. Ordenar numéricamente (CTR-LAFT-01 ... CTR-LAFT-26)
+  return resultado.sort((a, b) => {
     const numA = parseInt((a.codigo || "").replace(/\D/g, ""), 10) || 0;
     const numB = parseInt((b.codigo || "").replace(/\D/g, ""), 10) || 0;
     return numA - numB;
   });
 };
 
-// Función para obtener ÚNICAMENTE riesgos válidos
+// Función para obtener todos los riesgos fusionando catálogo base y localStorage
 const obtenerTodosLosRiesgos = (): RiesgoRow[] => {
+  const mapa = new Map<string, RiesgoRow>();
+
+  if (Array.isArray(RIESGOS_INICIALES)) {
+    RIESGOS_INICIALES.forEach(r => {
+      if (r && r.codigo) {
+        mapa.set(r.codigo.trim().toUpperCase(), r);
+      }
+    });
+  }
+
   const keys = [
     "laft_matriz_riesgos_v3",
     "laft_matriz_riesgos_v2",
@@ -149,29 +167,27 @@ const obtenerTodosLosRiesgos = (): RiesgoRow[] => {
     "laft_riesgos"
   ];
 
-  let rawData: RiesgoRow[] = [];
-
-  for (const key of keys) {
+  keys.forEach(key => {
     try {
       const saved = localStorage.getItem(key);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          rawData = parsed;
-          break;
+        if (Array.isArray(parsed)) {
+          parsed.forEach(r => {
+            if (r && r.codigo) {
+              const codKey = r.codigo.trim().toUpperCase();
+              const existente = mapa.get(codKey) || {};
+              mapa.set(codKey, { ...existente, ...r });
+            }
+          });
         }
       }
     } catch (e) {}
-  }
+  });
 
-  if (rawData.length === 0 && Array.isArray(RIESGOS_INICIALES)) {
-    rawData = RIESGOS_INICIALES;
-  }
-
-  // Filtrar riesgos basura ("Sin descripción" o códigos viejos "RIE-LAFT")
-  return rawData.filter(r => {
+  return Array.from(mapa.values()).filter(r => {
     if (!r || !r.codigo) return false;
-    if (r.codigo.startsWith("RIE-LAFT")) return false; // descarta viejos
+    if (r.codigo.startsWith("RIE-LAFT")) return false;
     const desc = (r.descripcion || "").trim();
     if (!desc || desc === "Sin descripción") return false;
     return true;
@@ -618,7 +634,7 @@ export default function Events() {
                 </div>
               </div>
 
-              {/* Selector de Riesgos y Controles limpiados */}
+              {/* Selector de Riesgos y Controles */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-lg border border-slate-200">
                 <div>
                   <label className="block font-bold text-teal-900 mb-1">
@@ -641,7 +657,7 @@ export default function Events() {
 
                 <div>
                   <label className="block font-bold text-amber-950 mb-1">
-                    Control Aplicado ({controlesList.length})
+                    Control Aplicado (Lista Completa: {controlesList.length})
                   </label>
                   <select
                     required
