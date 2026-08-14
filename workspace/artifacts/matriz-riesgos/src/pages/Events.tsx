@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Plus, Trash2, Edit3, X, AlertTriangle, ShieldAlert, CheckCircle2, TrendingUp, TrendingDown } from "lucide-react";
+import { Plus, Trash2, Edit3, X, AlertTriangle, Shield, CheckCircle, RefreshCw } from "lucide-react";
 
 // Estructura de Evento con métricas de Brecha
 export interface EventoRow {
@@ -11,17 +11,14 @@ export interface EventoRow {
   controlAplicado: string;
   descripcion: string;
 
-  // Métricas Manuales del Evento
   probabilidadEvento: number;
   impactoEvento: number;
   nivelEvento: number;
 
-  // Métricas Residuales del Riesgo (Traídas de la Matriz)
   probabilidadResidual: number;
   impactoResidual: number;
   nivelResidual: number;
 
-  // Brecha de Riesgo Calculada (Nivel Evento - Nivel Residual)
   brechaRiesgo: number;
 }
 
@@ -37,7 +34,7 @@ interface ControlItem {
   nombre: string;
 }
 
-// 1. Obtener Riesgos Reales desde LocalStorage (incluye Perfil Residual)
+// 1. Lectura Ultra Segura de Riesgos
 const obtenerRiesgosActuales = (): RiesgoItem[] => {
   const keys = ["laft_matriz_riesgos_v4", "laft_matriz_riesgos_v3", "laft_matriz_riesgos", "laft_riesgos"];
   for (const key of keys) {
@@ -46,24 +43,21 @@ const obtenerRiesgosActuales = (): RiesgoItem[] => {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.map((r: any) => {
-            const pRes = Number(r.probabilidadResidual) || Number(r.probabilidadInherente) || 2;
-            const iRes = Number(r.impactoResidual) || Number(r.impactoInherente) || 3;
-            return {
-              codigo: r.codigo || r.idRiesgo || r.id || "R-LAFT-001",
-              nombre: r.riesgo || r.nombre || r.descripcion || "Riesgo sin nombre",
-              probabilidadResidual: pRes,
-              impactoResidual: iRes
-            };
-          });
+          return parsed
+            .filter((r: any) => r && typeof r === "object")
+            .map((r: any) => ({
+              codigo: String(r?.codigo || r?.idRiesgo || r?.id || "R-LAFT-001"),
+              nombre: String(r?.riesgo || r?.nombre || r?.descripcion || "Riesgo sin nombre"),
+              probabilidadResidual: Number(r?.probabilidadResidual) || Number(r?.probabilidadInherente) || 2,
+              impactoResidual: Number(r?.impactoResidual) || Number(r?.impactoInherente) || 3
+            }));
         }
       }
     } catch (e) {
-      console.error("Error leyendo riesgos en Eventos:", e);
+      console.warn("Error leyendo riesgos en Eventos:", e);
     }
   }
 
-  // Fallback de respaldo si no hay riesgos creados
   return [
     { codigo: "R-LAFT-001", nombre: "Vinculación de clientes o contrapartes en listas de sanción", probabilidadResidual: 2, impactoResidual: 3 },
     { codigo: "R-LAFT-002", nombre: "Operaciones inusuales no detectadas en el sistema de monitoreo", probabilidadResidual: 2, impactoResidual: 2 },
@@ -71,35 +65,26 @@ const obtenerRiesgosActuales = (): RiesgoItem[] => {
   ];
 };
 
-// 2. Obtener Controles Reales desde LocalStorage (v4)
+// 2. Lectura Ultra Segura de Controles
 const obtenerControlesActuales = (): ControlItem[] => {
-  try {
-    const saved = localStorage.getItem("laft_catalogo_controles_v4");
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed.map((c: any) => ({
-          codigo: c.codigo || c.id || "CTR-LAFT-01",
-          nombre: c.control || c.nombre || "Control sin nombre"
-        }));
-      }
-    }
-  } catch (e) {}
-
-  const fallbackKeys = ["laft_catalogo_controles_v3", "laft_controles_v3", "laft_controles"];
-  for (const key of fallbackKeys) {
+  const keys = ["laft_catalogo_controles_v4", "laft_catalogo_controles_v3", "laft_controles"];
+  for (const key of keys) {
     try {
       const saved = localStorage.getItem(key);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.map((c: any) => ({
-            codigo: c.codigo || c.id || "CTR-LAFT-01",
-            nombre: c.control || c.nombre || "Control sin nombre"
-          }));
+          return parsed
+            .filter((c: any) => c && typeof c === "object")
+            .map((c: any) => ({
+              codigo: String(c?.codigo || c?.id || "CTR-LAFT-01"),
+              nombre: String(c?.control || c?.nombre || "Control sin nombre")
+            }));
         }
       }
-    } catch (e) {}
+    } catch (e) {
+      console.warn("Error leyendo controles en Eventos:", e);
+    }
   }
 
   return [
@@ -109,11 +94,46 @@ const obtenerControlesActuales = (): ControlItem[] => {
 };
 
 export default function Events() {
+  // Estado de eventos con formateador de seguridad integrado
   const [eventos, setEventos] = useState<EventoRow[]>(() => {
     try {
       const saved = localStorage.getItem("laft_eventos_v2");
-      if (saved) return JSON.parse(saved);
-    } catch (e) {}
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          return parsed
+            .filter((e: any) => e && typeof e === "object")
+            .map((e: any) => {
+              const pEv = Number(e?.probabilidadEvento) || 2;
+              const iEv = Number(e?.impactoEvento) || 3;
+              const nEv = Number(e?.nivelEvento) || (pEv * iEv);
+
+              const pRes = Number(e?.probabilidadResidual) || 2;
+              const iRes = Number(e?.impactoResidual) || 2;
+              const nRes = Number(e?.nivelResidual) || (pRes * iRes);
+
+              return {
+                id: String(e?.id || Date.now() + Math.random()),
+                codigoEvento: String(e?.codigoEvento || "EVENTO-1"),
+                tipoEvento: String(e?.tipoEvento || "LAFT"),
+                tipoIncidencia: String(e?.tipoIncidencia || "FADM = Fallas Administrativas / Control"),
+                riesgoVinculado: String(e?.riesgoVinculado || ""),
+                controlAplicado: String(e?.controlAplicado || ""),
+                descripcion: String(e?.descripcion || ""),
+                probabilidadEvento: pEv,
+                impactoEvento: iEv,
+                nivelEvento: nEv,
+                probabilidadResidual: pRes,
+                impactoResidual: iRes,
+                nivelResidual: nRes,
+                brechaRiesgo: typeof e?.brechaRiesgo === "number" ? e.brechaRiesgo : (nEv - nRes)
+              };
+            });
+        }
+      }
+    } catch (e) {
+      console.error("Error cargando eventos guardados:", e);
+    }
     return [];
   });
 
@@ -123,10 +143,9 @@ export default function Events() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  // Formulario de Registro
   const [formData, setFormData] = useState<EventoRow>({
     id: "",
-    codigoEvento: `EVENTO-${eventos.length + 1}`,
+    codigoEvento: `EVENTO-${(eventos?.length || 0) + 1}`,
     tipoEvento: "LAFT",
     tipoIncidencia: "FADM = Fallas Administrativas / Control",
     riesgoVinculado: "",
@@ -141,13 +160,9 @@ export default function Events() {
     brechaRiesgo: 3
   });
 
-  // Cargar y sincronizar catálogos
   const recargarSincronizacion = useCallback(() => {
-    const rOptions = obtenerRiesgosActuales();
-    const cOptions = obtenerControlesActuales();
-
-    setRiesgosOptions(rOptions);
-    setControlesOptions(cOptions);
+    setRiesgosOptions(obtenerRiesgosActuales());
+    setControlesOptions(obtenerControlesActuales());
   }, []);
 
   useEffect(() => {
@@ -166,15 +181,16 @@ export default function Events() {
     };
   }, [recargarSincronizacion]);
 
-  // Persistir eventos en localStorage
   useEffect(() => {
-    localStorage.setItem("laft_eventos_v2", JSON.stringify(eventos));
-    window.dispatchEvent(new CustomEvent("laft-data-updated"));
+    try {
+      localStorage.setItem("laft_eventos_v2", JSON.stringify(eventos));
+    } catch (e) {
+      console.error("Error guardando eventos:", e);
+    }
   }, [eventos]);
 
-  // Actualizar perfil residual al cambiar el Riesgo Seleccionado
   const handleRiesgoChange = (riesgoCodigoNombre: string) => {
-    const riesgoEncontrado = riesgosOptions.find(
+    const riesgoEncontrado = (riesgosOptions || []).find(
       r => `${r.codigo} - ${r.nombre}` === riesgoCodigoNombre || r.codigo === riesgoCodigoNombre
     );
 
@@ -182,8 +198,9 @@ export default function Events() {
     const iRes = riesgoEncontrado ? riesgoEncontrado.impactoResidual : 2;
     const nRes = pRes * iRes;
 
-    const nEv = formData.probabilidadEvento * formData.impactoEvento;
-    const brecha = nEv - nRes;
+    const pEv = formData.probabilidadEvento || 1;
+    const iEv = formData.impactoEvento || 1;
+    const nEv = pEv * iEv;
 
     setFormData(prev => ({
       ...prev,
@@ -191,21 +208,22 @@ export default function Events() {
       probabilidadResidual: pRes,
       impactoResidual: iRes,
       nivelResidual: nRes,
-      brechaRiesgo: brecha
+      brechaRiesgo: nEv - nRes
     }));
   };
 
-  // Recalcular nivel de evento y brecha en tiempo real
   const handleMetricaEventoChange = (pEv: number, iEv: number) => {
-    const nEv = pEv * iEv;
-    const brecha = nEv - formData.nivelResidual;
+    const p = Math.max(1, pEv);
+    const i = Math.max(1, iEv);
+    const nEv = p * i;
+    const nRes = formData.nivelResidual || 0;
 
     setFormData(prev => ({
       ...prev,
-      probabilidadEvento: pEv,
-      impactoEvento: iEv,
+      probabilidadEvento: p,
+      impactoEvento: i,
       nivelEvento: nEv,
-      brechaRiesgo: brecha
+      brechaRiesgo: nEv - nRes
     }));
   };
 
@@ -213,7 +231,7 @@ export default function Events() {
     recargarSincronizacion();
     setEditingId(null);
 
-    const rInicial = riesgosOptions.length > 0 ? riesgosOptions[0] : null;
+    const rInicial = riesgosOptions && riesgosOptions.length > 0 ? riesgosOptions[0] : null;
     const rVal = rInicial ? `${rInicial.codigo} - ${rInicial.nombre}` : "";
     const pRes = rInicial ? rInicial.probabilidadResidual : 2;
     const iRes = rInicial ? rInicial.impactoResidual : 3;
@@ -223,12 +241,12 @@ export default function Events() {
     const iEv = 3;
     const nEv = pEv * iEv;
 
-    const cInicial = controlesOptions.length > 0 ? controlesOptions[0] : null;
+    const cInicial = controlesOptions && controlesOptions.length > 0 ? controlesOptions[0] : null;
     const cVal = cInicial ? `${cInicial.codigo} - ${cInicial.nombre}` : "";
 
     setFormData({
       id: "",
-      codigoEvento: `EVENTO-${eventos.length + 1}`,
+      codigoEvento: `EVENTO-${(eventos?.length || 0) + 1}`,
       tipoEvento: "LAFT",
       tipoIncidencia: "FADM = Fallas Administrativas / Control",
       riesgoVinculado: rVal,
@@ -259,12 +277,20 @@ export default function Events() {
     }
   };
 
+  const handleResetCache = () => {
+    if (confirm("¿Desea restablecer los eventos almacenados para corregir problemas de caché?")) {
+      localStorage.removeItem("laft_eventos_v2");
+      setEventos([]);
+      window.location.reload();
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (editingId) {
       setEventos(prev => prev.map(ev => (ev.id === editingId ? formData : ev)));
     } else {
-      setEventos(prev => [...prev, { ...formData, id: Date.now().toString() }]);
+      setEventos(prev => [...(prev || []), { ...formData, id: Date.now().toString() }]);
     }
     setIsModalOpen(false);
   };
@@ -283,13 +309,23 @@ export default function Events() {
           </div>
         </div>
 
-        <button
-          onClick={handleOpenModal}
-          className="flex items-center gap-2 px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-semibold rounded-lg text-xs transition-colors shadow-xs"
-        >
-          <Plus className="w-4 h-4" />
-          Nuevo Evento
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleResetCache}
+            title="Limpiar datos locales"
+            className="flex items-center gap-1.5 px-3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg text-xs transition-colors"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            Restablecer
+          </button>
+          <button
+            onClick={handleOpenModal}
+            className="flex items-center gap-2 px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white font-semibold rounded-lg text-xs transition-colors shadow-xs"
+          >
+            <Plus className="w-4 h-4" />
+            Nuevo Evento
+          </button>
+        </div>
       </div>
 
       {/* Tabla de Eventos */}
@@ -301,14 +337,14 @@ export default function Events() {
               <th className="p-3">Tipo Evento</th>
               <th className="p-3">Tipo Incidencia</th>
               <th className="p-3">Riesgo Vinculado</th>
-              <th className="p-3 text-center bg-slate-200/50">Nivel Evento ($P \times I$)</th>
-              <th className="p-3 text-center bg-teal-50 text-teal-900">Nivel Residual ($P_{res} \times I_{res}$)</th>
+              <th className="p-3 text-center bg-slate-200/50">Nivel Evento (P × I)</th>
+              <th className="p-3 text-center bg-teal-50 text-teal-900">Nivel Residual (P.Res × I.Res)</th>
               <th className="p-3 text-center font-extrabold">Brecha del Riesgo</th>
               <th className="p-3 text-center">Acciones</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200">
-            {eventos.length === 0 ? (
+            {!Array.isArray(eventos) || eventos.length === 0 ? (
               <tr>
                 <td colSpan={8} className="p-8 text-center text-slate-400 font-medium">
                   No hay eventos registrados. Haz clic en "Nuevo Evento" para crear uno.
@@ -316,7 +352,8 @@ export default function Events() {
               </tr>
             ) : (
               eventos.map(e => {
-                const excede = e.brechaRiesgo > 0;
+                const brecha = Number(e?.brechaRiesgo) || 0;
+                const excede = brecha > 0;
                 return (
                   <tr key={e.id} className="hover:bg-slate-50">
                     <td className="p-3 font-bold text-slate-900">{e.codigoEvento}</td>
@@ -324,10 +361,10 @@ export default function Events() {
                     <td className="p-3 text-slate-700 max-w-[200px] truncate">{e.tipoIncidencia}</td>
                     <td className="p-3 text-slate-700 max-w-[220px] truncate">{e.riesgoVinculado || "N/A"}</td>
                     <td className="p-3 text-center font-bold text-slate-900 bg-slate-50">
-                      {e.nivelEvento} <span className="text-[10px] text-slate-400">({e.probabilidadEvento}x{e.impactoEvento})</span>
+                      {e.nivelEvento || 0} <span className="text-[10px] text-slate-400">({e.probabilidadEvento || 0}x{e.impactoEvento || 0})</span>
                     </td>
                     <td className="p-3 text-center font-bold text-teal-800 bg-teal-50/50">
-                      {e.nivelResidual} <span className="text-[10px] text-teal-600">({e.probabilidadResidual}x{e.impactoResidual})</span>
+                      {e.nivelResidual || 0} <span className="text-[10px] text-teal-600">({e.probabilidadResidual || 0}x{e.impactoResidual || 0})</span>
                     </td>
                     <td className="p-3 text-center">
                       <span
@@ -337,8 +374,7 @@ export default function Events() {
                             : "bg-emerald-50 text-emerald-700 border-emerald-200"
                         }`}
                       >
-                        {excede ? <TrendingUp className="w-3.5 h-3.5 text-rose-600" /> : <TrendingDown className="w-3.5 h-3.5 text-emerald-600" />}
-                        {e.brechaRiesgo > 0 ? `+${e.brechaRiesgo}` : e.brechaRiesgo} {excede ? "(Excedida)" : "(Tolerada)"}
+                        {brecha > 0 ? `+${brecha}` : brecha} {excede ? "(Excedida)" : "(Tolerada)"}
                       </span>
                     </td>
                     <td className="p-3 text-center">
@@ -359,11 +395,10 @@ export default function Events() {
         </table>
       </div>
 
-      {/* MODAL AJUSTADO (SIN FACTOR, ETAPA, APETITO NI ESTADO) */}
+      {/* Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-3xl overflow-hidden">
-            {/* Header Modal */}
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
               <h2 className="text-lg font-bold text-slate-900">
                 {editingId ? "Editar Evento" : "Registrar Nuevo Evento"}
@@ -376,9 +411,7 @@ export default function Events() {
               </button>
             </div>
 
-            {/* Formulario */}
             <form onSubmit={handleSubmit} className="p-6 space-y-5 text-xs">
-              {/* FILA 1: Código, Tipo Evento, Tipo Incidencia */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Código Evento</label>
@@ -418,18 +451,17 @@ export default function Events() {
                 </div>
               </div>
 
-              {/* FILA 2: Riesgo Vinculado y Control Aplicado */}
               <div className="p-4 bg-emerald-50/40 border border-emerald-100 rounded-xl grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block font-bold text-amber-900 mb-1.5">
-                    Riesgo Vinculado ({riesgosOptions.length})
+                    Riesgo Vinculado ({riesgosOptions?.length || 0})
                   </label>
                   <select
                     value={formData.riesgoVinculado}
                     onChange={e => handleRiesgoChange(e.target.value)}
                     className="w-full p-2.5 border border-amber-200 rounded-lg bg-white text-amber-900 font-medium"
                   >
-                    {riesgosOptions.length === 0 ? (
+                    {(!riesgosOptions || riesgosOptions.length === 0) ? (
                       <option value="">No hay riesgos registrados</option>
                     ) : (
                       riesgosOptions.map(r => {
@@ -446,14 +478,14 @@ export default function Events() {
 
                 <div>
                   <label className="block font-bold text-amber-900 mb-1.5">
-                    Control Aplicado (Lista Activa: {controlesOptions.length})
+                    Control Aplicado (Lista Activa: {controlesOptions?.length || 0})
                   </label>
                   <select
                     value={formData.controlAplicado}
                     onChange={e => setFormData({ ...formData, controlAplicado: e.target.value })}
                     className="w-full p-2.5 border border-amber-200 rounded-lg bg-white text-amber-900 font-medium"
                   >
-                    {controlesOptions.length === 0 ? (
+                    {(!controlesOptions || controlesOptions.length === 0) ? (
                       <option value="">No hay controles registrados</option>
                     ) : (
                       controlesOptions.map(c => {
@@ -469,7 +501,6 @@ export default function Events() {
                 </div>
               </div>
 
-              {/* FILA 3: Descripción del Evento */}
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">Evento / Descripción</label>
                 <textarea
@@ -481,9 +512,7 @@ export default function Events() {
                 ></textarea>
               </div>
 
-              {/* FILA 4: MÉTRICAS MANUALES VS PERFIL RESIDUAL Y BRECHA */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
-                {/* Métricas Evento (Manual) */}
                 <div className="space-y-2">
                   <h3 className="font-bold text-slate-800 text-[11px] uppercase tracking-wider">Nivel de Evento (Manual)</h3>
                   <div className="grid grid-cols-2 gap-2">
@@ -520,7 +549,6 @@ export default function Events() {
                   </div>
                 </div>
 
-                {/* Métricas Residuales del Riesgo (Traídas de Matriz) */}
                 <div className="space-y-2">
                   <h3 className="font-bold text-teal-800 text-[11px] uppercase tracking-wider">Perfil Residual (Desde Riesgo)</h3>
                   <div className="grid grid-cols-2 gap-2 text-center">
@@ -539,7 +567,6 @@ export default function Events() {
                   </div>
                 </div>
 
-                {/* Brecha del Riesgo Calculada */}
                 <div className="flex flex-col justify-between space-y-2">
                   <h3 className="font-bold text-slate-800 text-[11px] uppercase tracking-wider">Brecha del Riesgo</h3>
                   <div
@@ -551,9 +578,9 @@ export default function Events() {
                   >
                     <div className="flex items-center gap-1 font-black text-lg">
                       {formData.brechaRiesgo > 0 ? (
-                        <ShieldAlert className="w-5 h-5 text-rose-600" />
+                        <Shield className="w-5 h-5 text-rose-600" />
                       ) : (
-                        <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                        <CheckCircle className="w-5 h-5 text-emerald-600" />
                       )}
                       <span>{formData.brechaRiesgo > 0 ? `+${formData.brechaRiesgo}` : formData.brechaRiesgo}</span>
                     </div>
@@ -564,7 +591,6 @@ export default function Events() {
                 </div>
               </div>
 
-              {/* Acciones */}
               <div className="flex justify-end items-center gap-3 pt-3 border-t border-slate-100">
                 <button
                   type="button"
