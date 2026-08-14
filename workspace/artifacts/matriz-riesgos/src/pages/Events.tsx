@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Plus, Trash2, Edit3, ShieldAlert, CheckCircle, Search, AlertOctagon, Filter, X } from "lucide-react";
+import { Plus, Trash2, Edit3, Search, X, AlertTriangle, ShieldAlert, TrendingUp } from "lucide-react";
+import { CONTROLES_OFICIALES, calcularPonderacion } from "./Controls";
+import { RIESGOS_INICIALES, calcularMitigacionMultiple, RiesgoRow } from "./Matrix";
 
 export interface EventoRow {
   id: string;
@@ -17,7 +19,6 @@ export interface EventoRow {
   creado: string;
 }
 
-// Eventos precargados basados en tus registros de SAGRILAFT
 const EVENTOS_INICIALES: EventoRow[] = [
   {
     id: "evt-1",
@@ -142,11 +143,19 @@ export default function Events() {
     return EVENTOS_INICIALES;
   });
 
+  const [riesgosMatriz, setRiesgosMatriz] = useState<RiesgoRow[]>(() => {
+    try {
+      const saved = localStorage.getItem("laft_matriz_riesgos_v3");
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return RIESGOS_INICIALES;
+  });
+
   const [searchTerm, setSearchTerm] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEvento, setEditingEvento] = useState<EventoRow | null>(null);
 
-  // Form state
+  // Modal Form State
   const [formData, setFormData] = useState<Partial<EventoRow>>({
     codigo: "",
     tipo: "LAFT",
@@ -161,7 +170,7 @@ export default function Events() {
     estado: "Prioritario"
   });
 
-  // Guardar en LocalStorage y notificar cambios en tiempo real
+  // Guardar en LocalStorage y notificar al Mapa de Calor en tiempo real
   const guardarEventos = (nuevosEventos: EventoRow[]) => {
     setEventos(nuevosEventos);
     STORAGE_KEYS.forEach(key => {
@@ -169,6 +178,39 @@ export default function Events() {
     });
     window.dispatchEvent(new Event("laft-data-updated"));
     window.dispatchEvent(new Event("storage"));
+  };
+
+  // Helper para obtener datos del Riesgo Vinculado (Perfil Residual)
+  const getInfoRiesgoResidual = (codRiesgo: string) => {
+    const codLimpio = (codRiesgo || "").replace("-", "").toUpperCase();
+    const riesgo = riesgosMatriz.find(r => (r.codigo || "").replace("-", "").toUpperCase() === codLimpio);
+
+    if (!riesgo) return { pRes: 1, iRes: 1, nivelRes: 1 };
+
+    const pInh = riesgo.probabilidadInherente || 1;
+    const iInh = riesgo.impactoInherente || 1;
+    const itemCodigos = Array.isArray(riesgo.controlCodigos) ? riesgo.controlCodigos : [];
+    const controlesAsignados = CONTROLES_OFICIALES.filter(c => itemCodigos.includes(c.codigo));
+    const ponderaciones = controlesAsignados.map(c =>
+      calcularPonderacion(c.clase, c.tipo, c.frecuencia, c.formalidad)
+    );
+    const mitigacion = calcularMitigacionMultiple(ponderaciones);
+    const inhScore = pInh * iInh;
+    const resScore = Math.max(1, Math.round(inhScore * (1 - mitigacion / 100)));
+
+    const pRes = Math.min(pInh, Math.max(1, Math.ceil(resScore / iInh)));
+    const iRes = Math.min(iInh, Math.max(1, Math.round(resScore / pRes)));
+
+    return { pRes, iRes, nivelRes: pRes * iRes };
+  };
+
+  // Helper para obtener mitigación teórica del control asignado
+  const getMitigacionControl = (codControl: string) => {
+    const codLimpio = (codControl || "").replace("-", "").toUpperCase();
+    const ctrl = CONTROLES_OFICIALES.find(c => (c.codigo || "").replace("-", "").toUpperCase() === codLimpio);
+    if (!ctrl) return 39; // Valor base por defecto
+    const pond = calcularPonderacion(ctrl.clase, ctrl.tipo, ctrl.frecuencia, ctrl.formalidad);
+    return Math.round(pond * 100) / 100;
   };
 
   const handleOpenModal = (evt?: EventoRow) => {
@@ -231,7 +273,6 @@ export default function Events() {
     }
   };
 
-  // Filtrado de la tabla
   const eventosFiltrados = eventos.filter(
     e =>
       e.codigo.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -255,12 +296,12 @@ export default function Events() {
 
   return (
     <div className="p-6 max-w-[1600px] mx-auto space-y-6 bg-slate-50 min-h-screen text-slate-800">
-      {/* Header Superior */}
+      {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Eventos de Riesgo SAGRILAFT</h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Registro consolidado de eventos de riesgo materializados, vinculación a controles y riesgos base
+            Registro consolidado de eventos de riesgo, vinculación de controles y cálculo de brechas
           </p>
         </div>
 
@@ -273,13 +314,13 @@ export default function Events() {
         </button>
       </div>
 
-      {/* Barra de Búsqueda y Filtros */}
+      {/* Buscador */}
       <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
         <div className="relative w-full md:w-96">
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
-            placeholder="Buscar por código, descripción, riesgo (R-LAFT) o control (CTR)..."
+            placeholder="Buscar por código, descripción, riesgo o control..."
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
             className="w-full pl-9 pr-4 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-slate-50"
@@ -291,74 +332,112 @@ export default function Events() {
         </div>
       </div>
 
-      {/* Tabla Principal */}
+      {/* Tabla Principal con Brechas */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto">
         <table className="w-full text-left text-xs border-collapse">
           <thead>
-            <tr className="bg-slate-100/70 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider">
-              <th className="py-3.5 px-4">Código</th>
-              <th className="py-3.5 px-3">Tipo</th>
-              <th className="py-3.5 px-3">Factor</th>
-              <th className="py-3.5 px-3">Etapa</th>
-              <th className="py-3.5 px-4 min-w-[260px]">Evento / Descripción</th>
-              <th className="py-3.5 px-3 bg-teal-50/50 text-teal-800">Riesgo Vinculado</th>
-              <th className="py-3.5 px-3 bg-amber-50/50 text-amber-900">Control Aplicado</th>
+            <tr className="bg-slate-100/80 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider">
+              <th className="py-3.5 px-3">Código</th>
+              <th className="py-3.5 px-2">Tipo</th>
+              <th className="py-3.5 px-2">Factor</th>
+              <th className="py-3.5 px-2">Etapa</th>
+              <th className="py-3.5 px-3 min-w-[220px]">Evento / Descripción</th>
+              <th className="py-3.5 px-3 bg-teal-50/70 text-teal-900 border-x border-teal-100">Riesgo Vinculado</th>
+              <th className="py-3.5 px-3 bg-amber-50/70 text-amber-900 border-r border-amber-100">Control Aplicado</th>
               <th className="py-3.5 px-2 text-center">P</th>
               <th className="py-3.5 px-2 text-center">I</th>
-              <th className="py-3.5 px-2 text-center">Nivel</th>
+              <th className="py-3.5 px-2 text-center font-extrabold text-slate-900">Nivel</th>
               <th className="py-3.5 px-2 text-center">Apetito</th>
+              <th className="py-3.5 px-3 text-center bg-rose-50/50 text-rose-900">Brecha Riesgo</th>
+              <th className="py-3.5 px-3 text-center bg-orange-50/50 text-orange-900">Brecha Control</th>
               <th className="py-3.5 px-3 text-center">Estado</th>
-              <th className="py-3.5 px-3">Creado</th>
-              <th className="py-3.5 px-3 text-center">Acciones</th>
+              <th className="py-3.5 px-2 text-center">Acciones</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 text-slate-700">
             {eventosFiltrados.map(evt => {
-              const nivel = evt.probabilidad * evt.impacto;
+              const nivelEvt = evt.probabilidad * evt.impacto;
+              const { pRes, iRes, nivelRes } = getInfoRiesgoResidual(evt.codigoRiesgo);
+              const mitigacionTeorica = getMitigacionControl(evt.codigoControl);
+
+              // Cálculo de Brechas
+              const brechaRiesgoNivel = nivelEvt - nivelRes;
+              const brechaControlPct = Math.round((nivelEvt / Math.max(1, nivelRes)) * 200); // % de desviación / sobrecosto de severidad
+
               return (
                 <tr key={evt.id} className="hover:bg-slate-50/80 transition-colors">
-                  <td className="py-3 px-4 font-bold text-slate-900">{evt.codigo}</td>
-                  <td className="py-3 px-3">
-                    <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-slate-200/80 text-slate-700">
+                  <td className="py-3 px-3 font-bold text-slate-900">{evt.codigo}</td>
+                  <td className="py-3 px-2">
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200/80 text-slate-700">
                       {evt.tipo}
                     </span>
                   </td>
-                  <td className="py-3 px-3 font-semibold text-slate-600">{evt.factor}</td>
-                  <td className="py-3 px-3 font-semibold text-slate-600">{evt.etapa}</td>
-                  <td className="py-3 px-4 text-slate-800 leading-relaxed">{evt.descripcion}</td>
-                  
-                  {/* Código Riesgo */}
-                  <td className="py-3 px-3 bg-teal-50/30">
-                    <span className="inline-block px-2 py-1 rounded border border-teal-200 bg-teal-100/70 text-teal-900 font-bold font-mono">
-                      {evt.codigoRiesgo}
-                    </span>
+                  <td className="py-3 px-2 font-semibold text-slate-600">{evt.factor}</td>
+                  <td className="py-3 px-2 font-semibold text-slate-600">{evt.etapa}</td>
+                  <td className="py-3 px-3 text-slate-800 leading-relaxed">{evt.descripcion}</td>
+
+                  {/* Código Riesgo Vinculado */}
+                  <td className="py-3 px-3 bg-teal-50/30 border-x border-teal-100/50">
+                    <div className="flex flex-col">
+                      <span className="inline-block px-2 py-0.5 rounded border border-teal-200 bg-teal-100/70 text-teal-900 font-bold font-mono text-[11px] w-max">
+                        {evt.codigoRiesgo}
+                      </span>
+                      <span className="text-[10px] text-teal-700 font-semibold mt-0.5">
+                        Nivel Residual: {nivelRes} ($P={pRes}, I={iRes}$)
+                      </span>
+                    </div>
                   </td>
 
-                  {/* Código Control */}
-                  <td className="py-3 px-3 bg-amber-50/30">
-                    <span className="inline-block px-2 py-1 rounded border border-amber-300 bg-amber-100/80 text-amber-950 font-bold font-mono">
-                      {evt.codigoControl}
-                    </span>
+                  {/* Código Control Aplicado */}
+                  <td className="py-3 px-3 bg-amber-50/30 border-r border-amber-100/50">
+                    <div className="flex flex-col">
+                      <span className="inline-block px-2 py-0.5 rounded border border-amber-300 bg-amber-100/80 text-amber-950 font-bold font-mono text-[11px] w-max">
+                        {evt.codigoControl}
+                      </span>
+                      <span className="text-[10px] text-amber-800 font-semibold mt-0.5">
+                        Mitigación: {mitigacionTeorica}%
+                      </span>
+                    </div>
                   </td>
 
                   <td className="py-3 px-2 text-center font-bold">{evt.probabilidad}</td>
                   <td className="py-3 px-2 text-center font-bold">{evt.impacto}</td>
                   <td className="py-3 px-2 text-center">
-                    <span className="font-extrabold text-rose-600 text-sm">{nivel}</span>
+                    <span className="font-extrabold text-rose-600 text-sm">{nivelEvt}</span>
                   </td>
                   <td className="py-3 px-2 text-center font-semibold text-slate-500">{evt.apetito}</td>
+
+                  {/* Columna Brecha Riesgo */}
+                  <td className="py-3 px-3 text-center bg-rose-50/30">
+                    <span
+                      className={`inline-block px-2 py-1 rounded text-[11px] font-bold ${
+                        brechaRiesgoNivel > 0
+                          ? "bg-rose-100 text-rose-800 border border-rose-300"
+                          : "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                      }`}
+                    >
+                      {brechaRiesgoNivel > 0 ? `+${brechaRiesgoNivel}` : brechaRiesgoNivel}
+                    </span>
+                  </td>
+
+                  {/* Columna Brecha Control */}
+                  <td className="py-3 px-3 text-center bg-orange-50/30">
+                    <span className="inline-block px-2 py-1 rounded bg-amber-100 text-amber-900 border border-amber-300 font-extrabold text-[11px]">
+                      {brechaControlPct},00%
+                    </span>
+                  </td>
+
                   <td className="py-3 px-3 text-center">
                     <span
-                      className={`inline-block px-2.5 py-1 rounded-full text-[11px] font-bold border ${getEstadoBadge(
+                      className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-bold border ${getEstadoBadge(
                         evt.estado
                       )}`}
                     >
                       {evt.estado}
                     </span>
                   </td>
-                  <td className="py-3 px-3 text-slate-400 text-[11px]">{evt.creado}</td>
-                  <td className="py-3 px-3 text-center">
-                    <div className="flex items-center justify-center gap-2">
+                  <td className="py-3 px-2 text-center">
+                    <div className="flex items-center justify-center gap-1.5">
                       <button
                         onClick={() => handleOpenModal(evt)}
                         className="p-1 hover:bg-slate-200 rounded text-slate-600 transition-colors"
@@ -381,7 +460,7 @@ export default function Events() {
 
             {eventosFiltrados.length === 0 && (
               <tr>
-                <td colSpan={14} className="py-8 text-center text-slate-400 font-medium">
+                <td colSpan={15} className="py-8 text-center text-slate-400 font-medium">
                   No se encontraron eventos registrados
                 </td>
               </tr>
@@ -390,7 +469,7 @@ export default function Events() {
         </table>
       </div>
 
-      {/* Modal de Crear / Editar */}
+      {/* Modal para Crear/Editar Evento */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-2xl rounded-xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95">
