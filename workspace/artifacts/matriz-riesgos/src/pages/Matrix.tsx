@@ -22,7 +22,7 @@ export interface RiesgoRow {
   subproceso?: string;
   quePuedeSuceder?: string;
   descripcionEvento?: string;
-  descripcion?: string; // Para compatibilidad
+  descripcion?: string;
   banderas?: {
     laft: boolean;
     operativo: boolean;
@@ -82,7 +82,122 @@ const DEFAULTS_FACTORES = [
   "TECNOLÓGICO"
 ];
 
-// CALIFICACIÓN DEL PERFIL DE RIESGO
+// Convierte arreglos de strings u objetos ({nombre, label, etc}) a string[] limpio
+function normalizarLista(arr: any): string[] {
+  if (!Array.isArray(arr)) return [];
+  return arr
+    .map((item) => {
+      if (!item) return "";
+      if (typeof item === "string") return item.trim();
+      if (typeof item === "object") {
+        return (
+          item.nombre ||
+          item.label ||
+          item.value ||
+          item.name ||
+          item.titulo ||
+          item.texto ||
+          item.opcion ||
+          ""
+        ).toString().trim();
+      }
+      return String(item).trim();
+    })
+    .filter((val) => val.length > 0);
+}
+
+// Función que lee prioritariamente desde localStorage
+export function obtenerListasParametrosActualizadas(defaultsOverride?: {
+  procesos?: string[];
+  subprocesos?: string[];
+  factores?: string[];
+}) {
+  let procesos: string[] = [];
+  let subprocesos: string[] = [];
+  let factores: string[] = [];
+
+  try {
+    // 1. Claves compuestas
+    const keysToTry = [
+      "laft_parametros_v1",
+      "laft_parametros",
+      "laft_parametros_v2",
+      "laft_parametros_v3",
+      "laft_config_parametros",
+      "parametros_laft",
+      "parametros"
+    ];
+
+    for (const key of keysToTry) {
+      const saved = localStorage.getItem(key);
+      if (saved) {
+        try {
+          const p = JSON.parse(saved);
+          if (p && typeof p === "object") {
+            if (procesos.length === 0 && p.procesos) procesos = normalizarLista(p.procesos);
+            if (subprocesos.length === 0 && p.subprocesos) subprocesos = normalizarLista(p.subprocesos);
+            if (factores.length === 0 && p.factores) factores = normalizarLista(p.factores);
+          }
+        } catch (e) {}
+      }
+    }
+
+    // 2. Claves individuales de localStorage
+    if (procesos.length === 0) {
+      const keysP = ["laft_procesos", "procesos", "laft_lista_procesos", "lista_procesos", "config_procesos"];
+      for (const k of keysP) {
+        const raw = localStorage.getItem(k);
+        if (raw) {
+          const norm = normalizarLista(JSON.parse(raw));
+          if (norm.length > 0) { procesos = norm; break; }
+        }
+      }
+    }
+
+    if (subprocesos.length === 0) {
+      const keysSP = ["laft_subprocesos", "subprocesos", "laft_lista_subprocesos", "lista_subprocesos"];
+      for (const k of keysSP) {
+        const raw = localStorage.getItem(k);
+        if (raw) {
+          const norm = normalizarLista(JSON.parse(raw));
+          if (norm.length > 0) { subprocesos = norm; break; }
+        }
+      }
+    }
+
+    if (factores.length === 0) {
+      const keysF = ["laft_factores", "factores", "laft_lista_factores", "lista_factores"];
+      for (const k of keysF) {
+        const raw = localStorage.getItem(k);
+        if (raw) {
+          const norm = normalizarLista(JSON.parse(raw));
+          if (norm.length > 0) { factores = norm; break; }
+        }
+      }
+    }
+  } catch (e) {
+    console.error("Error al leer parámetros de localStorage:", e);
+  }
+
+  // 3. Fallbacks si localStorage estaba vacío
+  if (procesos.length === 0 && defaultsOverride?.procesos && defaultsOverride.procesos.length > 0) {
+    procesos = normalizarLista(defaultsOverride.procesos);
+  }
+  if (subprocesos.length === 0 && defaultsOverride?.subprocesos && defaultsOverride.subprocesos.length > 0) {
+    subprocesos = normalizarLista(defaultsOverride.subprocesos);
+  }
+  if (factores.length === 0 && defaultsOverride?.factores && defaultsOverride.factores.length > 0) {
+    factores = normalizarLista(defaultsOverride.factores);
+  }
+
+  // 4. Valores base por defecto
+  if (procesos.length === 0) procesos = [...DEFAULTS_PROCESOS];
+  if (subprocesos.length === 0) subprocesos = [...DEFAULTS_SUBPROCESOS];
+  if (factores.length === 0) factores = [...DEFAULTS_FACTORES];
+
+  return { procesos, subprocesos, factores };
+}
+
 export function getNivelRiesgo(score: number): { label: string; bgBadge: string } {
   if (score <= 3) {
     return { 
@@ -130,81 +245,6 @@ function obtenerCodigosControlSeguros(item: RiesgoRow): string[] {
   return [];
 }
 
-// Función auxiliar exhaustiva para obtener listas actualizadas directamente desde localStorage o parámetros
-export function obtenerListasParametrosActualizadas(defaultsOverride?: {
-  procesos?: string[];
-  subprocesos?: string[];
-  factores?: string[];
-}) {
-  let procesos = defaultsOverride?.procesos && defaultsOverride.procesos.length > 0 
-    ? defaultsOverride.procesos 
-    : [...DEFAULTS_PROCESOS];
-
-  let subprocesos = defaultsOverride?.subprocesos && defaultsOverride.subprocesos.length > 0 
-    ? defaultsOverride.subprocesos 
-    : [...DEFAULTS_SUBPROCESOS];
-
-  let factores = defaultsOverride?.factores && defaultsOverride.factores.length > 0 
-    ? defaultsOverride.factores 
-    : [...DEFAULTS_FACTORES];
-
-  try {
-    // 1. Revisar objetos consolidados
-    const keysToTry = [
-      "laft_parametros_v1",
-      "laft_parametros",
-      "laft_parametros_v2",
-      "laft_parametros_v3",
-      "laft_config_parametros"
-    ];
-
-    for (const key of keysToTry) {
-      const saved = localStorage.getItem(key);
-      if (saved) {
-        const p = JSON.parse(saved);
-        if ((!defaultsOverride?.procesos || defaultsOverride.procesos.length === 0) && Array.isArray(p.procesos) && p.procesos.length > 0) {
-          procesos = p.procesos;
-        }
-        if ((!defaultsOverride?.subprocesos || defaultsOverride.subprocesos.length === 0) && Array.isArray(p.subprocesos) && p.subprocesos.length > 0) {
-          subprocesos = p.subprocesos;
-        }
-        if ((!defaultsOverride?.factores || defaultsOverride.factores.length === 0) && Array.isArray(p.factores) && p.factores.length > 0) {
-          factores = p.factores;
-        }
-      }
-    }
-
-    // 2. Revisar claves independientes en localStorage
-    if (!defaultsOverride?.procesos || defaultsOverride.procesos.length === 0) {
-      const savedP = localStorage.getItem("laft_procesos") || localStorage.getItem("procesos") || localStorage.getItem("laft_lista_procesos");
-      if (savedP) {
-        const arr = JSON.parse(savedP);
-        if (Array.isArray(arr) && arr.length > 0) procesos = arr;
-      }
-    }
-
-    if (!defaultsOverride?.subprocesos || defaultsOverride.subprocesos.length === 0) {
-      const savedSP = localStorage.getItem("laft_subprocesos") || localStorage.getItem("subprocesos") || localStorage.getItem("laft_lista_subprocesos");
-      if (savedSP) {
-        const arr = JSON.parse(savedSP);
-        if (Array.isArray(arr) && arr.length > 0) subprocesos = arr;
-      }
-    }
-
-    if (!defaultsOverride?.factores || defaultsOverride.factores.length === 0) {
-      const savedF = localStorage.getItem("laft_factores") || localStorage.getItem("factores") || localStorage.getItem("laft_lista_factores");
-      if (savedF) {
-        const arr = JSON.parse(savedF);
-        if (Array.isArray(arr) && arr.length > 0) factores = arr;
-      }
-    }
-  } catch (e) {
-    console.error("Error al obtener parámetros de localStorage:", e);
-  }
-
-  return { procesos, subprocesos, factores };
-}
-
 export const RIESGOS_INICIALES: RiesgoRow[] = [
   {
     id: "1",
@@ -225,26 +265,6 @@ export const RIESGOS_INICIALES: RiesgoRow[] = [
     responsable: "Analista Sagrilaft",
     controlCodigos: ["CTR-LAFT-01", "CTR-LAFT-02", "CTR-LAFT-03"],
     observaciones: "Monitoreo continuo de listas restrictivas"
-  },
-  {
-    id: "2",
-    codigo: "RIE-LAFT-02",
-    proceso: "GESTION ADMINISTRATIVA Y FINANCIERA",
-    subproceso: "CARTERA",
-    quePuedeSuceder: "Aceptación de pagos por matrícula o servicios con fondos cuyo origen ilícito no es justificado.",
-    descripcionEvento: "Recaudo de efectivo o transferencias desde cuentas de origen no justificado o de terceros sin vinculación formal.",
-    banderas: { laft: true, operativo: true, legal: true, reputacional: true, contagio: false },
-    factorRiesgo: "PRODUCTOS Y SERVICIOS",
-    tipologia: "Paso de dinero de origen ilícito mediante consignaciones en efectivo de terceros",
-    porQuePuedeSuceder: "Pagos de terceros no identificados o falta de conciliación bancaria diaria.",
-    consecuencia: "Ingreso de recursos ilícitos a la contabilidad de la organización e investigaciones penales.",
-    probabilidadInherente: 2,
-    impactoInherente: 3,
-    probabilidadResidual: 1,
-    impactoResidual: 3,
-    responsable: "Líder de Cartera y Tesorería",
-    controlCodigos: ["CTR-LAFT-01"],
-    observaciones: "Validación y causación de recibos de caja por cartera"
   }
 ];
 
@@ -278,7 +298,6 @@ export default function Matrix({
     return obtenerListasParametrosActualizadas({ factores: factoresProp }).factores;
   });
 
-  // Función para recargar los parámetros sin bloqueos
   const recargarParametros = useCallback(() => {
     const actual = obtenerListasParametrosActualizadas({
       procesos: procesosProp,
@@ -291,7 +310,6 @@ export default function Matrix({
     setListaFactores(actual.factores);
   }, [procesosProp, subprocesosProp, factoresProp]);
 
-  // Cargar parámetros al montar, actualizar props o recibir eventos de almacenamiento
   useEffect(() => {
     recargarParametros();
 
@@ -629,7 +647,7 @@ export default function Matrix({
     printWindow.document.close();
   };
 
-  // Construcción dinámica de opciones asegurando que los valores guardados estén incluidos
+  // Construcción dinámica de opciones asegurando unicidad y presencia del valor actual
   const opcionesProcesos = Array.from(new Set([...listaProcesos, formData.proceso])).filter(Boolean);
   const opcionesSubprocesos = Array.from(new Set([...listaSubprocesos, formData.subproceso || ""])).filter(Boolean);
   const opcionesFactores = Array.from(new Set([...listaFactores, formData.factorRiesgo])).filter(Boolean);
@@ -695,6 +713,7 @@ export default function Matrix({
               <label className="block font-medium text-slate-700 mb-1">Proceso *</label>
               <select
                 value={formData.proceso}
+                onFocus={recargarParametros}
                 onChange={(e) => setFormData({ ...formData, proceso: e.target.value })}
                 className="w-full p-2.5 border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-teal-600 focus:border-teal-600 font-medium"
               >
@@ -709,6 +728,7 @@ export default function Matrix({
               <label className="block font-medium text-slate-700 mb-1">Subproceso</label>
               <select
                 value={formData.subproceso || ""}
+                onFocus={recargarParametros}
                 onChange={(e) => setFormData({ ...formData, subproceso: e.target.value })}
                 className="w-full p-2.5 border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-teal-600 focus:border-teal-600 text-slate-700"
               >
@@ -733,6 +753,7 @@ export default function Matrix({
               <label className="block font-medium text-slate-700 mb-1">Factor de Riesgo *</label>
               <select
                 value={formData.factorRiesgo}
+                onFocus={recargarParametros}
                 onChange={(e) => setFormData({ ...formData, factorRiesgo: e.target.value })}
                 className="w-full p-2.5 border border-slate-300 rounded-md bg-white focus:ring-1 focus:ring-teal-600 focus:border-teal-600 font-semibold"
               >
