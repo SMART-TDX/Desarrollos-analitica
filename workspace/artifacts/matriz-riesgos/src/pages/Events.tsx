@@ -89,90 +89,93 @@ const EVENTOS_INICIALES: EventoRow[] = [
 
 const STORAGE_KEYS_EVENTOS = ["laft_eventos_v1", "laft_eventos", "laft_matriz_eventos"];
 
-// Función para obtener TODOS los controles escaneando exhaustivamente el almacenamiento local
+// Función para obtener ÚNICAMENTE controles válidos y filtrados
 const obtenerTodosLosControles = () => {
-  const mapa = new Map<string, any>();
-
-  // 1. Cargar catálogo oficial si está disponible
-  if (Array.isArray(CONTROLES_OFICIALES)) {
-    CONTROLES_OFICIALES.forEach(c => {
-      if (c && c.codigo) mapa.set(c.codigo, c);
-    });
-  }
-
-  // 2. Lista de claves a inspeccionar
-  const keysAExaminar = [
+  const keys = [
     "laft_controles_v3",
     "laft_controles_v2",
     "laft_controles_v1",
     "laft_controles",
-    "laft_matriz_controles",
-    "controles"
+    "laft_matriz_controles"
   ];
 
-  // Escaneo dinámico de todas las llaves en localStorage
-  try {
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (k && k.toLowerCase().includes("control") && !keysAExaminar.includes(k)) {
-        keysAExaminar.push(k);
-      }
-    }
-  } catch (e) {}
+  let rawData: any[] = [];
 
-  // 3. Fusionar todos los controles sin hacer break prematuro
-  keysAExaminar.forEach(key => {
+  // Buscar en la clave activa más reciente
+  for (const key of keys) {
     try {
       const saved = localStorage.getItem(key);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          parsed.forEach(c => {
-            if (c && c.codigo) {
-              mapa.set(c.codigo, { ...mapa.get(c.codigo), ...c });
-            }
-          });
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          rawData = parsed;
+          break; // Toma la lista más reciente disponible
         }
       }
     } catch (e) {}
+  }
+
+  // Si no hay nada en localStorage, recurrir a los catalogados oficialmente
+  if (rawData.length === 0 && Array.isArray(CONTROLES_OFICIALES)) {
+    rawData = CONTROLES_OFICIALES;
+  }
+
+  // Depuración y Filtro de Basura/Fantasmas
+  const controlesDepurados = rawData.filter(c => {
+    if (!c || !c.codigo) return false;
+    const nombre = (c.nombre || c.descripcion || "").trim();
+
+    // Descartar si está vacío, si dice "Sin descripción" o si el nombre es exactamente igual al código
+    if (!nombre || nombre === "Sin descripción" || nombre === c.codigo) {
+      return false;
+    }
+    return true;
   });
 
-  const resultado = Array.from(mapa.values());
-
-  // Ordenar correlativamente por número de control (CTR-LAFT-1 ... CTR-LAFT-26)
-  return resultado.sort((a, b) => {
+  // Ordenar numéricamente por código (CTR-LAFT-1 ... CTR-LAFT-26)
+  return controlesDepurados.sort((a, b) => {
     const numA = parseInt((a.codigo || "").replace(/\D/g, ""), 10) || 0;
     const numB = parseInt((b.codigo || "").replace(/\D/g, ""), 10) || 0;
     return numA - numB;
   });
 };
 
-// Función para obtener TODOS los riesgos escaneando la matriz
+// Función para obtener ÚNICAMENTE riesgos válidos
 const obtenerTodosLosRiesgos = (): RiesgoRow[] => {
-  const mapa = new Map<string, RiesgoRow>();
+  const keys = [
+    "laft_matriz_riesgos_v3",
+    "laft_matriz_riesgos_v2",
+    "laft_matriz_riesgos",
+    "laft_riesgos"
+  ];
 
-  if (Array.isArray(RIESGOS_INICIALES)) {
-    RIESGOS_INICIALES.forEach(r => {
-      if (r && r.codigo) mapa.set(r.codigo, r);
-    });
-  }
+  let rawData: RiesgoRow[] = [];
 
-  const keys = ["laft_matriz_riesgos_v3", "laft_matriz_riesgos", "laft_riesgos"];
-  keys.forEach(key => {
+  for (const key of keys) {
     try {
       const saved = localStorage.getItem(key);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          parsed.forEach(r => {
-            if (r && r.codigo) mapa.set(r.codigo, { ...mapa.get(r.codigo), ...r });
-          });
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          rawData = parsed;
+          break;
         }
       }
     } catch (e) {}
-  });
+  }
 
-  return Array.from(mapa.values());
+  if (rawData.length === 0 && Array.isArray(RIESGOS_INICIALES)) {
+    rawData = RIESGOS_INICIALES;
+  }
+
+  // Filtrar riesgos basura ("Sin descripción" o códigos viejos "RIE-LAFT")
+  return rawData.filter(r => {
+    if (!r || !r.codigo) return false;
+    if (r.codigo.startsWith("RIE-LAFT")) return false; // descarta viejos
+    const desc = (r.descripcion || "").trim();
+    if (!desc || desc === "Sin descripción") return false;
+    return true;
+  });
 };
 
 export default function Events() {
@@ -196,7 +199,6 @@ export default function Events() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEvento, setEditingEvento] = useState<EventoRow | null>(null);
 
-  // Recargar listas dinámicamente si cambian los datos
   const recargarCatalogos = useCallback(() => {
     setControlesList(obtenerTodosLosControles());
     setRiesgosMatriz(obtenerTodosLosRiesgos());
@@ -616,11 +618,11 @@ export default function Events() {
                 </div>
               </div>
 
-              {/* Selector de Riesgos y Controles */}
+              {/* Selector de Riesgos y Controles limpiados */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-lg border border-slate-200">
                 <div>
                   <label className="block font-bold text-teal-900 mb-1">
-                    Riesgo Vinculado (Matriz: {riesgosMatriz.length})
+                    Riesgo Vinculado ({riesgosMatriz.length})
                   </label>
                   <select
                     required
@@ -631,7 +633,7 @@ export default function Events() {
                     <option value="">-- Seleccionar Riesgo --</option>
                     {riesgosMatriz.map(r => (
                       <option key={r.id || r.codigo} value={r.codigo}>
-                        {r.codigo} - {r.descripcion ? r.descripcion.substring(0, 45) + "..." : "Sin descripción"}
+                        {r.codigo} - {r.descripcion ? r.descripcion.substring(0, 45) + "..." : r.codigo}
                       </option>
                     ))}
                   </select>
@@ -639,7 +641,7 @@ export default function Events() {
 
                 <div>
                   <label className="block font-bold text-amber-950 mb-1">
-                    Control Aplicado (Lista Completa: {controlesList.length})
+                    Control Aplicado ({controlesList.length})
                   </label>
                   <select
                     required
@@ -650,7 +652,7 @@ export default function Events() {
                     <option value="">-- Seleccionar Control --</option>
                     {controlesList.map((c: any) => (
                       <option key={c.id || c.codigo} value={c.codigo}>
-                        {c.codigo} - {c.nombre || c.descripcion || c.codigo}
+                        {c.codigo} - {c.nombre || c.descripcion}
                       </option>
                     ))}
                   </select>
