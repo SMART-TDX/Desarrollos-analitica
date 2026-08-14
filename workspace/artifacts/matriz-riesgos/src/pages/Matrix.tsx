@@ -45,6 +45,14 @@ export interface RiesgoRow {
   observaciones?: string;
 }
 
+export interface MatrixProps {
+  procesos?: string[];
+  subprocesos?: string[];
+  factores?: string[];
+  controlesOficiales?: ControlRow[];
+  riesgosIniciales?: RiesgoRow[];
+}
+
 const DEFAULTS_PROCESOS = [
   "GESTION ADMINISTRATIVA Y FINANCIERA",
   "Gestión Académica",
@@ -122,11 +130,15 @@ function obtenerCodigosControlSeguros(item: RiesgoRow): string[] {
   return [];
 }
 
-// Función auxiliar para obtener listas actualizadas directamente desde localStorage
-export function obtenerListasParametrosActualizadas() {
-  let procesos = [...DEFAULTS_PROCESOS];
-  let subprocesos = [...DEFAULTS_SUBPROCESOS];
-  let factores = [...DEFAULTS_FACTORES];
+// Función auxiliar para obtener listas actualizadas directamente desde localStorage o parámetros
+export function obtenerListasParametrosActualizadas(defaultsOverride?: {
+  procesos?: string[];
+  subprocesos?: string[];
+  factores?: string[];
+}) {
+  let procesos = defaultsOverride?.procesos || [...DEFAULTS_PROCESOS];
+  let subprocesos = defaultsOverride?.subprocesos || [...DEFAULTS_SUBPROCESOS];
+  let factores = defaultsOverride?.factores || [...DEFAULTS_FACTORES];
 
   try {
     // 1. Intentar objeto consolidado 'laft_parametros_v1'
@@ -215,8 +227,17 @@ export const RIESGOS_INICIALES: RiesgoRow[] = [
   }
 ];
 
-export default function Matrix() {
+export default function Matrix({
+  procesos: procesosProp,
+  subprocesos: subprocesosProp,
+  factores: factoresProp,
+  controlesOficiales: controlesProp,
+  riesgosIniciales: riesgosProp
+}: MatrixProps = {}) {
   const [controles] = useState<ControlRow[]>(() => {
+    if (controlesProp && controlesProp.length > 0) {
+      return controlesProp;
+    }
     try {
       const saved = localStorage.getItem("laft_catalogo_controles_v3");
       if (saved) return JSON.parse(saved);
@@ -226,17 +247,27 @@ export default function Matrix() {
     return CONTROLES_OFICIALES;
   });
 
-  const [listaProcesos, setListaProcesos] = useState<string[]>(DEFAULTS_PROCESOS);
-  const [listaSubprocesos, setListaSubprocesos] = useState<string[]>(DEFAULTS_SUBPROCESOS);
-  const [listaFactores, setListaFactores] = useState<string[]>(DEFAULTS_FACTORES);
+  const [listaProcesos, setListaProcesos] = useState<string[]>(procesosProp || DEFAULTS_PROCESOS);
+  const [listaSubprocesos, setListaSubprocesos] = useState<string[]>(subprocesosProp || DEFAULTS_SUBPROCESOS);
+  const [listaFactores, setListaFactores] = useState<string[]>(factoresProp || DEFAULTS_FACTORES);
 
-  // Función para recargar los parámetros desde localStorage
+  // Función para recargar los parámetros desde localStorage o props
   const recargarParametros = useCallback(() => {
-    const { procesos, subprocesos, factores } = obtenerListasParametrosActualizadas();
+    if (procesosProp || subprocesosProp || factoresProp) {
+      if (procesosProp) setListaProcesos(procesosProp);
+      if (subprocesosProp) setListaSubprocesos(subprocesosProp);
+      if (factoresProp) setListaFactores(factoresProp);
+      return;
+    }
+    const { procesos, subprocesos, factores } = obtenerListasParametrosActualizadas({
+      procesos: procesosProp,
+      subprocesos: subprocesosProp,
+      factores: factoresProp
+    });
     setListaProcesos(procesos);
     setListaSubprocesos(subprocesos);
     setListaFactores(factores);
-  }, []);
+  }, [procesosProp, subprocesosProp, factoresProp]);
 
   // Cargar parámetros al montar y escuchar eventos de actualización
   useEffect(() => {
@@ -273,7 +304,7 @@ export default function Matrix() {
     } catch (e) {
       console.error("Error al cargar riesgos:", e);
     }
-    return RIESGOS_INICIALES;
+    return riesgosProp || RIESGOS_INICIALES;
   });
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -311,7 +342,11 @@ export default function Matrix() {
 
   const handleOpenNewForm = () => {
     // Recargar parámetros inmediatamente antes de abrir el formulario
-    const { procesos, subprocesos, factores } = obtenerListasParametrosActualizadas();
+    const { procesos, subprocesos, factores } = obtenerListasParametrosActualizadas({
+      procesos: procesosProp,
+      subprocesos: subprocesosProp,
+      factores: factoresProp
+    });
     setListaProcesos(procesos);
     setListaSubprocesos(subprocesos);
     setListaFactores(factores);
@@ -345,7 +380,11 @@ export default function Matrix() {
 
   const handleOpenEditForm = (item: RiesgoRow) => {
     // Recargar parámetros inmediatamente antes de abrir el formulario
-    const { procesos, subprocesos, factores } = obtenerListasParametrosActualizadas();
+    const { procesos, subprocesos, factores } = obtenerListasParametrosActualizadas({
+      procesos: procesosProp,
+      subprocesos: subprocesosProp,
+      factores: factoresProp
+    });
     setListaProcesos(procesos);
     setListaSubprocesos(subprocesos);
     setListaFactores(factores);
@@ -398,7 +437,7 @@ export default function Matrix() {
 
   const handleReset = () => {
     if (confirm("¿Desea restablecer los riesgos iniciales de la matriz?")) {
-      setRiesgos(RIESGOS_INICIALES);
+      setRiesgos(riesgosProp || RIESGOS_INICIALES);
       localStorage.removeItem("laft_matriz_riesgos_v3");
     }
   };
