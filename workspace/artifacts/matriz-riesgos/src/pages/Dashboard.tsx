@@ -1,27 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, Badge } from "@/components/ui";
 import { ShieldAlert, CheckCircle, AlertOctagon, Activity } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend } from "recharts";
 
-const RIESGOS_KEY = "laft_riesgos_v1";
-const CONTROLES_KEY = "laft_controles_v1";
-const EVENTOS_KEY = "laft_eventos_v1";
-
-const DEFAULT_RIESGOS = [
-  { id: 1, codigo: "R-LAFT001", proceso: "Gestión Comercial", perfilInherente: "TOLERABLE" },
-  { id: 2, codigo: "R-LAFT002", proceso: "GESTION ADMINISTRATIVA Y FINANCIERA", perfilInherente: "MODERADO" },
-  { id: 3, codigo: "R-LAFT003", proceso: "Gestión Comercial", perfilInherente: "MODERADO" },
-  { id: 4, codigo: "R-LAFT004", proceso: "GESTION ADMINISTRATIVA Y FINANCIERA", perfilInherente: "TOLERABLE" },
-  { id: 5, codigo: "R-LAFT005", proceso: "GESTION ADMINISTRATIVA Y FINANCIERA", perfilInherente: "MODERADO" },
-];
-
-const DEFAULT_CONTROLES = [
-  { id: 1, codigo: "CTR-LAFT-01", estado: "ACTIVO" },
-  { id: 2, codigo: "CTR-LAFT-02", estado: "ACTIVO" },
-  { id: 3, codigo: "CTR-LAFT-03", estado: "ACTIVO" },
-  { id: 4, codigo: "CTR-LAFT-04", estado: "ACTIVO" },
-  { id: 5, codigo: "CTR-LAFT-05", estado: "ACTIVO" },
-];
+// Claves posibles donde las pestañas de Matriz, Controles y Eventos pueden estar guardando información
+const RIESGOS_KEYS = ["laft_riesgos_v1", "laft_riesgos", "matriz_riesgos", "riesgos"];
+const CONTROLES_KEYS = ["laft_controles_v1", "laft_controles", "controles"];
+const EVENTOS_KEYS = ["laft_eventos_v1", "laft_eventos", "eventos"];
 
 const COLORS: Record<string, string> = {
   Aceptable: "#16a34a",
@@ -32,6 +17,34 @@ const COLORS: Record<string, string> = {
   Crítico: "#dc2626",
   Extremo: "#991b1b"
 };
+
+// Helper para obtener datos desde el localStorage probando múltiples claves probables
+const getStoredData = (keys: string[]) => {
+  for (const key of keys) {
+    const item = localStorage.getItem(key);
+    if (item) {
+      try {
+        const parsed = JSON.parse(item);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      } catch (e) {
+        console.error(`Error al parsear ${key}:`, e);
+      }
+    }
+  }
+  return [];
+};
+
+// Helper para normalizar texto (quita tildes, mayúsculas y espacios innecesarios)
+const normalizeStr = (str: string) =>
+  str
+    ? str
+        .toLowerCase()
+        .trim()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+    : "";
 
 export default function Dashboard() {
   const [resumen, setResumen] = useState<{
@@ -50,30 +63,16 @@ export default function Dashboard() {
     riesgosPorProceso: [],
   });
 
-  useEffect(() => {
-    // 1. Obtener Riesgos
-    const savedRiesgos = localStorage.getItem(RIESGOS_KEY);
-    let riesgos = savedRiesgos ? JSON.parse(savedRiesgos) : [];
-    if (!Array.isArray(riesgos) || riesgos.length === 0) {
-      riesgos = DEFAULT_RIESGOS;
-    }
+  const cargarDatos = useCallback(() => {
+    // 1. Obtener datos reales guardados en localStorage
+    const riesgos = getStoredData(RIESGOS_KEYS);
+    const controles = getStoredData(CONTROLES_KEYS);
+    const eventos = getStoredData(EVENTOS_KEYS);
 
-    // 2. Obtener Controles
-    const savedControles = localStorage.getItem(CONTROLES_KEY);
-    let controles = savedControles ? JSON.parse(savedControles) : [];
-    if (!Array.isArray(controles) || controles.length === 0) {
-      controles = DEFAULT_CONTROLES;
-    }
-
-    // 3. Obtener Eventos
-    const savedEventos = localStorage.getItem(EVENTOS_KEY);
-    const eventos = savedEventos ? JSON.parse(savedEventos) : [];
-
-    // --- Calcular Perfiles ---
+    // --- Calcular Perfiles de Riesgo ---
     const perfilCounts: Record<string, number> = {};
     riesgos.forEach((r: any) => {
       const pRaw = r.perfilInherente || r.perfilResidual || r.perfil || "Tolerable";
-      // Capitalizar palabra (ej. "MODERADO" -> "Moderado")
       const p = pRaw.charAt(0).toUpperCase() + pRaw.slice(1).toLowerCase();
       perfilCounts[p] = (perfilCounts[p] || 0) + 1;
     });
@@ -83,20 +82,41 @@ export default function Dashboard() {
       count
     }));
 
-    // --- Calcular Procesos ---
-    const procesoCounts: Record<string, number> = {};
+    // --- Calcular Procesos (con unificación inteligente de duplicados) ---
+    const procesoMap: Record<string, { label: string; count: number }> = {};
+
     riesgos.forEach((r: any) => {
-      const proc = r.proceso || "Sin Clasificar";
-      procesoCounts[proc] = (procesoCounts[proc] || 0) + 1;
+      const rawProc = (r.proceso || "Sin Clasificar").trim();
+      const normKey = normalizeStr(rawProc);
+
+      if (!normKey) return;
+
+      if (procesoMap[normKey]) {
+        procesoMap[normKey].count += 1;
+      } else {
+        // Formatear bonita la etiqueta visual manteniendo la ortografía limpia
+        const formattedLabel = rawProc
+          .toLowerCase()
+          .replace(/(^\w|\s\w)/g, m => m.toUpperCase())
+          .replace(/\bY\b/g, "y")
+          .replace(/\bDe\b/g, "de");
+
+        procesoMap[normKey] = {
+          label: formattedLabel,
+          count: 1
+        };
+      }
     });
 
-    const riesgosPorProceso = Object.entries(procesoCounts).map(([proceso, count]) => ({
-      proceso,
-      count
+    const riesgosPorProceso = Object.values(procesoMap).map(item => ({
+      proceso: item.label,
+      count: item.count
     }));
 
     // --- Calcular Controles Activos ---
-    const controlesActivos = controles.filter((c: any) => (c.estado || "ACTIVO") === "ACTIVO").length;
+    const controlesActivos = controles.filter(
+      (c: any) => (c.estado || "ACTIVO").toUpperCase() === "ACTIVO"
+    ).length;
 
     // --- Calcular Eventos por Estado ---
     const eventoCounts: Record<string, number> = {};
@@ -119,6 +139,26 @@ export default function Dashboard() {
       riesgosPorProceso
     });
   }, []);
+
+  useEffect(() => {
+    // Cargar datos inmediatamente al montar
+    cargarDatos();
+
+    // Eventos de escucha para reactividad instantánea
+    window.addEventListener("storage", cargarDatos);
+    window.addEventListener("laft-data-updated", cargarDatos);
+    window.addEventListener("focus", cargarDatos);
+
+    // Polling ligero cada 1.5 segundos
+    const interval = setInterval(cargarDatos, 1500);
+
+    return () => {
+      window.removeEventListener("storage", cargarDatos);
+      window.removeEventListener("laft-data-updated", cargarDatos);
+      window.removeEventListener("focus", cargarDatos);
+      clearInterval(interval);
+    };
+  }, [cargarDatos]);
 
   const pieData = resumen.riesgosPorPerfil.map(item => ({
     name: item.perfil,
@@ -176,7 +216,9 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-destructive">
-              {resumen.riesgosPorPerfil.filter(r => ["Crítico", "Extremo", "Alto"].includes(r.perfil)).reduce((acc, curr) => acc + curr.count, 0)}
+              {resumen.riesgosPorPerfil
+                .filter(r => ["Crítico", "Extremo", "Alto"].includes(r.perfil))
+                .reduce((acc, curr) => acc + curr.count, 0)}
             </div>
           </CardContent>
         </Card>
@@ -209,7 +251,7 @@ export default function Dashboard() {
                 </PieChart>
               </ResponsiveContainer>
             ) : (
-              <div className="text-muted-foreground text-sm">No hay datos suficientes</div>
+              <div className="text-muted-foreground text-sm">No hay datos registrados en la Matriz</div>
             )}
           </CardContent>
         </Card>
@@ -230,7 +272,9 @@ export default function Dashboard() {
                 </div>
               ))}
               {resumen.riesgosPorProceso.length === 0 && (
-                <div className="text-sm text-muted-foreground text-center py-4">No hay datos</div>
+                <div className="text-sm text-muted-foreground text-center py-4">
+                  No se encontraron riesgos asignados a procesos
+                </div>
               )}
             </div>
           </CardContent>
