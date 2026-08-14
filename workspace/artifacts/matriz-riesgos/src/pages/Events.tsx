@@ -78,7 +78,7 @@ const EVENTOS_INICIALES: EventoRow[] = [
     etapa: "AIRE LIBRE",
     descripcion: "Incumplimiento de Debida Diligencia por fallas continuas en la plataforma tecnológica.",
     codigoRiesgo: "R-LAFT-003",
-    codigoControl: "CTR-LAFT-27",
+    codigoControl: "CTR-LAFT-26",
     probabilidad: 2,
     impacto: 3,
     apetito: 2,
@@ -87,52 +87,97 @@ const EVENTOS_INICIALES: EventoRow[] = [
   }
 ];
 
-const STORAGE_KEYS = ["laft_eventos_v1", "laft_eventos", "laft_matriz_eventos"];
+const STORAGE_KEYS_EVENTOS = ["laft_eventos_v1", "laft_eventos", "laft_matriz_eventos"];
 
-// Función para obtener TODOS los controles combinando lista base y LocalStorage
+// Función para obtener TODOS los controles escaneando exhaustivamente el almacenamiento local
 const obtenerTodosLosControles = () => {
-  let guardados: any[] = [];
-  const keys = ["laft_controles_v1", "laft_controles", "laft_matriz_controles"];
-  for (const key of keys) {
+  const mapa = new Map<string, any>();
+
+  // 1. Cargar catálogo oficial si está disponible
+  if (Array.isArray(CONTROLES_OFICIALES)) {
+    CONTROLES_OFICIALES.forEach(c => {
+      if (c && c.codigo) mapa.set(c.codigo, c);
+    });
+  }
+
+  // 2. Lista de claves a inspeccionar
+  const keysAExaminar = [
+    "laft_controles_v3",
+    "laft_controles_v2",
+    "laft_controles_v1",
+    "laft_controles",
+    "laft_matriz_controles",
+    "controles"
+  ];
+
+  // Escaneo dinámico de todas las llaves en localStorage
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.toLowerCase().includes("control") && !keysAExaminar.includes(k)) {
+        keysAExaminar.push(k);
+      }
+    }
+  } catch (e) {}
+
+  // 3. Fusionar todos los controles sin hacer break prematuro
+  keysAExaminar.forEach(key => {
     try {
       const saved = localStorage.getItem(key);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          guardados = parsed;
-          break;
+        if (Array.isArray(parsed)) {
+          parsed.forEach(c => {
+            if (c && c.codigo) {
+              mapa.set(c.codigo, { ...mapa.get(c.codigo), ...c });
+            }
+          });
         }
       }
     } catch (e) {}
+  });
+
+  const resultado = Array.from(mapa.values());
+
+  // Ordenar correlativamente por número de control (CTR-LAFT-1 ... CTR-LAFT-26)
+  return resultado.sort((a, b) => {
+    const numA = parseInt((a.codigo || "").replace(/\D/g, ""), 10) || 0;
+    const numB = parseInt((b.codigo || "").replace(/\D/g, ""), 10) || 0;
+    return numA - numB;
+  });
+};
+
+// Función para obtener TODOS los riesgos escaneando la matriz
+const obtenerTodosLosRiesgos = (): RiesgoRow[] => {
+  const mapa = new Map<string, RiesgoRow>();
+
+  if (Array.isArray(RIESGOS_INICIALES)) {
+    RIESGOS_INICIALES.forEach(r => {
+      if (r && r.codigo) mapa.set(r.codigo, r);
+    });
   }
 
-  // Mapa para fusionar sin duplicados y asegurar que estén TODOS los 27 controles
-  const mapa = new Map();
-  CONTROLES_OFICIALES.forEach(c => mapa.set(c.codigo, c));
-  guardados.forEach(c => {
-    if (c.codigo) {
-      mapa.set(c.codigo, { ...mapa.get(c.codigo), ...c });
-    }
+  const keys = ["laft_matriz_riesgos_v3", "laft_matriz_riesgos", "laft_riesgos"];
+  keys.forEach(key => {
+    try {
+      const saved = localStorage.getItem(key);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          parsed.forEach(r => {
+            if (r && r.codigo) mapa.set(r.codigo, { ...mapa.get(r.codigo), ...r });
+          });
+        }
+      }
+    } catch (e) {}
   });
 
   return Array.from(mapa.values());
 };
 
-// Función para obtener TODOS los riesgos desde la Matriz
-const obtenerTodosLosRiesgos = (): RiesgoRow[] => {
-  try {
-    const saved = localStorage.getItem("laft_matriz_riesgos_v3");
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-    }
-  } catch (e) {}
-  return RIESGOS_INICIALES;
-};
-
 export default function Events() {
   const [eventos, setEventos] = useState<EventoRow[]>(() => {
-    for (const key of STORAGE_KEYS) {
+    for (const key of STORAGE_KEYS_EVENTOS) {
       try {
         const saved = localStorage.getItem(key);
         if (saved) {
@@ -151,13 +196,14 @@ export default function Events() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEvento, setEditingEvento] = useState<EventoRow | null>(null);
 
-  // Recargar listas dinámicamente si cambian los datos globales
+  // Recargar listas dinámicamente si cambian los datos
   const recargarCatalogos = useCallback(() => {
     setControlesList(obtenerTodosLosControles());
     setRiesgosMatriz(obtenerTodosLosRiesgos());
   }, []);
 
   useEffect(() => {
+    recargarCatalogos();
     window.addEventListener("laft-data-updated", recargarCatalogos);
     window.addEventListener("storage", recargarCatalogos);
     return () => {
@@ -182,17 +228,15 @@ export default function Events() {
     estado: "Prioritario"
   });
 
-  // Guardar en LocalStorage y notificar a la app
   const guardarEventos = (nuevosEventos: EventoRow[]) => {
     setEventos(nuevosEventos);
-    STORAGE_KEYS.forEach(key => {
+    STORAGE_KEYS_EVENTOS.forEach(key => {
       localStorage.setItem(key, JSON.stringify(nuevosEventos));
     });
     window.dispatchEvent(new Event("laft-data-updated"));
     window.dispatchEvent(new Event("storage"));
   };
 
-  // Helper para obtener nivel residual del riesgo vinculado
   const getInfoRiesgoResidual = (codRiesgo: string) => {
     if (!codRiesgo) return { pRes: 1, iRes: 1, nivelRes: 1 };
     const codLimpio = codRiesgo.replace("-", "").toUpperCase();
@@ -217,12 +261,11 @@ export default function Events() {
     return { pRes, iRes, nivelRes: pRes * iRes };
   };
 
-  // Helper para obtener la mitigación del control
   const getMitigacionControl = (codControl: string) => {
     if (!codControl) return 0;
     const codLimpio = codControl.replace("-", "").toUpperCase();
     const ctrl = controlesList.find((c: any) => (c.codigo || "").replace("-", "").toUpperCase() === codLimpio);
-    if (!ctrl) return 39;
+    if (!ctrl) return 0;
     const pond = calcularPonderacion(ctrl.clase, ctrl.tipo, ctrl.frecuencia, ctrl.formalidad);
     return Math.round(pond * 100) / 100;
   };
@@ -321,7 +364,7 @@ export default function Events() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Eventos de Riesgo SAGRILAFT</h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Registro de eventos, matriz de riesgos, controles asignados y cálculo dinámico de brechas
+            Registro consolidado de eventos, tipo de incidencia, matriz de riesgos, controles y cálculo de brechas
           </p>
         </div>
 
@@ -492,7 +535,7 @@ export default function Events() {
         </table>
       </div>
 
-      {/* Modal para Crear/Editar Evento */}
+      {/* Modal Crear/Editar */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-3xl rounded-xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95">
@@ -573,11 +616,11 @@ export default function Events() {
                 </div>
               </div>
 
-              {/* Riesgos y Controles con Carga Completa */}
+              {/* Selector de Riesgos y Controles */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-lg border border-slate-200">
                 <div>
                   <label className="block font-bold text-teal-900 mb-1">
-                    Riesgo Vinculado (Matriz)
+                    Riesgo Vinculado (Matriz: {riesgosMatriz.length})
                   </label>
                   <select
                     required
