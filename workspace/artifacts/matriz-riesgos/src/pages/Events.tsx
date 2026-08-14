@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { Plus, Trash2, Edit3, Search, X, AlertTriangle, ShieldAlert, TrendingUp } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { Plus, Trash2, Edit3, Search, X } from "lucide-react";
 import { CONTROLES_OFICIALES, calcularPonderacion } from "./Controls";
 import { RIESGOS_INICIALES, calcularMitigacionMultiple, RiesgoRow } from "./Matrix";
 
@@ -7,11 +7,12 @@ export interface EventoRow {
   id: string;
   codigo: string;
   tipo: string; // LAFT, REPS, TEC, FADM
+  tipoIncidencia: string; // Operativa, Legal, Reputacional, Tecnológica
   factor: string; // CLI, EMP, PRV, TEC
   etapa: string; // VIN, POR, LUN, AIRE LIBRE, ESTAFA
   descripcion: string;
-  codigoRiesgo: string; // Ej: R-LAFT-001
-  codigoControl: string; // Ej: CTR-LAFT-27
+  codigoRiesgo: string; // Seleccionado de la Matriz
+  codigoControl: string; // Seleccionado de la lista de Controles
   probabilidad: number; // 1 - 5
   impacto: number; // 1 - 5
   apetito: number;
@@ -24,6 +25,7 @@ const EVENTOS_INICIALES: EventoRow[] = [
     id: "evt-1",
     codigo: "EVENTO-1",
     tipo: "LAFT",
+    tipoIncidencia: "Operativa",
     factor: "CLI",
     etapa: "VIN",
     descripcion: "Documento auténtico obtenido de fuente ilícita o falsificado en debida diligencia.",
@@ -39,6 +41,7 @@ const EVENTOS_INICIALES: EventoRow[] = [
     id: "evt-10",
     codigo: "EVENTO-10",
     tipo: "REPS",
+    tipoIncidencia: "Reputacional",
     factor: "CLI",
     etapa: "POR",
     descripcion: "Relación indirecta con investigaciones de listas o noticias restrictivas.",
@@ -54,6 +57,7 @@ const EVENTOS_INICIALES: EventoRow[] = [
     id: "evt-11",
     codigo: "EVENTO-11",
     tipo: "LAFT",
+    tipoIncidencia: "Legal / Cumplimiento",
     factor: "EMP",
     etapa: "LUN",
     descripcion: "Omisión deliberada de Reporte de Operación Sospechosa (ROS).",
@@ -69,6 +73,7 @@ const EVENTOS_INICIALES: EventoRow[] = [
     id: "evt-17",
     codigo: "EVENTO-17",
     tipo: "TEC",
+    tipoIncidencia: "Tecnológica",
     factor: "TEC",
     etapa: "AIRE LIBRE",
     descripcion: "Incumplimiento de Debida Diligencia por fallas continuas en la plataforma tecnológica.",
@@ -79,57 +84,13 @@ const EVENTOS_INICIALES: EventoRow[] = [
     apetito: 2,
     estado: "En seguimiento",
     creado: "21/7/2026"
-  },
-  {
-    id: "evt-2",
-    codigo: "EVENTO-2",
-    tipo: "LAFT",
-    factor: "EMP",
-    etapa: "LUN",
-    descripcion: "Empleado facilita operación sospechosa omitiendo controles obligatorios.",
-    codigoRiesgo: "R-LAFT-001",
-    codigoControl: "CTR-LAFT-11",
-    probabilidad: 2,
-    impacto: 4,
-    apetito: 2,
-    estado: "Prioritario",
-    creado: "21/7/2026"
-  },
-  {
-    id: "evt-3",
-    codigo: "EVENTO-3",
-    tipo: "LAFT",
-    factor: "PRV",
-    etapa: "ESTAFA",
-    descripcion: "Proveedor incluido en listas restrictivas o vinculados a procesos sancionatorios.",
-    codigoRiesgo: "R-LAFT-003",
-    codigoControl: "CTR-LAFT-12",
-    probabilidad: 2,
-    impacto: 3,
-    apetito: 2,
-    estado: "Controlado",
-    creado: "21/7/2026"
-  },
-  {
-    id: "evt-4",
-    codigo: "EVENTO-4",
-    tipo: "REPS",
-    factor: "CLI",
-    etapa: "POR",
-    descripcion: "Estudiante o cliente vinculado a caso de investigación judicial de conocimiento público.",
-    codigoRiesgo: "R-LAFT-004",
-    codigoControl: "CTR-LAFT-27",
-    probabilidad: 1,
-    impacto: 3,
-    apetito: 2,
-    estado: "Controlado",
-    creado: "21/7/2026"
   }
 ];
 
 const STORAGE_KEYS = ["laft_eventos_v1", "laft_eventos", "laft_matriz_eventos"];
 
 export default function Events() {
+  // Estado de Eventos
   const [eventos, setEventos] = useState<EventoRow[]>(() => {
     for (const key of STORAGE_KEYS) {
       try {
@@ -143,7 +104,8 @@ export default function Events() {
     return EVENTOS_INICIALES;
   });
 
-  const [riesgosMatriz, setRiesgosMatriz] = useState<RiesgoRow[]>(() => {
+  // Carga dinámica de Riesgos desde la Matriz
+  const [riesgosMatriz] = useState<RiesgoRow[]>(() => {
     try {
       const saved = localStorage.getItem("laft_matriz_riesgos_v3");
       if (saved) return JSON.parse(saved);
@@ -151,26 +113,36 @@ export default function Events() {
     return RIESGOS_INICIALES;
   });
 
+  // Carga dinámica de Controles
+  const [controlesList] = useState(() => {
+    try {
+      const saved = localStorage.getItem("laft_controles_v1");
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return CONTROLES_OFICIALES;
+  });
+
   const [searchTerm, setSearchTerm] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEvento, setEditingEvento] = useState<EventoRow | null>(null);
 
-  // Modal Form State
+  // Form State
   const [formData, setFormData] = useState<Partial<EventoRow>>({
     codigo: "",
     tipo: "LAFT",
+    tipoIncidencia: "Operativa",
     factor: "CLI",
     etapa: "VIN",
     descripcion: "",
-    codigoRiesgo: "R-LAFT-001",
-    codigoControl: "CTR-LAFT-01",
+    codigoRiesgo: "",
+    codigoControl: "",
     probabilidad: 2,
     impacto: 3,
     apetito: 2,
     estado: "Prioritario"
   });
 
-  // Guardar en LocalStorage y notificar al Mapa de Calor en tiempo real
+  // Guardar en LocalStorage y notificar
   const guardarEventos = (nuevosEventos: EventoRow[]) => {
     setEventos(nuevosEventos);
     STORAGE_KEYS.forEach(key => {
@@ -180,9 +152,10 @@ export default function Events() {
     window.dispatchEvent(new Event("storage"));
   };
 
-  // Helper para obtener datos del Riesgo Vinculado (Perfil Residual)
+  // Helper para calcular Perfil Residual del Riesgo Seleccionado
   const getInfoRiesgoResidual = (codRiesgo: string) => {
-    const codLimpio = (codRiesgo || "").replace("-", "").toUpperCase();
+    if (!codRiesgo) return { pRes: 1, iRes: 1, nivelRes: 1 };
+    const codLimpio = codRiesgo.replace("-", "").toUpperCase();
     const riesgo = riesgosMatriz.find(r => (r.codigo || "").replace("-", "").toUpperCase() === codLimpio);
 
     if (!riesgo) return { pRes: 1, iRes: 1, nivelRes: 1 };
@@ -204,11 +177,12 @@ export default function Events() {
     return { pRes, iRes, nivelRes: pRes * iRes };
   };
 
-  // Helper para obtener mitigación teórica del control asignado
+  // Helper para obtener % de Mitigación Teórica del Control Seleccionado
   const getMitigacionControl = (codControl: string) => {
-    const codLimpio = (codControl || "").replace("-", "").toUpperCase();
-    const ctrl = CONTROLES_OFICIALES.find(c => (c.codigo || "").replace("-", "").toUpperCase() === codLimpio);
-    if (!ctrl) return 39; // Valor base por defecto
+    if (!codControl) return 0;
+    const codLimpio = codControl.replace("-", "").toUpperCase();
+    const ctrl = controlesList.find((c: any) => (c.codigo || "").replace("-", "").toUpperCase() === codLimpio);
+    if (!ctrl) return 39;
     const pond = calcularPonderacion(ctrl.clase, ctrl.tipo, ctrl.frecuencia, ctrl.formalidad);
     return Math.round(pond * 100) / 100;
   };
@@ -219,14 +193,17 @@ export default function Events() {
       setFormData(evt);
     } else {
       setEditingEvento(null);
+      const defaultRiesgo = riesgosMatriz[0]?.codigo || "R-LAFT-001";
+      const defaultControl = controlesList[0]?.codigo || "CTR-LAFT-01";
       setFormData({
         codigo: `EVENTO-${eventos.length + 1}`,
         tipo: "LAFT",
+        tipoIncidencia: "Operativa",
         factor: "CLI",
         etapa: "VIN",
         descripcion: "",
-        codigoRiesgo: "R-LAFT-001",
-        codigoControl: "CTR-LAFT-01",
+        codigoRiesgo: defaultRiesgo,
+        codigoControl: defaultControl,
         probabilidad: 2,
         impacto: 3,
         apetito: 2,
@@ -238,7 +215,7 @@ export default function Events() {
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.codigo || !formData.descripcion) return;
+    if (!formData.codigo || !formData.descripcion || !formData.codigoRiesgo || !formData.codigoControl) return;
 
     let actualizados: EventoRow[];
     if (editingEvento) {
@@ -248,11 +225,12 @@ export default function Events() {
         id: `evt-${Date.now()}`,
         codigo: formData.codigo || `EVENTO-${eventos.length + 1}`,
         tipo: formData.tipo || "LAFT",
+        tipoIncidencia: formData.tipoIncidencia || "Operativa",
         factor: formData.factor || "CLI",
         etapa: formData.etapa || "VIN",
         descripcion: formData.descripcion || "",
-        codigoRiesgo: formData.codigoRiesgo || "R-LAFT-001",
-        codigoControl: formData.codigoControl || "CTR-LAFT-01",
+        codigoRiesgo: formData.codigoRiesgo || "",
+        codigoControl: formData.codigoControl || "",
         probabilidad: Number(formData.probabilidad) || 1,
         impacto: Number(formData.impacto) || 1,
         apetito: Number(formData.apetito) || 2,
@@ -278,7 +256,8 @@ export default function Events() {
       e.codigo.toLowerCase().includes(searchTerm.toLowerCase()) ||
       e.descripcion.toLowerCase().includes(searchTerm.toLowerCase()) ||
       e.codigoRiesgo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      e.codigoControl.toLowerCase().includes(searchTerm.toLowerCase())
+      e.codigoControl.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (e.tipoIncidencia && e.tipoIncidencia.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const getEstadoBadge = (estado: string) => {
@@ -301,7 +280,7 @@ export default function Events() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Eventos de Riesgo SAGRILAFT</h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Registro consolidado de eventos de riesgo, vinculación de controles y cálculo de brechas
+            Registro consolidado de eventos, tipo de incidencia, matriz de riesgos, controles y cálculo de brechas
           </p>
         </div>
 
@@ -320,7 +299,7 @@ export default function Events() {
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
-            placeholder="Buscar por código, descripción, riesgo o control..."
+            placeholder="Buscar por código, descripción, riesgo, control o incidencia..."
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
             className="w-full pl-9 pr-4 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 bg-slate-50"
@@ -332,13 +311,14 @@ export default function Events() {
         </div>
       </div>
 
-      {/* Tabla Principal con Brechas */}
+      {/* Tabla Principal con Brechas y Listas Desplegables */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto">
         <table className="w-full text-left text-xs border-collapse">
           <thead>
             <tr className="bg-slate-100/80 border-b border-slate-200 text-slate-600 font-bold uppercase tracking-wider">
               <th className="py-3.5 px-3">Código</th>
               <th className="py-3.5 px-2">Tipo</th>
+              <th className="py-3.5 px-2">Incidencia</th>
               <th className="py-3.5 px-2">Factor</th>
               <th className="py-3.5 px-2">Etapa</th>
               <th className="py-3.5 px-3 min-w-[220px]">Evento / Descripción</th>
@@ -362,7 +342,7 @@ export default function Events() {
 
               // Cálculo de Brechas
               const brechaRiesgoNivel = nivelEvt - nivelRes;
-              const brechaControlPct = Math.round((nivelEvt / Math.max(1, nivelRes)) * 200); // % de desviación / sobrecosto de severidad
+              const brechaControlPct = Math.round((nivelEvt / Math.max(1, nivelRes)) * 100);
 
               return (
                 <tr key={evt.id} className="hover:bg-slate-50/80 transition-colors">
@@ -371,6 +351,9 @@ export default function Events() {
                     <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200/80 text-slate-700">
                       {evt.tipo}
                     </span>
+                  </td>
+                  <td className="py-3 px-2 font-semibold text-slate-600">
+                    {evt.tipoIncidencia || "Operativa"}
                   </td>
                   <td className="py-3 px-2 font-semibold text-slate-600">{evt.factor}</td>
                   <td className="py-3 px-2 font-semibold text-slate-600">{evt.etapa}</td>
@@ -383,7 +366,7 @@ export default function Events() {
                         {evt.codigoRiesgo}
                       </span>
                       <span className="text-[10px] text-teal-700 font-semibold mt-0.5">
-                        Nivel Residual: {nivelRes} ($P={pRes}, I={iRes}$)
+                        Nivel Residual: {nivelRes} (P={pRes}, I={iRes})
                       </span>
                     </div>
                   </td>
@@ -407,7 +390,7 @@ export default function Events() {
                   </td>
                   <td className="py-3 px-2 text-center font-semibold text-slate-500">{evt.apetito}</td>
 
-                  {/* Columna Brecha Riesgo */}
+                  {/* Brecha Riesgo */}
                   <td className="py-3 px-3 text-center bg-rose-50/30">
                     <span
                       className={`inline-block px-2 py-1 rounded text-[11px] font-bold ${
@@ -420,7 +403,7 @@ export default function Events() {
                     </span>
                   </td>
 
-                  {/* Columna Brecha Control */}
+                  {/* Brecha Control */}
                   <td className="py-3 px-3 text-center bg-orange-50/30">
                     <span className="inline-block px-2 py-1 rounded bg-amber-100 text-amber-900 border border-amber-300 font-extrabold text-[11px]">
                       {brechaControlPct},00%
@@ -460,7 +443,7 @@ export default function Events() {
 
             {eventosFiltrados.length === 0 && (
               <tr>
-                <td colSpan={15} className="py-8 text-center text-slate-400 font-medium">
+                <td colSpan={16} className="py-8 text-center text-slate-400 font-medium">
                   No se encontraron eventos registrados
                 </td>
               </tr>
@@ -472,7 +455,7 @@ export default function Events() {
       {/* Modal para Crear/Editar Evento */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-2xl rounded-xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95">
+          <div className="bg-white w-full max-w-3xl rounded-xl shadow-2xl border border-slate-200 overflow-hidden animate-in fade-in zoom-in-95">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50">
               <h3 className="text-base font-bold text-slate-900">
                 {editingEvento ? "Editar Evento de Riesgo" : "Registrar Nuevo Evento"}
@@ -486,7 +469,7 @@ export default function Events() {
             </div>
 
             <form onSubmit={handleSave} className="p-6 space-y-4 text-xs">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">Código Evento</label>
                   <input
@@ -499,7 +482,7 @@ export default function Events() {
                 </div>
 
                 <div>
-                  <label className="block font-bold text-slate-700 mb-1">Tipo</label>
+                  <label className="block font-bold text-slate-700 mb-1">Tipo Evento</label>
                   <select
                     value={formData.tipo || "LAFT"}
                     onChange={e => setFormData({ ...formData, tipo: e.target.value })}
@@ -509,6 +492,21 @@ export default function Events() {
                     <option value="REPS">REPS</option>
                     <option value="TEC">TEC</option>
                     <option value="FADM">FADM</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Tipo Incidencia</label>
+                  <select
+                    value={formData.tipoIncidencia || "Operativa"}
+                    onChange={e => setFormData({ ...formData, tipoIncidencia: e.target.value })}
+                    className="w-full p-2 border border-slate-300 rounded focus:ring-2 focus:ring-teal-500 bg-white"
+                  >
+                    <option value="Operativa">Operativa</option>
+                    <option value="Legal / Cumplimiento">Legal / Cumplimiento</option>
+                    <option value="Reputacional">Reputacional</option>
+                    <option value="Tecnológica">Tecnológica</option>
+                    <option value="Directa">Directa</option>
                   </select>
                 </div>
 
@@ -535,30 +533,44 @@ export default function Events() {
                 </div>
               </div>
 
-              {/* Riesgo y Control Vinculados */}
+              {/* Riesgo y Control Vinculados via Select Dropdown */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-lg border border-slate-200">
                 <div>
-                  <label className="block font-bold text-teal-900 mb-1">Riesgo Vinculado (Matriz)</label>
-                  <input
-                    type="text"
+                  <label className="block font-bold text-teal-900 mb-1">
+                    Riesgo Vinculado (Desde Matriz)
+                  </label>
+                  <select
                     required
                     value={formData.codigoRiesgo || ""}
                     onChange={e => setFormData({ ...formData, codigoRiesgo: e.target.value })}
-                    className="w-full p-2 border border-teal-300 rounded bg-white font-mono font-bold text-teal-900"
-                    placeholder="Ej: R-LAFT-001"
-                  />
+                    className="w-full p-2 border border-teal-300 rounded bg-white font-mono font-bold text-teal-900 focus:ring-2 focus:ring-teal-500"
+                  >
+                    <option value="">-- Seleccionar Riesgo --</option>
+                    {riesgosMatriz.map(r => (
+                      <option key={r.id || r.codigo} value={r.codigo}>
+                        {r.codigo} - {r.descripcion ? r.descripcion.substring(0, 45) + "..." : "Sin descripción"}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>
-                  <label className="block font-bold text-amber-950 mb-1">Control Aplicado</label>
-                  <input
-                    type="text"
+                  <label className="block font-bold text-amber-950 mb-1">
+                    Control Aplicado (Desde Lista)
+                  </label>
+                  <select
                     required
                     value={formData.codigoControl || ""}
                     onChange={e => setFormData({ ...formData, codigoControl: e.target.value })}
-                    className="w-full p-2 border border-amber-300 rounded bg-white font-mono font-bold text-amber-950"
-                    placeholder="Ej: CTR-LAFT-27"
-                  />
+                    className="w-full p-2 border border-amber-300 rounded bg-white font-mono font-bold text-amber-950 focus:ring-2 focus:ring-amber-500"
+                  >
+                    <option value="">-- Seleccionar Control --</option>
+                    {controlesList.map((c: any) => (
+                      <option key={c.id || c.codigo} value={c.codigo}>
+                        {c.codigo} - {c.nombre || c.descripcion || c.codigo}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
