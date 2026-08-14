@@ -60,7 +60,6 @@ export interface ControlRow {
 }
 
 // 2. FÓRMULA DE PONDERACIÓN FIEL A EXCEL
-// =@SI.ERROR((($D2*PARAMETROS!$E$6))+(($F2*PARAMETROS!$G$6))+(($H2*PARAMETROS!$I$6))+(($J2*PARAMETROS!$K$6));NOD())
 export function calcularPonderacion(
   clase: string,
   tipo: string,
@@ -159,12 +158,15 @@ export default function Controls() {
     evidencia: ""
   });
 
+  // EFECTO CON NOTIFICACIÓN DE EVENTO GLOBAL AL DASHBOARD
   useEffect(() => {
     localStorage.setItem("laft_catalogo_controles_v4", JSON.stringify(controles));
+    window.dispatchEvent(new CustomEvent("laft-data-updated"));
   }, [controles]);
 
   useEffect(() => {
     localStorage.setItem("laft_parametros_controles_v2", JSON.stringify(parametros));
+    window.dispatchEvent(new CustomEvent("laft-data-updated"));
   }, [parametros]);
 
   const handleSaveControl = (e: React.FormEvent) => {
@@ -245,7 +247,7 @@ export default function Controls() {
         </div>
       </div>
 
-      {/* PANEL CONFIGURACIÓN DE PARÁMETROS (SI SE ACTIVA) */}
+      {/* PANEL CONFIGURACIÓN DE PARÁMETROS */}
       {showParams && (
         <div className="bg-white p-6 rounded-xl border border-indigo-200 shadow-sm space-y-4">
           <h2 className="text-sm font-bold text-slate-900 border-b border-slate-100 pb-2">
