@@ -89,20 +89,20 @@ const EVENTOS_INICIALES: EventoRow[] = [
 
 const STORAGE_KEYS_EVENTOS = ["laft_eventos_v1", "laft_eventos", "laft_matriz_eventos"];
 
-// Función para obtener los 26 controles fusionando el catálogo base con el localStorage
+// Carga completa e incondicional de TODOS los controles
 const obtenerTodosLosControles = () => {
   const mapa = new Map<string, any>();
 
-  // 1. Cargar primero el catálogo oficial completo
+  // 1. Cargar el catálogo completo oficial
   if (Array.isArray(CONTROLES_OFICIALES)) {
     CONTROLES_OFICIALES.forEach(c => {
       if (c && c.codigo) {
-        mapa.set(c.codigo.trim().toUpperCase(), c);
+        mapa.set(c.codigo.trim().toUpperCase(), { ...c });
       }
     });
   }
 
-  // 2. FUSIONAR lo que esté guardado en localStorage sin detener el bucle
+  // 2. Fusionar con cualquier cambio realizado en localStorage
   const keys = [
     "laft_controles_v3",
     "laft_controles_v2",
@@ -130,32 +130,24 @@ const obtenerTodosLosControles = () => {
     } catch (e) {}
   });
 
-  // 3. Filtrar registros inválidos o nombres fantasmas
-  const resultado = Array.from(mapa.values()).filter(c => {
-    if (!c || !c.codigo) return false;
-    const nombre = (c.nombre || c.descripcion || "").trim();
-    if (!nombre || nombre === "Sin descripción" || nombre === c.codigo) {
-      return false;
-    }
-    return true;
-  });
+  const lista = Array.from(mapa.values()).filter(c => c && c.codigo);
 
-  // 4. Ordenar numéricamente (CTR-LAFT-01 ... CTR-LAFT-26)
-  return resultado.sort((a, b) => {
+  // Orden numérico estricto (1 al 26+)
+  return lista.sort((a, b) => {
     const numA = parseInt((a.codigo || "").replace(/\D/g, ""), 10) || 0;
     const numB = parseInt((b.codigo || "").replace(/\D/g, ""), 10) || 0;
     return numA - numB;
   });
 };
 
-// Función para obtener todos los riesgos fusionando catálogo base y localStorage
+// Carga completa e incondicional de TODOS los riesgos
 const obtenerTodosLosRiesgos = (): RiesgoRow[] => {
   const mapa = new Map<string, RiesgoRow>();
 
   if (Array.isArray(RIESGOS_INICIALES)) {
     RIESGOS_INICIALES.forEach(r => {
       if (r && r.codigo) {
-        mapa.set(r.codigo.trim().toUpperCase(), r);
+        mapa.set(r.codigo.trim().toUpperCase(), { ...r });
       }
     });
   }
@@ -164,7 +156,8 @@ const obtenerTodosLosRiesgos = (): RiesgoRow[] => {
     "laft_matriz_riesgos_v3",
     "laft_matriz_riesgos_v2",
     "laft_matriz_riesgos",
-    "laft_riesgos"
+    "laft_riesgos",
+    "laft_matriz"
   ];
 
   keys.forEach(key => {
@@ -185,12 +178,12 @@ const obtenerTodosLosRiesgos = (): RiesgoRow[] => {
     } catch (e) {}
   });
 
-  return Array.from(mapa.values()).filter(r => {
-    if (!r || !r.codigo) return false;
-    if (r.codigo.startsWith("RIE-LAFT")) return false;
-    const desc = (r.descripcion || "").trim();
-    if (!desc || desc === "Sin descripción") return false;
-    return true;
+  const lista = Array.from(mapa.values()).filter(r => r && r.codigo);
+
+  return lista.sort((a, b) => {
+    const numA = parseInt((a.codigo || "").replace(/\D/g, ""), 10) || 0;
+    const numB = parseInt((b.codigo || "").replace(/\D/g, ""), 10) || 0;
+    return numA - numB;
   });
 };
 
@@ -224,9 +217,11 @@ export default function Events() {
     recargarCatalogos();
     window.addEventListener("laft-data-updated", recargarCatalogos);
     window.addEventListener("storage", recargarCatalogos);
+    window.addEventListener("focus", recargarCatalogos);
     return () => {
       window.removeEventListener("laft-data-updated", recargarCatalogos);
       window.removeEventListener("storage", recargarCatalogos);
+      window.removeEventListener("focus", recargarCatalogos);
     };
   }, [recargarCatalogos]);
 
@@ -647,11 +642,14 @@ export default function Events() {
                     className="w-full p-2 border border-teal-300 rounded bg-white font-mono font-bold text-teal-900 focus:ring-2 focus:ring-teal-500"
                   >
                     <option value="">-- Seleccionar Riesgo --</option>
-                    {riesgosMatriz.map(r => (
-                      <option key={r.id || r.codigo} value={r.codigo}>
-                        {r.codigo} - {r.descripcion ? r.descripcion.substring(0, 45) + "..." : r.codigo}
-                      </option>
-                    ))}
+                    {riesgosMatriz.map(r => {
+                      const desc = r.descripcion || r.nombre || r.codigo;
+                      return (
+                        <option key={r.id || r.codigo} value={r.codigo}>
+                          {r.codigo} - {desc.length > 50 ? desc.substring(0, 50) + "..." : desc}
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
 
@@ -666,11 +664,14 @@ export default function Events() {
                     className="w-full p-2 border border-amber-300 rounded bg-white font-mono font-bold text-amber-950 focus:ring-2 focus:ring-amber-500"
                   >
                     <option value="">-- Seleccionar Control --</option>
-                    {controlesList.map((c: any) => (
-                      <option key={c.id || c.codigo} value={c.codigo}>
-                        {c.codigo} - {c.nombre || c.descripcion}
-                      </option>
-                    ))}
+                    {controlesList.map((c: any) => {
+                      const labelText = c.nombre || c.descripcion || c.codigo;
+                      return (
+                        <option key={c.id || c.codigo} value={c.codigo}>
+                          {c.codigo} - {labelText}
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
               </div>
