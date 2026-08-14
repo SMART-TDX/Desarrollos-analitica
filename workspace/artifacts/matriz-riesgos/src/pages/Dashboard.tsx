@@ -3,11 +3,6 @@ import { Card, CardContent, CardHeader, CardTitle, Badge } from "@/components/ui
 import { ShieldAlert, CheckCircle, AlertOctagon, Activity } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend } from "recharts";
 
-// Claves posibles donde las pestañas de Matriz, Controles y Eventos pueden estar guardando información
-const RIESGOS_KEYS = ["laft_riesgos_v1", "laft_riesgos", "matriz_riesgos", "riesgos"];
-const CONTROLES_KEYS = ["laft_controles_v1", "laft_controles", "controles"];
-const EVENTOS_KEYS = ["laft_eventos_v1", "laft_eventos", "eventos"];
-
 const COLORS: Record<string, string> = {
   Aceptable: "#16a34a",
   Bajo: "#16a34a",
@@ -18,25 +13,7 @@ const COLORS: Record<string, string> = {
   Extremo: "#991b1b"
 };
 
-// Helper para obtener datos desde el localStorage probando múltiples claves probables
-const getStoredData = (keys: string[]) => {
-  for (const key of keys) {
-    const item = localStorage.getItem(key);
-    if (item) {
-      try {
-        const parsed = JSON.parse(item);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
-        }
-      } catch (e) {
-        console.error(`Error al parsear ${key}:`, e);
-      }
-    }
-  }
-  return [];
-};
-
-// Helper para normalizar texto (quita tildes, mayúsculas y espacios innecesarios)
+// Helper para normalizar texto (eliminar diferencias de mayúsculas y tildes)
 const normalizeStr = (str: string) =>
   str
     ? str
@@ -46,11 +23,78 @@ const normalizeStr = (str: string) =>
         .replace(/[\u0300-\u036f]/g, "")
     : "";
 
+// Escáner dinámico e inteligente de LocalStorage
+const autoDetectLocalStorageData = () => {
+  let riesgos: any[] = [];
+  let controles: any[] = [];
+  let eventos: any[] = [];
+
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (!key) continue;
+
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const parsed = JSON.parse(raw);
+
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const sample = parsed[0];
+        if (!sample || typeof sample !== "object") continue;
+
+        const keyLower = key.toLowerCase();
+
+        // Detectar si es la lista de RIESGOS (ej. R-LAFT-001)
+        if (
+          keyLower.includes("riesgo") ||
+          keyLower.includes("matrix") ||
+          keyLower.includes("matriz") ||
+          sample.codigo?.toString().toUpperCase().startsWith("R-") ||
+          sample.codigo?.toString().toUpperCase().startsWith("RIE") ||
+          "perfilResidual" in sample ||
+          "perfilInherente" in sample ||
+          ("proceso" in sample && ("mitigacion" in sample || "consecuencia" in sample))
+        ) {
+          if (parsed.length > riesgos.length) riesgos = parsed;
+        }
+
+        // Detectar si es la lista de CONTROLES (ej. CTR-LAFT-026)
+        if (
+          keyLower.includes("control") ||
+          sample.codigo?.toString().toUpperCase().startsWith("CTR") ||
+          "mecanismo" in sample ||
+          "frecuencia" in sample ||
+          "diseno" in sample
+        ) {
+          if (parsed.length > controles.length) controles = parsed;
+        }
+
+        // Detectar si es la lista de EVENTOS (ej. EVENTO-1)
+        if (
+          keyLower.includes("evento") ||
+          sample.codigo?.toString().toUpperCase().startsWith("EVE") ||
+          sample.codigo?.toString().toUpperCase().startsWith("EVENTO") ||
+          sample.id?.toString().toUpperCase().startsWith("EVENTO") ||
+          "factor" in sample ||
+          "probabilidad" in sample
+        ) {
+          if (parsed.length > eventos.length) eventos = parsed;
+        }
+      }
+    } catch (e) {
+      // Ignorar valores que no sean JSON válido
+    }
+  }
+
+  return { riesgos, controles, eventos };
+};
+
 export default function Dashboard() {
   const [resumen, setResumen] = useState<{
     totalRiesgos: number;
     totalControles: number;
     controlesActivos: number;
+    totalEventos: number;
     eventosPorEstado: { estado: string; count: number }[];
     riesgosPorPerfil: { perfil: string; count: number }[];
     riesgosPorProceso: { proceso: string; count: number }[];
@@ -58,21 +102,20 @@ export default function Dashboard() {
     totalRiesgos: 0,
     totalControles: 0,
     controlesActivos: 0,
+    totalEventos: 0,
     eventosPorEstado: [],
     riesgosPorPerfil: [],
     riesgosPorProceso: [],
   });
 
   const cargarDatos = useCallback(() => {
-    // 1. Obtener datos reales guardados en localStorage
-    const riesgos = getStoredData(RIESGOS_KEYS);
-    const controles = getStoredData(CONTROLES_KEYS);
-    const eventos = getStoredData(EVENTOS_KEYS);
+    // 1. Escanear datos reales guardados
+    const { riesgos, controles, eventos } = autoDetectLocalStorageData();
 
-    // --- Calcular Perfiles de Riesgo ---
+    // --- Agrupar Riesgos por Perfil ---
     const perfilCounts: Record<string, number> = {};
     riesgos.forEach((r: any) => {
-      const pRaw = r.perfilInherente || r.perfilResidual || r.perfil || "Tolerable";
+      const pRaw = r.perfilResidual || r.perfilInherente || r.perfil || "Tolerable";
       const p = pRaw.charAt(0).toUpperCase() + pRaw.slice(1).toLowerCase();
       perfilCounts[p] = (perfilCounts[p] || 0) + 1;
     });
@@ -82,7 +125,7 @@ export default function Dashboard() {
       count
     }));
 
-    // --- Calcular Procesos (con unificación inteligente de duplicados) ---
+    // --- Agrupar Riesgos por Proceso ---
     const procesoMap: Record<string, { label: string; count: number }> = {};
 
     riesgos.forEach((r: any) => {
@@ -94,7 +137,6 @@ export default function Dashboard() {
       if (procesoMap[normKey]) {
         procesoMap[normKey].count += 1;
       } else {
-        // Formatear bonita la etiqueta visual manteniendo la ortografía limpia
         const formattedLabel = rawProc
           .toLowerCase()
           .replace(/(^\w|\s\w)/g, m => m.toUpperCase())
@@ -115,13 +157,13 @@ export default function Dashboard() {
 
     // --- Calcular Controles Activos ---
     const controlesActivos = controles.filter(
-      (c: any) => (c.estado || "ACTIVO").toUpperCase() === "ACTIVO"
+      (c: any) => (c.estado || "ACTIVO").toString().toUpperCase() === "ACTIVO"
     ).length;
 
-    // --- Calcular Eventos por Estado ---
+    // --- Eventos ---
     const eventoCounts: Record<string, number> = {};
     eventos.forEach((e: any) => {
-      const est = e.estado || "REGISTRADO";
+      const est = e.estado || e.nivelRiesgo || "REGISTRADO";
       eventoCounts[est] = (eventoCounts[est] || 0) + 1;
     });
 
@@ -134,6 +176,7 @@ export default function Dashboard() {
       totalRiesgos: riesgos.length,
       totalControles: controles.length,
       controlesActivos,
+      totalEventos: eventos.length,
       eventosPorEstado,
       riesgosPorPerfil,
       riesgosPorProceso
@@ -141,16 +184,15 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
-    // Cargar datos inmediatamente al montar
     cargarDatos();
 
-    // Eventos de escucha para reactividad instantánea
+    // Eventos de escucha en tiempo real
     window.addEventListener("storage", cargarDatos);
     window.addEventListener("laft-data-updated", cargarDatos);
     window.addEventListener("focus", cargarDatos);
 
-    // Polling ligero cada 1.5 segundos
-    const interval = setInterval(cargarDatos, 1500);
+    // Sondeo rápido cada segundo
+    const interval = setInterval(cargarDatos, 1000);
 
     return () => {
       window.removeEventListener("storage", cargarDatos);
@@ -170,7 +212,7 @@ export default function Dashboard() {
     <div className="flex-1 overflow-y-auto p-8 bg-background">
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-foreground">Dashboard Consolidado</h1>
-        <p className="text-muted-foreground text-sm mt-1">Resumen general de la matriz de riesgos LAFT</p>
+        <p className="text-muted-foreground text-sm mt-1">Resumen general en tiempo real de la matriz de riesgos LAFT</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -203,9 +245,7 @@ export default function Dashboard() {
             <AlertOctagon className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold">
-              {resumen.eventosPorEstado.reduce((acc, curr) => acc + curr.count, 0)}
-            </div>
+            <div className="text-3xl font-bold">{resumen.totalEventos}</div>
           </CardContent>
         </Card>
         
@@ -251,7 +291,7 @@ export default function Dashboard() {
                 </PieChart>
               </ResponsiveContainer>
             ) : (
-              <div className="text-muted-foreground text-sm">No hay datos registrados en la Matriz</div>
+              <div className="text-muted-foreground text-sm">No hay riesgos registrados</div>
             )}
           </CardContent>
         </Card>
@@ -273,7 +313,7 @@ export default function Dashboard() {
               ))}
               {resumen.riesgosPorProceso.length === 0 && (
                 <div className="text-sm text-muted-foreground text-center py-4">
-                  No se encontraron riesgos asignados a procesos
+                  No hay datos registrados
                 </div>
               )}
             </div>
