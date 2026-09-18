@@ -117,18 +117,9 @@ export default function Heatmap() {
     const keyInh = `${pInh}-${iInh}`;
     mapInherente[keyInh] = (mapInherente[keyInh] || 0) + 1;
 
-    // Residual (Post-controles)
-    const itemCodigos = Array.isArray(r.controlCodigos) ? r.controlCodigos : [];
-    const controlesAsignados = CONTROLES_OFICIALES.filter((c) => itemCodigos.includes(c.codigo));
-    const ponderaciones = controlesAsignados.map((c) =>
-      calcularPonderacion(c.clase, c.tipo, c.frecuencia, c.formalidad)
-    );
-    const mitigacion = calcularMitigacionMultiple(ponderaciones);
-    const inhScore = pInh * iInh;
-    const resScore = Math.max(1, Math.round(inhScore * (1 - mitigacion / 100)));
-
-    let pRes = Math.min(pInh, Math.max(1, Math.ceil(resScore / iInh)));
-    let iRes = Math.min(iInh, Math.max(1, Math.round(resScore / pRes)));
+    // Residual: usar los valores ingresados manualmente por el usuario
+    const pRes = Math.max(1, Math.min(5, r.probabilidadResidual || 1));
+    const iRes = Math.max(1, Math.min(5, r.impactoResidual || 1));
     const keyRes = `${pRes}-${iRes}`;
     mapResidual[keyRes] = (mapResidual[keyRes] || 0) + 1;
   });
